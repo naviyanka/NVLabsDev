@@ -1,0 +1,20 @@
+:root, [data-theme="slate"] {
+  --bg-void: #0f172a;
+  --bg-surface: #1e293b;
+  --bg-card: #1e293b;
+  --border-c: #334155;
+  --border-dim: #1e293b;
+
+  --amber: #38bdf8;
+  --amber-low: rgba(56, 189, 248, 0.11);
+  --teal: #818cf8;
+  --teal-low: rgba(129, 140, 248, 0.09);
+  --ok: #22c55e;
+  --warn: #f59e0b;
+  --crit: #ef4444;
+
+  --text: #f8fafc;
+  --text-sub: #94a3b8;
+  --text-ghost: #475569;
+  --radius: 0.5rem;
+}

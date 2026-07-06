@@ -1,0 +1,192 @@
+using Microsoft.AspNetCore.Mvc;
+using Nexus.Gateway.Models;
+using Nexus.Gateway.Services;
+using System.IO;
+
+namespace Nexus.Gateway.Controllers;
+
+[ApiController]
+[Route("api/servers/{serverIp}/files")]
+public class WindowsFilesController : ControllerBase
+{
+    private readonly CimService _cimService;
+
+    public WindowsFilesController(CimService cimService)
+    {
+        _cimService = cimService;
+    }
+
+    [HttpGet("sources")]
+    public IActionResult GetSources(string serverIp)
+    {
+        try
+        {
+            var sources = new List<FileSourceModel>();
+            var session = _cimService.GetSession(serverIp);
+
+            var logicalDisks = session.QueryInstances(@"root\cimv2", "WQL", "SELECT Name, VolumeName FROM Win32_LogicalDisk WHERE DriveType = 3").ToList();
+            foreach (var ld in logicalDisks)
+            {
+                var letter = ld.CimInstanceProperties["Name"]?.Value?.ToString() ?? "";
+                var label = ld.CimInstanceProperties["VolumeName"]?.Value?.ToString() ?? "";
+                sources.Add(new FileSourceModel
+                {
+                    Name = $"{letter} ({label})".Trim(),
+                    Type = "Disk",
+                    Path = letter
+                });
+            }
+
+            var shares = session.QueryInstances(@"root\cimv2", "WQL", "SELECT Name, Path FROM Win32_Share WHERE Type = 0").ToList();
+            foreach (var sh in shares)
+            {
+                var name = sh.CimInstanceProperties["Name"]?.Value?.ToString() ?? "";
+                if (name.EndsWith("$") && name != "IPC$") continue;
+                sources.Add(new FileSourceModel
+                {
+                    Name = name,
+                    Type = "Share",
+                    Path = name
+                });
+            }
+
+            return Ok(sources);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ex.Message);
+        }
+    }
+
+    private string BuildUncPath(string serverIp, string path)
+    {
+        if (path.Length >= 2 && path[1] == ':')
+        {
+            char drive = path[0];
+            string rest = path.Length > 2 ? path.Substring(2) : "";
+            if (rest.StartsWith("\\") || rest.StartsWith("/")) rest = rest.Substring(1);
+            return $@"\\{serverIp}\{drive}$\{rest}";
+        }
+        else
+        {
+            return $@"\\{serverIp}\{path}";
+        }
+    }
+
+    [HttpGet("list")]
+    public IActionResult ListFiles(string serverIp, [FromQuery] string path)
+    {
+        try
+        {
+            var uncPath = BuildUncPath(serverIp, path);
+            var dirInfo = new DirectoryInfo(uncPath);
+
+            if (!dirInfo.Exists)
+                return NotFound(new { message = "Directory not found." });
+
+            var items = new List<FileItemModel>();
+
+            foreach (var dir in dirInfo.GetDirectories())
+            {
+                items.Add(new FileItemModel
+                {
+                    Name = dir.Name,
+                    Type = "folder",
+                    Size = 0,
+                    Modified = dir.LastWriteTime.ToString("yyyy-MM-dd HH:mm"),
+                    Attrs = "D----"
+                });
+            }
+
+            foreach (var file in dirInfo.GetFiles())
+            {
+                items.Add(new FileItemModel
+                {
+                    Name = file.Name,
+                    Type = string.IsNullOrEmpty(file.Extension) ? "file" : file.Extension.Replace(".", "").ToLower(),
+                    Size = file.Length,
+                    Modified = file.LastWriteTime.ToString("yyyy-MM-dd HH:mm"),
+                    Attrs = "-A---"
+                });
+            }
+
+            return Ok(items);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("new-folder")]
+    public IActionResult CreateFolder(string serverIp, [FromQuery] string path, [FromQuery] string name)
+    {
+        try
+        {
+            var uncPath = BuildUncPath(serverIp, Path.Combine(path, name));
+            Directory.CreateDirectory(uncPath);
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("delete")]
+    public IActionResult Delete(string serverIp, [FromQuery] string path)
+    {
+        try
+        {
+            var uncPath = BuildUncPath(serverIp, path);
+            if (Directory.Exists(uncPath))
+            {
+                Directory.Delete(uncPath, true);
+            }
+            else if (System.IO.File.Exists(uncPath))
+            {
+                System.IO.File.Delete(uncPath);
+            }
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("upload")]
+    [RequestSizeLimit(long.MaxValue)]
+    [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
+    public async Task<IActionResult> Upload(string serverIp, [FromQuery] string path, [FromForm] IFormFile file)
+    {
+        try
+        {
+            var uncPath = BuildUncPath(serverIp, Path.Combine(path, file.FileName));
+            using var stream = new FileStream(uncPath, FileMode.Create);
+            await file.CopyToAsync(stream);
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("download")]
+    public IActionResult Download(string serverIp, [FromQuery] string path)
+    {
+        try
+        {
+            var uncPath = BuildUncPath(serverIp, path);
+            if (!System.IO.File.Exists(uncPath)) return NotFound();
+            
+            var fileName = Path.GetFileName(uncPath);
+            return PhysicalFile(uncPath, "application/octet-stream", fileName);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+}

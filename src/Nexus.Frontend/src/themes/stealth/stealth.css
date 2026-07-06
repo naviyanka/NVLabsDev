@@ -1,0 +1,20 @@
+:root, [data-theme="stealth"] {
+  --bg-void: #000000;
+  --bg-surface: #0a0a0a;
+  --bg-card: #050505;
+  --border-c: #1a1a1a;
+  --border-dim: #111111;
+
+  --amber: #10b981;
+  --amber-low: rgba(16, 185, 129, 0.11);
+  --teal: #3b82f6;
+  --teal-low: rgba(59, 130, 246, 0.09);
+  --ok: #22c55e;
+  --warn: #f59e0b;
+  --crit: #dc2626;
+
+  --text: #f5f5f5;
+  --text-sub: #737373;
+  --text-ghost: #262626;
+  --radius: 0.5rem;
+}

@@ -1,0 +1,437 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* NEXUS — "Signal Room" design system */
+
+@theme inline {
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-void: var(--bg-void);
+  --color-surface: var(--bg-surface);
+  --color-card: var(--bg-card);
+  --color-border: var(--border-c);
+  --color-border-dim: var(--border-dim);
+
+  --color-amber: var(--amber);
+  --color-amber-low: var(--amber-low);
+  --color-teal: var(--teal);
+  --color-teal-low: var(--teal-low);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-crit: var(--crit);
+
+  --color-text: var(--text);
+  --color-text-sub: var(--text-sub);
+  --color-text-ghost: var(--text-ghost);
+
+  /* shadcn token bridge */
+  --color-background: var(--bg-void);
+  --color-foreground: var(--text);
+  --color-primary: var(--amber);
+  --color-primary-foreground: #09090f;
+  --color-secondary: var(--bg-card);
+  --color-secondary-foreground: var(--text);
+  --color-muted: var(--bg-card);
+  --color-muted-foreground: var(--text-sub);
+  --color-accent: var(--bg-card);
+  --color-accent-foreground: var(--text);
+  --color-destructive: var(--crit);
+  --color-destructive-foreground: #ffffff;
+  --color-input: var(--border-c);
+  --color-ring: var(--amber);
+  --color-popover: var(--bg-card);
+  --color-popover-foreground: var(--text);
+  --color-card-bg: var(--bg-card);
+  --color-card-foreground: var(--text);
+
+  --color-background: var(--bg-void);
+  --color-surface: var(--bg-surface);
+  --color-surface-container: #F5F0E8;
+  --color-surface-container-high: var(--border-dim);
+  --color-surface-container-low: #f3f4f3;
+  --color-surface-container-lowest: var(--bg-card);
+  --color-surface-bright: var(--bg-surface);
+  --color-surface-dim: var(--border-c);
+  --color-surface-warm: #F5F0E8;
+  --color-outline-subtle: var(--border-c);
+  --color-outline: var(--border-c);
+  --color-primary: var(--amber);
+  --color-primary-container: var(--amber-low);
+  --color-on-primary: #ffffff;
+  --color-secondary: #88B04B;
+  --color-secondary-container: #D6ED7A;
+  --color-tertiary: #326578;
+  --color-tertiary-container: #BBE9FF;
+  --color-error: var(--crit);
+  --color-error-container: #FFDAD6;
+  --color-on-surface: var(--text);
+  --color-on-surface-variant: var(--text-sub);
+  --color-on-surface-muted: var(--text-sub);
+}
+
+/* ─── EXISTING THEMES — DO NOT MODIFY ─────────────────────────────────────── */
+
+:root, [data-theme="dark"] {
+  --bg-void: #09090f;
+  --bg-surface: #0d0f1e;
+  --bg-card: #111428;
+  --border-c: #1c2040;
+  --border-dim: #161930;
+
+  --amber: #e8a020;
+  --amber-low: rgba(232, 160, 32, 0.11);
+  --teal: #0effd0;
+  --teal-low: rgba(14, 255, 208, 0.09);
+  --ok: #22c55e;
+  --warn: #f59e0b;
+  --crit: #ff3d5a;
+
+  --text: #dde3f0;
+  --text-sub: #50597a;
+  --text-ghost: #1e2340;
+
+  --radius: 0.5rem;
+}
+
+[data-theme="light"] {
+  --bg-void: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-card: #ffffff;
+  --border-c: #e2e8f0;
+  --border-dim: #f1f5f9;
+
+  --amber: #f59e0b;
+  --amber-low: rgba(245, 158, 11, 0.11);
+  --teal: #0d9488;
+  --teal-low: rgba(13, 148, 136, 0.09);
+  --ok: #16a34a;
+  --warn: #d97706;
+  --crit: #dc2626;
+
+  --text: #0f172a;
+  --text-sub: #64748b;
+  --text-ghost: #cbd5e1;
+  --radius: 0.5rem;
+}
+
+[data-theme="slate"] {
+  --bg-void: #0f172a;
+  --bg-surface: #1e293b;
+  --bg-card: #1e293b;
+  --border-c: #334155;
+  --border-dim: #1e293b;
+
+  --amber: #38bdf8;
+  --amber-low: rgba(56, 189, 248, 0.11);
+  --teal: #818cf8;
+  --teal-low: rgba(129, 140, 248, 0.09);
+  --ok: #22c55e;
+  --warn: #f59e0b;
+  --crit: #ef4444;
+
+  --text: #f8fafc;
+  --text-sub: #94a3b8;
+  --text-ghost: #475569;
+  --radius: 0.5rem;
+}
+
+[data-theme="stealth"] {
+  --bg-void: #000000;
+  --bg-surface: #0a0a0a;
+  --bg-card: #050505;
+  --border-c: #1a1a1a;
+  --border-dim: #111111;
+
+  --amber: #10b981;
+  --amber-low: rgba(16, 185, 129, 0.11);
+  --teal: #3b82f6;
+  --teal-low: rgba(59, 130, 246, 0.09);
+  --ok: #22c55e;
+  --warn: #f59e0b;
+  --crit: #dc2626;
+
+  --text: #f5f5f5;
+  --text-sub: #737373;
+  --text-ghost: #262626;
+  --radius: 0.5rem;
+}
+
+/* ─── CYBERPUNK NEON — "Ghost Wire" ─────────────────────────────────────────
+   Generated via Stitch MCP · design system: assets/3032561383631532309
+   Project: projects/13841612018576501273
+   ─────────────────────────────────────────────────────────────────────────── */
+[data-theme="cyberpunk"] {
+  --bg-void:    #0a0a12;
+  --bg-surface: hsl(255, 22%, 7%);
+  --bg-card:    hsla(255, 30%, 10%, 0.55);
+  --border-c:   hsla(270, 80%, 60%, 0.25);
+  --border-dim: hsla(270, 50%, 14%, 1);
+
+  --amber:       #00e5ff;
+  --amber-low:   rgba(0, 229, 255, 0.10);
+  --amber-hover: #33edff;
+  --teal:        #e040fb;
+  --teal-low:    rgba(224, 64, 251, 0.10);
+
+  --ok:   #18f552;
+  --warn: #ffb300;
+  --crit: #ff1a4b;
+
+  --text:       hsl(220, 80%, 95%);
+  --text-sub:   hsl(240, 30%, 55%);
+  --text-ghost: hsl(255, 25%, 20%);
+
+  --radius: 0.5rem;
+
+  --cx-primary:      #00e5ff;
+  --cx-secondary:    #e040fb;
+  --cx-glass-bg:     hsla(255, 30%, 10%, 0.55);
+  --cx-glass-border: hsla(270, 80%, 60%, 0.25);
+  --cx-glow-card:    0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="cyberpunk"] .nx-card {
+  background-color: var(--cx-glass-bg);
+  backdrop-filter: blur(14px) saturate(1.6);
+  -webkit-backdrop-filter: blur(14px) saturate(1.6);
+  border: 1px solid var(--cx-glass-border);
+  box-shadow: var(--cx-glow-card);
+  transition: all 0.3s ease;
+  animation: cx-slide-up 0.35s ease both;
+}
+[data-theme="cyberpunk"] .nx-card:hover {
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.3);
+  border-color: rgba(0, 229, 255, 0.5);
+}
+[data-theme="cyberpunk"] .metric-fill {
+  background: linear-gradient(90deg, #00e5ff, #e040fb);
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+}
+[data-theme="cyberpunk"] ::-webkit-scrollbar { width: 8px; }
+[data-theme="cyberpunk"] ::-webkit-scrollbar-track { background: hsl(255, 20%, 4%); }
+[data-theme="cyberpunk"] ::-webkit-scrollbar-thumb {
+  background: #e040fb;
+  box-shadow: 0 0 5px rgba(224, 64, 251, 0.8);
+  border-radius: 4px;
+}
+[data-theme="cyberpunk"] input:focus,
+[data-theme="cyberpunk"] select:focus,
+[data-theme="cyberpunk"] textarea:focus {
+  border-color: #00e5ff !important;
+  box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.25), 0 0 10px rgba(0, 229, 255, 0.5) !important;
+  outline: none;
+}
+[data-theme="cyberpunk"] body::before {
+  content: " ";
+  display: block;
+  position: fixed;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+              linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  z-index: 9999;
+  background-size: 100% 2px, 3px 100%;
+  pointer-events: none;
+}
+
+@keyframes cx-slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── INFRARED COMMAND ───────────────────────────────────────────────────────
+   NEW THEME — Generated via Stitch MCP · design system: assets/2482274769542877212
+   Project: projects/1764721135183339986 · "NEXUS — Infrared Command"
+   Deep violet-black command center · violet-purple primary · amber CTAs
+   All token values extracted from Stitch-generated HTML/Tailwind config
+   ─────────────────────────────────────────────────────────────────────────── */
+[data-theme="infrared"] {
+  /* Backgrounds — from Stitch void/surface/card */
+  --bg-void:    #05050a;
+  --bg-surface: #0c0b14;
+  --bg-card:    #13121f;
+  --border-c:   #1e1b32;
+  --border-dim: #12101e;
+
+  /* Primary: deep violet-purple · Secondary: amber for CTAs */
+  --amber:      #f59e0b;   /* amber — primary action / CTA color */
+  --amber-low:  rgba(245, 158, 11, 0.12);
+  --amber-hover: #fbbf24;
+  --teal:       #6366f1;   /* electric indigo — data accent / secondary */
+  --teal-low:   rgba(99, 102, 241, 0.10);
+
+  /* Semantic — from Stitch success/critical/warning */
+  --ok:   #10b981;   /* emerald — servers online */
+  --warn: #f59e0b;   /* amber warning */
+  --crit: #f43f5e;   /* hot coral — critical/offline */
+
+  /* Text — from Stitch text-primary/secondary/ghost */
+  --text:       #eeeaf8;   /* lavender white */
+  --text-sub:   #5c5880;   /* muted violet-gray */
+  --text-ghost: #1c1a30;   /* near invisible */
+
+  --radius: 0.5rem;
+
+  /* Infrared extended tokens */
+  --ir-primary:        #7c3aed;
+  --ir-primary-active: #6366f1;
+  --ir-glow-border:    rgba(124, 58, 237, 0.35);
+  --ir-glow-shadow:    0 0 8px rgba(124, 58, 237, 0.15);
+  --ir-card-hover-border: rgba(124, 58, 237, 0.35);
+  --ir-card-hover-shadow: 0 0 8px rgba(124, 58, 237, 0.15);
+}
+
+/* Card hover glow — Stitch .glow-border:hover pattern */
+[data-theme="infrared"] .nx-card {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+[data-theme="infrared"] .nx-card:hover {
+  border-color: var(--ir-glow-border);
+  box-shadow: var(--ir-glow-shadow);
+}
+
+/* Metric fill — violet-to-amber gradient per Stitch design */
+[data-theme="infrared"] .metric-fill {
+  background: linear-gradient(90deg, #7c3aed, #f59e0b);
+  box-shadow: 0 0 6px rgba(124, 58, 237, 0.4);
+}
+
+/* Scrollbar — from Stitch generated CSS */
+[data-theme="infrared"] ::-webkit-scrollbar { width: 6px; height: 6px; }
+[data-theme="infrared"] ::-webkit-scrollbar-track { background: #05050a; }
+[data-theme="infrared"] ::-webkit-scrollbar-thumb { background: #1e1b32; border-radius: 3px; }
+[data-theme="infrared"] ::-webkit-scrollbar-thumb:hover { background: #5c5880; }
+
+/* Focus rings */
+[data-theme="infrared"] input:focus,
+[data-theme="infrared"] select:focus,
+[data-theme="infrared"] textarea:focus {
+  border-color: #7c3aed !important;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2), 0 0 8px rgba(124, 58, 237, 0.15) !important;
+  outline: none;
+}
+
+/* Critical pulse — from Stitch .pulse-critical */
+[data-theme="infrared"] .nx-crit-pulse {
+  animation: ir-pulse-critical 2s infinite;
+}
+[data-theme="infrared"] .nx-live-pulse {
+  animation: ir-pulse-live 2s infinite;
+}
+
+/* Status badge active state — violet glow on active sidebar item */
+[data-theme="infrared"] [data-active="true"] {
+  color: #6366f1;
+  filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.5));
+}
+
+@keyframes ir-pulse-critical {
+  0%   { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.7); }
+  70%  { transform: scale(1);   box-shadow: 0 0 0 6px rgba(244, 63, 94, 0); }
+  100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
+}
+@keyframes ir-pulse-live {
+  0%   { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70%  { transform: scale(1);   box-shadow: 0 0 0 4px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+@keyframes ir-slide-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── BASE ───────────────────────────────────────────────────────────────── */
+@layer base {
+  * {
+    border-color: var(--border-c);
+  }
+  html,
+  body {
+    background-color: var(--bg-void);
+    color: var(--text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    min-height: 100vh;
+  }
+
+  ::-webkit-scrollbar {
+    width: 3px;
+    height: 3px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-c);
+    border-radius: 2px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--amber);
+  }
+}
+
+@utility eyebrow {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--text-sub);
+}
+
+@utility mono {
+  font-family: var(--font-mono);
+}
+
+@utility display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+@utility nx-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-c);
+  border-radius: 8px;
+}
+
+@utility metric-bar {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--border-dim);
+  overflow: hidden;
+}
+
+@utility metric-fill {
+  height: 100%;
+  background: var(--teal);
+  box-shadow: 0 0 7px rgba(14, 255, 208, 0.4);
+  transition: width 0.5s ease;
+}
+
+@keyframes nx-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@keyframes nx-spin-slow {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes nx-ring-pulse {
+  0% { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+.nx-blink {
+  animation: nx-pulse 1.4s ease-in-out infinite;
+}

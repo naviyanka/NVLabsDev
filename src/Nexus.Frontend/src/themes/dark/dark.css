@@ -1,0 +1,21 @@
+:root, [data-theme="dark"] {
+  --bg-void: #09090f;
+  --bg-surface: #0d0f1e;
+  --bg-card: #111428;
+  --border-c: #1c2040;
+  --border-dim: #161930;
+
+  --amber: #e8a020;
+  --amber-low: rgba(232, 160, 32, 0.11);
+  --teal: #0effd0;
+  --teal-low: rgba(14, 255, 208, 0.09);
+  --ok: #22c55e;
+  --warn: #f59e0b;
+  --crit: #ff3d5a;
+
+  --text: #dde3f0;
+  --text-sub: #50597a;
+  --text-ghost: #1e2340;
+
+  --radius: 0.5rem;
+}

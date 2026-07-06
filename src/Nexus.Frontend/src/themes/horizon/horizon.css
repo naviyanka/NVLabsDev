@@ -1,0 +1,67 @@
+:root, [data-theme="horizon"] {
+  --bg-void:    #fafaf9;
+  --bg-surface: #ffffff;
+  --bg-card:    #ffffff;
+  --border-c:   #e7e5e4;
+  --border-dim: #f5f5f4;
+
+  --amber:      #ff5e3a;
+  --amber-low:  rgba(255, 94, 58, 0.12);
+  --amber-hover: #ff7657;
+  --teal:       #0d9488;
+  --teal-low:   rgba(13, 148, 136, 0.10);
+
+  --ok:   #10b981;
+  --warn: #f59e0b;
+  --crit: #ef4444;
+
+  --text:       #1c1917;
+  --text-sub:   #78716c;
+  --text-ghost: #d6d3d1;
+  --radius: 9999px;
+
+  --font-sans: "Plus Jakarta Sans", "Inter", sans-serif;
+}
+[data-theme="horizon"] .nx-card {
+  background: #ffffff;
+  border: 1px solid #e7e5e4;
+  border-radius: 1.5rem;
+  box-shadow: 0 4px 20px -2px rgba(28, 25, 23, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+[data-theme="horizon"] .nx-card:hover {
+  box-shadow: 0 10px 30px -5px rgba(255, 94, 58, 0.12);
+  border-color: rgba(255, 94, 58, 0.3);
+  transform: translateY(-2px);
+}
+[data-theme="horizon"] .metric-fill {
+  background: linear-gradient(90deg, #ff5e3a, #f59e0b);
+  box-shadow: 0 0 10px rgba(255, 94, 58, 0.3);
+}
+[data-theme="horizon"] ::-webkit-scrollbar { width: 6px; height: 6px; }
+[data-theme="horizon"] ::-webkit-scrollbar-track { background: #fafaf9; }
+[data-theme="horizon"] ::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 9999px; }
+[data-theme="horizon"] ::-webkit-scrollbar-thumb:hover { background: #ff5e3a; }
+[data-theme="horizon"] input:focus,
+[data-theme="horizon"] select:focus,
+[data-theme="horizon"] textarea:focus {
+  border-color: #ff5e3a !important;
+  box-shadow: 0 0 0 2px rgba(255, 94, 58, 0.2), 0 0 12px rgba(255, 94, 58, 0.15) !important;
+  outline: none;
+}
+.dark[data-theme="horizon"] {
+  --bg-void:    #050508;
+  --bg-surface: #0a0a0f;
+  --bg-card:    #0c0c12;
+  --border-c:   #1f1f2e;
+  --border-dim: #161622;
+  --text:       #f8fafc;
+  --text-sub:   #94a3b8;
+  --text-ghost: #475569;
+}
+.dark[data-theme="horizon"] .nx-card {
+  background: #0c0c12;
+  border: 1px solid #1f1f2e;
+}
+.dark[data-theme="horizon"] ::-webkit-scrollbar-track { background: #050508; }
+.dark[data-theme="horizon"] ::-webkit-scrollbar-thumb { background: #475569; }

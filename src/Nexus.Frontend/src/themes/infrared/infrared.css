@@ -1,0 +1,49 @@
+:root, [data-theme="infrared"] {
+  --bg-void:    #05050a;
+  --bg-surface: #0c0b14;
+  --bg-card:    #13121f;
+  --border-c:   #1e1b32;
+  --border-dim: #12101e;
+
+  --amber:      #f59e0b;
+  --amber-low:  rgba(245, 158, 11, 0.12);
+  --amber-hover: #fbbf24;
+  --teal:       #6366f1;
+  --teal-low:   rgba(99, 102, 241, 0.10);
+
+  --ok:   #10b981;
+  --warn: #f59e0b;
+  --crit: #f43f5e;
+
+  --text:       #eeeaf8;
+  --text-sub:   #5c5880;
+  --text-ghost: #1c1a30;
+  --radius: 0.5rem;
+
+  --ir-primary:        #7c3aed;
+  --ir-primary-active: #6366f1;
+  --ir-glow-border:    rgba(124, 58, 237, 0.35);
+  --ir-glow-shadow:    0 0 8px rgba(124, 58, 237, 0.15);
+}
+[data-theme="infrared"] .nx-card {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+[data-theme="infrared"] .nx-card:hover {
+  border-color: var(--ir-glow-border);
+  box-shadow: var(--ir-glow-shadow);
+}
+[data-theme="infrared"] .metric-fill {
+  background: linear-gradient(90deg, #7c3aed, #f59e0b);
+  box-shadow: 0 0 6px rgba(124, 58, 237, 0.4);
+}
+[data-theme="infrared"] ::-webkit-scrollbar { width: 6px; height: 6px; }
+[data-theme="infrared"] ::-webkit-scrollbar-track { background: #05050a; }
+[data-theme="infrared"] ::-webkit-scrollbar-thumb { background: #1e1b32; border-radius: 3px; }
+[data-theme="infrared"] ::-webkit-scrollbar-thumb:hover { background: #5c5880; }
+[data-theme="infrared"] input:focus,
+[data-theme="infrared"] select:focus,
+[data-theme="infrared"] textarea:focus {
+  border-color: #7c3aed !important;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2), 0 0 8px rgba(124, 58, 237, 0.15) !important;
+  outline: none;
+}

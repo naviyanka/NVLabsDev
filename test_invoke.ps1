@@ -1,0 +1,1 @@
+$results = Invoke-Command -ComputerName localhost -ScriptBlock { echo "Hello"; echo "World" }; $results | Group-Object PSComputerName | ForEach-Object { echo "==== $($_.Name) ===="; $_.Group | Out-String }

@@ -1,0 +1,20 @@
+:root, [data-theme="light"] {
+  --bg-void: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-card: #ffffff;
+  --border-c: #e2e8f0;
+  --border-dim: #f1f5f9;
+
+  --amber: #f59e0b;
+  --amber-low: rgba(245, 158, 11, 0.11);
+  --teal: #0d9488;
+  --teal-low: rgba(13, 148, 136, 0.09);
+  --ok: #16a34a;
+  --warn: #d97706;
+  --crit: #dc2626;
+
+  --text: #0f172a;
+  --text-sub: #64748b;
+  --text-ghost: #cbd5e1;
+  --radius: 0.5rem;
+}

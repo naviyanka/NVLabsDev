@@ -1,0 +1,50 @@
+# Added by code-review-graph
+.code-review-graph/
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+
+# SQLite
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+
+# Visual Studio / .NET
+.vs/
+bin/
+obj/
+Bin/
+Obj/
+*.user
+*.userprefs
+*.suo
+*.pidb
+*.booproj
+*.sln.docstates
+
+# Frontend (Vite/TanStack/Node)
+dist/
+build/
+.output/
+.nitro/
+.npm/
+
+# Packaging
+Packaging/Output/
+Packaging/Staging/
+*.exe
+*.msi
+*.iso
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
