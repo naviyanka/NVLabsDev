@@ -4,14 +4,44 @@ NEXUS is a modern, web-based Windows Server and Active Directory administration 
 
 ![Nexus Dashboard](https://via.placeholder.com/1200x600?text=Nexus+Dashboard) *(Replace with actual screenshot)*
 
-## ✨ Features
+## ✨ Features & Capabilities
 
-- **Real-Time Dashboard**: Live CPU, memory, and disk monitoring via SignalR.
-- **Active Directory Integration**: Manage users, groups, and domain policies directly from your browser.
-- **Server Management**: Restart services, kill processes, and manage multiple servers.
-- **Remote Terminal**: Built-in web terminal for direct PowerShell execution.
-- **Theming System**: Multiple built-in themes (Horizon, Cyberpunk, Stealth, Light, Dark).
-- **Extensible Plugin System**: Easily extend the app with custom plugins.
+NEXUS comes packed with a comprehensive suite of tools to manage every aspect of your Windows Server environment:
+
+### Core Administration
+- **Dashboard & Performance**: Live CPU, memory, network, and disk monitoring via SignalR.
+- **Server Management**: Add and manage multiple remote Windows servers from a single pane of glass.
+- **Active Directory (Users & Groups)**: Manage AD users, groups, and domain policies directly from your browser.
+- **PowerShell Terminal**: Fully functional, built-in web terminal for direct PowerShell execution.
+
+### System & Compute
+- **Processes**: View, filter, and kill running processes (Task Manager equivalent).
+- **Services**: Start, stop, restart, and configure startup types for Windows Services.
+- **Scheduled Tasks**: Manage, run, and modify Windows Task Scheduler jobs.
+- **Roles & Features**: Install or remove Windows Server roles and features remotely.
+- **Virtual Machines (Hyper-V)**: Manage Hyper-V VMs and Virtual Switches.
+
+### Storage & Files
+- **Storage Management**: Manage disks, volumes, and Storage Replicas.
+- **File Explorer**: Browse and manage the remote server's file system.
+
+### Security & Networking
+- **Windows Defender Security**: Monitor and trigger Defender scans.
+- **Windows Firewall**: Manage inbound and outbound firewall rules.
+- **Certificates**: View and manage the Windows Certificate Store.
+- **Network Configuration**: View adapters, IP settings, and network topology.
+- **Remote Desktop**: RDP launcher integration for quick server access.
+
+### Maintenance & Troubleshooting
+- **Event Viewer**: Browse and filter Windows Event Logs.
+- **Registry Editor**: Navigate and modify the Windows Registry.
+- **Windows Updates**: Check for and install Windows updates.
+- **Installed Apps**: View and manage installed software.
+- **Device Manager**: View hardware devices and their status.
+
+### Customization & Extensibility
+- **Plugin System**: Extend NEXUS by developing and installing custom plugins.
+- **Theming System**: Multiple built-in themes including Horizon, Cyberpunk, Stealth, Light, and Dark mode.
 
 ---
 
