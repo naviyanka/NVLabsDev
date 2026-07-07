@@ -25,7 +25,7 @@ export default defineConfig({
   reporter: 'html',
   use: {
     /* Base URL to use in actions like `await page.goto('')`. */
-    baseURL: 'https://localhost',
+    baseURL: 'http://localhost:5173',
     ignoreHTTPSErrors: true,
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */

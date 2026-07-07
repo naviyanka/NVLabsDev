@@ -7,18 +7,43 @@ on:
 jobs:
   test:
     timeout-minutes: 60
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
+    
     - uses: actions/setup-node@v4
       with:
         node-version: lts/*
-    - name: Install dependencies
+        
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Install Root Dependencies
       run: npm ci
+
+    - name: Install Frontend Dependencies
+      working-directory: ./src/Nexus.Frontend
+      run: npm install
+
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
+
+    - name: Start Backend
+      working-directory: ./src/Nexus.Gateway
+      run: Start-Process dotnet -ArgumentList "run" -NoNewWindow
+
+    - name: Start Frontend
+      working-directory: ./src/Nexus.Frontend
+      run: Start-Process npm -ArgumentList "run dev" -NoNewWindow
+
+    - name: Wait for servers to start
+      run: Start-Sleep -Seconds 20
+
     - name: Run Playwright tests
       run: npx playwright test
+
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:
