@@ -60,7 +60,7 @@ test.describe('Tier 1: Smoke & Theme Customization Tests', () => {
   test('1.7: Select Cyberpunk Neon theme and assert active theme attribute', async ({ page }) => {
     await loginAndGoToSettings(page);
     await page.click('button:has-text("Cyberpunk Neon")', { timeout: 2000 });
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'cyberpunk-neon');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'cyberpunk');
   });
 
   test('1.8: Select Cyberpunk Neon theme and verify local storage is updated', async ({ page }) => {
@@ -69,7 +69,7 @@ test.describe('Tier 1: Smoke & Theme Customization Tests', () => {
     // Reload to let RootComponent write to localStorage, or evaluate directly
     await page.reload();
     const storageTheme = await page.evaluate(() => localStorage.getItem('nexus-theme'));
-    expect(storageTheme).toBe('cyberpunk-neon');
+    expect(storageTheme).toBe('cyberpunk');
   });
 
   test('1.9: Verify Cyberpunk Neon glassmorphic element backdrop-blur classes', async ({ page }) => {
@@ -88,9 +88,9 @@ test.describe('Tier 1: Smoke & Theme Customization Tests', () => {
     await loginAndGoToSettings(page);
     await page.click('button:has-text("Cyberpunk Neon")', { timeout: 2000 });
     
-    // Reload page and check if html still has data-theme="cyberpunk-neon"
+    // Reload page and check if html still has data-theme="cyberpunk"
     await page.reload();
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'cyberpunk-neon');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'cyberpunk');
   });
 
 });

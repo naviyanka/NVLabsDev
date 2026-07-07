@@ -46,7 +46,12 @@ export async function loginAndGoToSettings(page: Page): Promise<void> {
   await page.evaluate((jwt) => {
     localStorage.setItem('nexus_token', jwt);
   }, token);
+  
+  // Start waiting for the settings GET request before navigating
+  const settingsPromise = page.waitForResponse(resp => resp.url().includes('/api/settings') && resp.request().method() === 'GET');
   await page.goto('/settings');
+  await settingsPromise; // ensure initial settings are loaded so they don't overwrite our clicks later
+  
   await expect(page.locator('h1')).toHaveText('Global Settings');
   await page.locator('aside button').getByText('Appearance').click();
 }
