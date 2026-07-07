@@ -495,6 +495,25 @@ public class CimService : IDisposable
         }
     }
 
+    public async Task<bool> EnableWinRmAsync(string ip)
+    {
+        try
+        {
+            var session = GetSession(ip);
+            var parameters = new CimMethodParametersCollection
+            {
+                CimMethodParameter.Create("CommandLine", "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"Enable-PSRemoting -Force; winrm quickconfig -q\"", CimType.String, CimFlags.In)
+            };
+            var result = session.InvokeMethod(@"root\cimv2", "Win32_Process", "Create", parameters);
+            return result.ReturnValue?.ToString() == "0";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to remote-enable WinRM on {Ip}", ip);
+            return false;
+        }
+    }
+
     public void Dispose()
     {
         foreach (var session in _sessions.Values)
