@@ -10,10 +10,18 @@ namespace Nexus.Gateway.Controllers;
 public class PowerShellController : ControllerBase
 {
     private readonly PowerShellSessionManager _sessionManager;
+    private readonly Nexus.Gateway.Data.NexusContext _db;
 
-    public PowerShellController(PowerShellSessionManager sessionManager)
+    public PowerShellController(PowerShellSessionManager sessionManager, Nexus.Gateway.Data.NexusContext db)
     {
         _sessionManager = sessionManager;
+        _db = db;
+    }
+
+    private string ResolveHostname(string ipOrName)
+    {
+        var server = _db.Servers.FirstOrDefault(s => s.Ip == ipOrName || s.Id == ipOrName.ToLower());
+        return server?.Name ?? ipOrName;
     }
 
     public class CreateSessionRequest
@@ -34,7 +42,8 @@ public class PowerShellController : ControllerBase
     [HttpPost("session")]
     public IActionResult CreateSession([FromBody] CreateSessionRequest req)
     {
-        var sessionId = _sessionManager.CreateSession(req.ServerId);
+        var hostname = ResolveHostname(req.ServerId);
+        var sessionId = _sessionManager.CreateSession(hostname);
         return Ok(new { sessionId });
     }
 
@@ -70,7 +79,8 @@ public class PowerShellController : ControllerBase
             var sessionId = req.SessionId;
             if (string.IsNullOrWhiteSpace(sessionId) || !_sessionManager.SessionExists(sessionId))
             {
-                sessionId = _sessionManager.CreateSession(req.ServerId);
+                var hostname = ResolveHostname(req.ServerId);
+                sessionId = _sessionManager.CreateSession(hostname);
                 // Send the new sessionId down so the client knows it
                 await Response.WriteAsync($"data: {System.Text.Json.JsonSerializer.Serialize(new { type = "session", sessionId })}\n\n");
                 await Response.Body.FlushAsync();
