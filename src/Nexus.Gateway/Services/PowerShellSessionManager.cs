@@ -16,9 +16,12 @@ public class PowerShellSessionManager : IDisposable
     private readonly ConcurrentDictionary<string, PsSession> _sessions = new();
     private readonly Timer _cleanupTimer;
 
-    public PowerShellSessionManager(ILogger<PowerShellSessionManager> logger)
+    private readonly IPowerShellExecutionService _executionService;
+
+    public PowerShellSessionManager(ILogger<PowerShellSessionManager> logger, IPowerShellExecutionService executionService)
     {
         _logger = logger;
+        _executionService = executionService;
         _cleanupTimer = new Timer(CleanupIdleSessions, null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
     }
 
@@ -30,19 +33,45 @@ public class PowerShellSessionManager : IDisposable
         public SemaphoreSlim Lock { get; } = new(1, 1);
         public DateTime LastUsed { get; set; } = DateTime.UtcNow;
 
-        public PsSession(string serverId)
+        public PsSession(string serverId, IPowerShellExecutionService executionService, ILogger logger)
         {
             ServerId = serverId;
 
-            // Always use WSManConnectionInfo to ensure each session gets a distinct wsmprovhost.exe process.
-            // This prevents in-process runspaces from sharing the Gateway's PID.
-            var connectionInfo = new WSManConnectionInfo
+            try
             {
-                ComputerName = serverId
-            };
+                // Always use WSManConnectionInfo to ensure each session gets a distinct wsmprovhost.exe process.
+                // This prevents in-process runspaces from sharing the Gateway's PID.
+                var connectionInfo = new WSManConnectionInfo
+                {
+                    ComputerName = serverId
+                };
+                
+                Runspace = RunspaceFactory.CreateRunspace(connectionInfo);
+                Runspace.Open();
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to open Runspace via WSMan to {ServerId}. Attempting to bootstrap WinRM via WMI...", serverId);
+                
+                // Bootstrap WinRM using WMI/CIM over DCOM using the local PowerShellExecutionService
+                // This command invokes a process on the remote machine to execute winrm quickconfig
+                var bootstrapCmd = $"Invoke-CimMethod -ComputerName '{serverId}' -ClassName Win32_Process -MethodName Create -Arguments @{{CommandLine='powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"Enable-PSRemoting -SkipNetworkProfileCheck -Force\"'}}";
+                var result = executionService.ExecuteAsync(bootstrapCmd).GetAwaiter().GetResult();
+                
+                if (result.ExitCode == 0)
+                {
+                    logger.LogInformation("Successfully bootstrapped WinRM on {ServerId}. Retrying Runspace connection...", serverId);
+                    Thread.Sleep(3000); // Wait for WinRM service to start
+                    var connectionInfo = new WSManConnectionInfo { ComputerName = serverId };
+                    Runspace = RunspaceFactory.CreateRunspace(connectionInfo);
+                    Runspace.Open();
+                }
+                else
+                {
+                    throw new Exception($"Failed to bootstrap WinRM on {serverId}. Exit Code: {result.ExitCode}. Error: {result.StandardError}", ex);
+                }
+            }
             
-            Runspace = RunspaceFactory.CreateRunspace(connectionInfo);
-            Runspace.Open();
             PowerShell = PowerShell.Create();
             PowerShell.Runspace = Runspace;
         }
@@ -58,7 +87,7 @@ public class PowerShellSessionManager : IDisposable
     public string CreateSession(string serverId)
     {
         var sessionId = Guid.NewGuid().ToString("N")[..12];
-        var session = new PsSession(serverId);
+        var session = new PsSession(serverId, _executionService, _logger);
         _sessions[sessionId] = session;
 
         _logger.LogInformation("Native PS runspace {Id} created for {Server}", sessionId, serverId);
