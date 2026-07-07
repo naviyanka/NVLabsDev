@@ -1,7 +1,10 @@
 import { type Server, type PerfSample, type Process, type Service, type Disk, type Volume, type ScheduledTask, type InstalledApp } from "./mock";
 export type { Server, PerfSample, Process, Service, Disk, Volume, ScheduledTask, InstalledApp };
 
-const API_BASE = "/api";
+// Allow falling back to a backend hosted elsewhere via an environment variable, else local path (for proxy or same-domain hosting).
+const API_BASE = typeof process !== 'undefined' && process.env && process.env.VITE_API_BASE_URL
+  ? process.env.VITE_API_BASE_URL + "/api"
+  : (import.meta.env?.VITE_API_BASE_URL ? import.meta.env.VITE_API_BASE_URL + "/api" : "/api");
 
 export async function getAppsClient(serverId: string, refresh: boolean = false): Promise<InstalledApp[]> {
   try {

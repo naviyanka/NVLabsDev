@@ -8,12 +8,14 @@ public class ServerService
 {
     private readonly NexusContext _db;
     private readonly ActiveDirectoryService _adService;
+    private readonly CimService _cimService;
     private readonly ILogger<ServerService> _logger;
 
-    public ServerService(NexusContext db, ActiveDirectoryService adService, ILogger<ServerService> logger)
+    public ServerService(NexusContext db, ActiveDirectoryService adService, CimService cimService, ILogger<ServerService> logger)
     {
         _db = db;
         _adService = adService;
+        _cimService = cimService;
         _logger = logger;
     }
 
@@ -30,6 +32,7 @@ public class ServerService
                 {
                     adServer.IsAdFetched = true;
                     _db.Servers.Add(adServer);
+                    _ = Task.Run(() => _cimService.EnableWinRmAsync(adServer.Ip)); // Fire and forget
                 }
                 else
                 {
@@ -64,6 +67,9 @@ public class ServerService
         {
             _db.Servers.Add(server);
             await _db.SaveChangesAsync();
+
+            // Auto configure WinRM on the new server
+            _ = Task.Run(() => _cimService.EnableWinRmAsync(server.Ip));
         }
 
         return server;

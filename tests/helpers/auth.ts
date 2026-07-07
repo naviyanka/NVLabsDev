@@ -42,11 +42,15 @@ export function generateToken(): string {
 
 export async function loginAndGoToSettings(page: Page): Promise<void> {
   const token = generateToken();
-  await page.goto('/login');
+  await page.goto('/');
   await page.evaluate((jwt) => {
     localStorage.setItem('nexus_token', jwt);
   }, token);
+  await page.waitForTimeout(100);
+
   await page.goto('/settings');
+  await page.waitForLoadState('networkidle');
+
   await expect(page.locator('h1')).toHaveText('Global Settings');
   await page.locator('aside button').getByText('Appearance').click();
 }
