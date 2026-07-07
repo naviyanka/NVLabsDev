@@ -7,10 +7,12 @@ test.describe('Tier 4: Real-world Application Scenarios', () => {
   test('4.1: First-time admin onboarding and theme customization flow', async ({ page }) => {
     // 1. User logs in by injecting token
     const token = generateToken();
-    await page.goto('/login');
+    await page.route('/api/**', route => route.abort());
+    await page.goto('/');
     await page.evaluate((jwt) => {
       localStorage.setItem('nexus_token', jwt);
     }, token);
+    await page.unroute('/api/**');
 
     // 2. Navigates to index/dashboard first
     await page.goto('/');
@@ -48,10 +50,13 @@ test.describe('Tier 4: Real-world Application Scenarios', () => {
     const token = generateToken();
     
     // Setup first page (Tab 1)
-    await page.goto('/login');
+    await page.route('/api/**', route => route.abort());
+    await page.goto('/');
     await page.evaluate((jwt) => {
       localStorage.setItem('nexus_token', jwt);
     }, token);
+    await page.unroute('/api/**');
+    await page.unroute('/api/**');
     await page.goto('/settings');
     await expect(page.locator('h1')).toHaveText('Global Settings');
     await page.locator('aside button').getByText('Appearance').click();
