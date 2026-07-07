@@ -12,20 +12,16 @@ export default defineConfig({
   vite: {
     server: {
       allowedHosts: "all",
-      port: 443,
+      port: 5173,
       host: "0.0.0.0",
-      https: {
-        pfx: fs.readFileSync('C:\\navishare\\DCFiles\\Certs\\NVLabs-Wildcard.pfx'),
-        passphrase: 'Naveen@1734'
-      },
       proxy: {
         '/api': {
-          target: 'https://localhost:5011',
+          target: 'http://localhost:5010',
           ws: true,
           secure: false
         },
         '/hub': {
-          target: 'https://localhost:5011',
+          target: 'http://localhost:5010',
           ws: true,
           secure: false
         }
