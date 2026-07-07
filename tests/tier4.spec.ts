@@ -23,10 +23,10 @@ test.describe('Tier 4: Real-world Application Scenarios', () => {
 
     // 4. Customizes General Settings
     // Select English locale (General is active by default)
-    await page.selectOption('select:near(label:has-text("Language")), select', 'en-US');
+    await page.selectOption('div:has(> label:has-text("Language / Locale")) select', 'en-US');
     
     // Select Alerts landing page
-    await page.selectOption('select:near(label:has-text("Default Landing Page")), select >> xpath=following-sibling::select', 'alerts');
+    await page.selectOption('div:has(> label:has-text("Default Landing Page")) select', 'alerts');
 
     // 5. Customizes Appearance Settings
     await page.locator('aside button').getByText('Appearance').click();
