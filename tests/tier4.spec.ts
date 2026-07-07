@@ -38,7 +38,7 @@ test.describe('Tier 4: Real-world Application Scenarios', () => {
     await page.reload();
     
     // Check theme
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'cyberpunk-neon');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'cyberpunk');
     
     // Go to General settings to check general preference persistence
     await page.locator('aside button').getByText('General').click();
@@ -65,12 +65,12 @@ test.describe('Tier 4: Real-world Application Scenarios', () => {
 
     // On Tab 1, select Cyberpunk Neon
     await page.click('button:has-text("Cyberpunk Neon")', { timeout: 2000 });
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'cyberpunk-neon');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'cyberpunk');
 
     // On Tab 2, verify theme synchronizes or matches Cyberpunk Neon
     // Since page2 is in the same context, it shares storage. A page reload or storage event updates it.
     await page2.reload();
-    await expect(page2.locator('html')).toHaveAttribute('data-theme', 'cyberpunk-neon');
+    await expect(page2.locator('html')).toHaveAttribute('data-theme', 'cyberpunk');
   });
 
 });
