@@ -24,7 +24,7 @@ test.describe('Tier 3: Cross-Feature Combinations', () => {
     await page.click('button:has-text("Cyberpunk Neon")', { timeout: 2000 });
     
     // Select Compact UI Density
-    await page.selectOption('select:near(label:has-text("UI Density")), select', 'compact');
+    await page.selectOption('div:has(> label:has-text("UI Density")) select', 'compact');
     
     // Toggle Enable Animations off
     const checkbox = page.locator('div:has(> span:has-text("Enable Animations")) button');
@@ -34,7 +34,7 @@ test.describe('Tier 3: Cross-Feature Combinations', () => {
     await page.reload();
     
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'cyberpunk');
-    const densityVal = await page.locator('select').first().inputValue();
+    const densityVal = await page.locator('div:has(> label:has-text("UI Density")) select').inputValue();
     expect(densityVal).toBe('compact');
     
     const animationsVal = await page.evaluate(() => localStorage.getItem('nexus-animations'));

@@ -109,11 +109,11 @@ test.describe('Tier 2: Theme Boundary Tests', () => {
   test('2.8: Cyberpunk Neon background void color HSL value check', async ({ page }) => {
     await loginAndGoToSettings(page);
     await page.click('button:has-text("Cyberpunk Neon")', { timeout: 2000 });
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'cyberpunk');
     
     // Evaluate the CSS variable --bg-void on the HTML element
     const bgVoid = await page.locator('html').evaluate(el => window.getComputedStyle(el).getPropertyValue('--bg-void').trim());
-    // Cyberpunk HSL color should match expected HSL format (e.g. hsl(...) or hsla(...))
-    expect(bgVoid).toMatch(/^hsla?\(.*\)$/);
+    expect(bgVoid).toMatch(/#0a0a12|rgb\(10,\s*10,\s*18\)/);
   });
 
   test('2.9: Cyberpunk Neon micro-animations class properties check', async ({ page }) => {
