@@ -16,13 +16,13 @@ test.describe('Tier 2: Theme Boundary Tests', () => {
       data: { theme: 'dark' }
     });
 
-    await page.route('/api/**', route => route.abort());
-    await page.goto('/');
-    await page.evaluate((jwt) => {
-      localStorage.setItem('nexus_token', jwt);
-      localStorage.setItem('nexus-theme', 'invalid-theme-value');
+    
+    
+    await page.context().addInitScript((jwt) => {
+      window.localStorage.setItem('nexus_token', jwt);
+      window.localStorage.setItem('nexus-theme', 'invalid-theme-value');
     }, token);
-    await page.unroute('/api/**');
+    
     await page.goto('/settings');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   });
@@ -37,13 +37,13 @@ test.describe('Tier 2: Theme Boundary Tests', () => {
       data: { theme: 'dark' }
     });
 
-    await page.route('/api/**', route => route.abort());
-    await page.goto('/');
-    await page.evaluate((jwt) => {
-      localStorage.setItem('nexus_token', jwt);
-      localStorage.setItem('nexus-theme', '');
+    
+    
+    await page.context().addInitScript((jwt) => {
+      window.localStorage.setItem('nexus_token', jwt);
+      window.localStorage.setItem('nexus-theme', '');
     }, token);
-    await page.unroute('/api/**');
+    
     await page.goto('/settings');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   });
@@ -67,13 +67,13 @@ test.describe('Tier 2: Theme Boundary Tests', () => {
       data: { terminalTheme: 'nexus-dark' }
     });
 
-    await page.route('/api/**', route => route.abort());
-    await page.goto('/');
-    await page.evaluate((jwt) => {
-      localStorage.setItem('nexus_token', jwt);
-      localStorage.setItem('nexus-terminal-theme', 'invalid-terminal-value');
+    
+    
+    await page.context().addInitScript((jwt) => {
+      window.localStorage.setItem('nexus_token', jwt);
+      window.localStorage.setItem('nexus-terminal-theme', 'invalid-terminal-value');
     }, token);
-    await page.unroute('/api/**');
+    
     await page.goto('/settings');
     // Ensure page loaded without crashing (H1 exists)
     await expect(page.locator('h1')).toHaveText('Global Settings');
