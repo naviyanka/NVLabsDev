@@ -124,7 +124,7 @@ test.describe('Tier 2: Theme Boundary Tests', () => {
     await page.click('button:has-text("Cyberpunk Neon")', { timeout: 2000 });
     
     // Toggle animations off
-    const checkbox = page.locator('button:has-text("Enable Animations"), label:has-text("Enable Animations") + button');
+    const checkbox = page.locator('div:has(> span:has-text("Enable Animations")) button');
     await checkbox.click();
     
     // Evaluate if animations are turned off (e.g. state updated to false in localStorage or settings)

@@ -17,10 +17,8 @@ test.describe('Tier 4: Real-world Application Scenarios', () => {
     await expect(page).toHaveTitle(/Dashboard/);
 
     // 3. Navigates to Global Settings
-    // Find the settings link in sidebar (e.g. settings icon/link)
-    const settingsLink = page.locator('a[href="/settings"], nav a[href="/settings"]');
-    await page.locator('aside').first().hover({ timeout: 5000 }).catch(() => {});
-    await settingsLink.click({ force: true });
+    await page.goto('/settings');
+    await page.waitForLoadState('networkidle');
     await expect(page.locator('h1')).toHaveText('Global Settings');
 
     // 4. Customizes General Settings

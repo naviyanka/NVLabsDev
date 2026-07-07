@@ -27,7 +27,7 @@ test.describe('Tier 3: Cross-Feature Combinations', () => {
     await page.selectOption('select:near(label:has-text("UI Density")), select', 'compact');
     
     // Toggle Enable Animations off
-    const checkbox = page.locator('button:has-text("Enable Animations"), label:has-text("Enable Animations") + button');
+    const checkbox = page.locator('div:has(> span:has-text("Enable Animations")) button');
     await checkbox.click();
     
     // Reload to verify DB settings persist all three
