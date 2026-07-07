@@ -51,7 +51,7 @@ function Start-App {
     Start-Process dotnet -ArgumentList "run" -WorkingDirectory "$rootDir\src\Nexus.Gateway" -WindowStyle Normal
 
     Write-Host "Starting Frontend..." -ForegroundColor Cyan
-    Start-Process npm -ArgumentList "run dev" -WorkingDirectory "$rootDir\src\Nexus.Frontend" -WindowStyle Normal
+    Start-Process npm.cmd -ArgumentList "run", "dev" -WorkingDirectory "$rootDir\src\Nexus.Frontend" -WindowStyle Normal
 
     Write-Host "Servers are booting up in separate windows!" -ForegroundColor Green
     Write-Host "Waiting 5 seconds before opening the browser..." -ForegroundColor Yellow

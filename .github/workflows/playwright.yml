@@ -36,7 +36,7 @@ jobs:
 
     - name: Start Frontend
       working-directory: ./src/Nexus.Frontend
-      run: Start-Process npm -ArgumentList "run dev" -NoNewWindow
+      run: Start-Process npm.cmd -ArgumentList "run", "dev" -NoNewWindow
 
     - name: Wait for servers to start
       run: Start-Sleep -Seconds 20
