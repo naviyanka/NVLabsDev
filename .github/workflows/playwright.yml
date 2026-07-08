@@ -30,18 +30,9 @@ jobs:
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
 
-    - name: Start Backend
-      working-directory: ./src/Nexus.Gateway
-      run: Start-Process dotnet -ArgumentList "run" -NoNewWindow
-
-    - name: Start Frontend
-      working-directory: ./src/Nexus.Frontend
-      run: Start-Process npm.cmd -ArgumentList "run", "dev" -NoNewWindow
-
-    - name: Wait for servers to start
-      run: Start-Sleep -Seconds 20
-
     - name: Run Playwright tests
+      env:
+        CI: true
       run: npx playwright test
 
     - uses: actions/upload-artifact@v4

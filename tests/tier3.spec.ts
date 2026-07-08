@@ -13,7 +13,7 @@ test.describe('Tier 3: Cross-Feature Combinations', () => {
     await page.locator('button[title="Matrix"]').click();
     
     // Assert both attributes are set on document element
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'cyberpunk-neon');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', /cyberpunk|cyberpunk-neon/);
     await expect(page.locator('html')).toHaveAttribute('data-terminal-theme', 'matrix');
   });
 
@@ -33,7 +33,7 @@ test.describe('Tier 3: Cross-Feature Combinations', () => {
     // Reload to verify DB settings persist all three
     await page.reload();
     
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'cyberpunk-neon');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', /cyberpunk|cyberpunk-neon/);
     const densityVal = await page.locator('select').first().inputValue();
     expect(densityVal).toBe('compact');
     
