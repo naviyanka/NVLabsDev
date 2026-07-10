@@ -55,3 +55,30 @@ You must heavily use the `gitnexus` and `code-review-graph` MCP tools to underst
 - [ ] Automated build scripts (`npm run build` in `src/Nexus.Frontend` and `dotnet build` in `src/Nexus.Gateway`) must pass entirely without errors after the cleanup and refactor.
 - [ ] No required functionality is accidentally broken (the frontend and backend must successfully start).
 - [ ] A final `walkthrough.md` report is generated listing precisely what was removed, optimized areas, and why the refactored code is superior.
+
+## Follow-up — 2026-07-10T16:55:13Z
+
+# Teamwork Project Prompt — Draft
+
+> Status: Ready for launch — awaiting user approval
+> Goal: Craft prompt → get user approval → delegate to teamwork_preview
+
+Fix and enhance the Installed Apps deployment feature, ensuring robust cross-server silent installations and providing an explicit mechanism that spawns the installer UI on the target server in an interactive session.
+
+Working directory: C:\Users\OrgAdmin\Documents\NVLabs
+Integrity mode: benchmark
+
+## Requirements
+
+### R1. Cross-Server Silent Installation
+Ensure the application can flawlessly install `.msi` and `.exe` software on a selected remote server (e.g., from DC to SPAPP), supporting proper remote file transfer and silent execution parameters. 
+
+### R2. Interactive UI Spawn
+Implement an explicit mechanism to bypass Session 0 isolation on remote servers. This should allow an installer UI to be spawned interactively on the target server's active user session (so the user gets the installation popup on their target machine).
+
+## Acceptance Criteria
+
+### Installation Integrity
+- [ ] Playwright E2E tests pass, confirming an app can be successfully installed across servers.
+- [ ] Playwright E2E tests verify the option to select "Interactive Mode" triggers the interactive installer bypassing Session 0.
+- [ ] No regression on retrieving the apps list via WMI.
