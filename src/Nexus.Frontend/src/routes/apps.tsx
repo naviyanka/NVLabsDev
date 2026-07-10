@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Search, Download, Trash2, Plus, RefreshCw } from "lucide-react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
-import { getAppsClient, installAppClient, uninstallAppClient, type InstalledApp } from "@/api/client";
+import { getAppsClient, installAppClient, uninstallAppClient, getServersClient, type InstalledApp } from "@/api/client";
 import { RemoteFilePicker } from "@/components/ui/RemoteFilePicker";
 
 export const Route = createFileRoute("/apps")({
@@ -20,6 +20,7 @@ function AppsPage() {
   const [installingPath, setInstallingPath] = useState("");
   const [installArgs, setInstallArgs] = useState("");
   const [sourceServerIp, setSourceServerIp] = useState("");
+  const [installAll, setInstallAll] = useState(false);
 
   const fetchApps = async (refresh: boolean = false) => {
     setIsLoading(true);
@@ -52,16 +53,29 @@ function AppsPage() {
   const handleInstall = async () => {
     if (!installingPath) return;
     setIsLoading(true);
-    const success = await installAppClient(server, installingPath, installArgs, sourceServerIp);
-    if (success) {
-      alert("Install completed.");
-      setInstallingPath("");
-      setInstallArgs("");
-      setSourceServerIp("");
-      fetchApps(true);
+
+    if (installAll) {
+      const servers = await getServersClient();
+      let successCount = 0;
+      for (const s of servers) {
+        const success = await installAppClient(s.ip, installingPath, installArgs, sourceServerIp);
+        if (success) successCount++;
+      }
+      alert(`Install completed on ${successCount} out of ${servers.length} servers.`);
     } else {
-      alert("Failed to install. Ensure the installer can run silently.");
+      const success = await installAppClient(server, installingPath, installArgs, sourceServerIp);
+      if (success) {
+        alert("Install completed.");
+      } else {
+        alert("Failed to install. Ensure the installer can run silently.");
+      }
     }
+
+    setInstallingPath("");
+    setInstallArgs("");
+    setSourceServerIp("");
+    setInstallAll(false);
+    fetchApps(true);
     setIsLoading(false);
   };
 
@@ -110,20 +124,29 @@ function AppsPage() {
                 className="w-full mt-1 rounded bg-[var(--bg-surface)] border border-[var(--border-c)] px-2 py-1 text-[12px] mono focus:border-[var(--amber)] outline-none"
               />
             </div>
-            <div className="flex items-end self-stretch pb-0.5">
-              <button 
-                onClick={handleInstall} 
-                disabled={isLoading}
-                className="h-7 px-4 rounded bg-[var(--amber)] text-black text-[12px] font-medium hover:bg-[var(--amber-hover)] disabled:opacity-50"
-              >
-                Start Install
-              </button>
-              <button 
-                onClick={() => setInstallingPath("")} 
-                className="h-7 px-3 ml-2 rounded border border-[var(--border-dim)] text-[var(--text-sub)] text-[12px] hover:text-[var(--text)]"
-              >
-                Cancel
-              </button>
+            <div className="flex flex-col justify-end self-stretch pb-0.5 gap-2">
+              <label className="flex items-center gap-2 text-[12px] text-[var(--text)]">
+                <input type="checkbox" checked={installAll} onChange={e => setInstallAll(e.target.checked)} className="rounded border-[var(--border-c)]" />
+                Install on all servers
+              </label>
+              <div className="flex items-center">
+                <button 
+                  onClick={handleInstall} 
+                  disabled={isLoading}
+                  className="h-7 px-4 rounded bg-[var(--amber)] text-black text-[12px] font-medium hover:bg-[var(--amber-hover)] disabled:opacity-50"
+                >
+                  Start Install
+                </button>
+                <button 
+                  onClick={() => {
+                    setInstallingPath("");
+                    setInstallAll(false);
+                  }}
+                  className="h-7 px-3 ml-2 rounded border border-[var(--border-dim)] text-[var(--text-sub)] text-[12px] hover:text-[var(--text)]"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>
