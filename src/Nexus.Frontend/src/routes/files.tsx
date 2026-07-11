@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
-import { Folder, File as FileIcon, ChevronRight, Upload, Plus, Trash2, Download, Edit2, Copy, MoveRight, Type, X, Save, FolderOpen } from "lucide-react";
+import { Folder, File as FileIcon, ChevronRight, Upload, Plus, Trash2, Download, Edit2, Copy, MoveRight, Type, X, Save, FolderOpen, MoreHorizontal, FilePlus, FolderPlus } from "lucide-react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
 import { 
@@ -176,6 +176,7 @@ function FilesPage() {
   const [server, setServer] = useState("dc");
   const [sources, setSources] = useState<FileSource[]>([]);
   const [path, setPath] = useState<string[]>([]);
+  const [pathInput, setPathInput] = useState("");
   const [files, setFiles] = useState<FileItem[]>([]);
   
   // Selection State
@@ -192,7 +193,7 @@ function FilesPage() {
   // Modals State
   const [promptState, setPromptState] = useState<{
     isOpen: boolean;
-    type: 'rename' | 'newFolder' | null;
+    type: 'rename' | 'newFolder' | 'newFile' | null;
     title: string;
     description: string;
     initialValue: string;
@@ -241,6 +242,7 @@ function FilesPage() {
   }, [server]);
 
   useEffect(() => {
+    setPathInput(path.join("\\"));
     fetchFiles();
   }, [path, server]);
 
@@ -293,6 +295,8 @@ function FilesPage() {
     try {
       if (type === 'newFolder') {
         await createFolderClient(server, path.join("\\"), val);
+      } else if (type === 'newFile') {
+        await writeTextFileClient(server, path.join("\\") + "\\" + val, "");
       } else if (type === 'rename' && selectedFile && val !== selectedFile.name) {
         await renameFileClient(server, path.join("\\") + "\\" + selectedFile.name, val);
       }
@@ -436,37 +440,53 @@ function FilesPage() {
 
         <div className="nx-card flex flex-col h-[calc(100vh-200px)]">
           <div className="flex flex-wrap items-center justify-between border-b border-[var(--border-c)] p-3 bg-[#0a0f18] gap-2">
-            <div className="mono flex items-center gap-1 text-[12px] overflow-x-auto whitespace-nowrap hide-scrollbar">
-              {path.map((p, i) => (
-                <span key={i} className="flex items-center gap-1">
-                  <button 
-                    onClick={() => setPath(path.slice(0, i + 1))}
-                    className="text-[var(--text-sub)] hover:text-[var(--amber)]">
-                    {p}
-                  </button>
-                  {i < path.length - 1 && <ChevronRight size={12} className="text-[var(--text-ghost)]" />}
-                </span>
-              ))}
+            <div className="flex-1 flex items-center gap-2">
+              <input 
+                type="text"
+                value={pathInput}
+                onChange={e => setPathInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    setPath(pathInput.split("\\").filter(Boolean));
+                  }
+                }}
+                className="mono w-full flex-1 rounded border border-[var(--border-c)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text)] outline-none focus:border-[var(--amber)] transition-colors"
+                placeholder="C:\Path\To\Folder"
+              />
             </div>
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2">
               <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
               
-              <TBtn icon={Plus} label="New Folder" onClick={handleCreateFolder} />
-              <TBtn icon={Upload} label="Upload" onClick={handleUploadClick} />
-              
-              <div className="w-[1px] h-6 bg-[var(--border-dim)] mx-1" />
-              
-              {selectedFile?.type === "folder" ? (
-                <TBtn icon={FolderOpen} label="Open" onClick={() => handleOpenItem(selectedFile)} />
-              ) : (
-                <TBtn icon={Edit2} label="Edit" disabled={!selectedFile || !isTextFile(selectedFile.type)} onClick={() => selectedFile && openEditor(selectedFile.name)} />
-              )}
-              
-              <TBtn icon={Download} label="Download" disabled={!selectedFile} onClick={handleDownload} />
-              <TBtn icon={Type} label="Rename" onClick={handleRename} disabled={!selectedFile} />
-              <TBtn icon={Copy} label="Copy" onClick={handleCopy} disabled={!selectedFile} />
-              <TBtn icon={MoveRight} label="Move" onClick={handleMove} disabled={!selectedFile} />
-              <TBtn icon={Trash2} label="Delete" onClick={handleDelete} disabled={!selectedFile} />
+              <div className="relative group">
+                <TBtn icon={Plus} label="" />
+                <div className="absolute right-0 top-full mt-1 hidden w-40 flex-col overflow-hidden rounded border border-[var(--border-c)] bg-[#0a0f18] shadow-xl group-hover:flex z-50">
+                  <button onClick={handleCreateFolder} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)]"><FolderPlus size={14} /> New Folder</button>
+                  <button onClick={() => {
+                    setPromptState({
+                      isOpen: true, type: 'newFile', title: 'New File', description: 'Enter a name for the new file.', initialValue: '', placeholder: 'newfile.txt'
+                    });
+                  }} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)]"><FilePlus size={14} /> New File</button>
+                </div>
+              </div>
+
+              <div className="relative group">
+                <TBtn icon={MoreHorizontal} label="" />
+                <div className="absolute right-0 top-full mt-1 hidden w-40 flex-col overflow-hidden rounded border border-[var(--border-c)] bg-[#0a0f18] shadow-xl group-hover:flex z-50">
+                  <button onClick={handleUploadClick} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)]"><Upload size={14} /> Upload</button>
+                  <div className="my-1 h-[1px] bg-[var(--border-dim)]" />
+                  <button onClick={handleDownload} disabled={!selectedFile} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)] disabled:opacity-50"><Download size={14} /> Download</button>
+                  {selectedFile?.type === "folder" ? (
+                    <button onClick={() => handleOpenItem(selectedFile)} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)]"><FolderOpen size={14} /> Open</button>
+                  ) : (
+                    <button onClick={() => selectedFile && openEditor(selectedFile.name)} disabled={!selectedFile || !isTextFile(selectedFile.type)} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)] disabled:opacity-50"><Edit2 size={14} /> Edit</button>
+                  )}
+                  <button onClick={handleRename} disabled={!selectedFile} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)] disabled:opacity-50"><Type size={14} /> Rename</button>
+                  <button onClick={handleCopy} disabled={!selectedFile} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)] disabled:opacity-50"><Copy size={14} /> Copy</button>
+                  <button onClick={handleMove} disabled={!selectedFile} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)] disabled:opacity-50"><MoveRight size={14} /> Move</button>
+                  <div className="my-1 h-[1px] bg-[var(--border-dim)]" />
+                  <button onClick={handleDelete} disabled={!selectedFile} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--red)] hover:bg-[var(--bg-surface)] disabled:opacity-50"><Trash2 size={14} /> Delete</button>
+                </div>
+              </div>
             </div>
           </div>
           
