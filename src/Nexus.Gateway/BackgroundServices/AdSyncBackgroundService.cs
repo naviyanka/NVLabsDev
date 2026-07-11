@@ -29,7 +29,7 @@ public class AdSyncBackgroundService : BackgroundService
                 var adService = scope.ServiceProvider.GetRequiredService<ActiveDirectoryService>();
                 var cimService = scope.ServiceProvider.GetRequiredService<CimService>();
 
-                var setting = await db.AppSettings.FirstOrDefaultAsync(cancellationToken: stoppingToken);
+                var setting = await db.AppSettings.FirstOrDefaultAsync(s => s.Id == "global", cancellationToken: stoppingToken);
                 int intervalMinutes = setting?.AdSyncInterval > 0 ? setting.AdSyncInterval : 60;
 
                 _logger.LogInformation("Starting background AD computer sync.");

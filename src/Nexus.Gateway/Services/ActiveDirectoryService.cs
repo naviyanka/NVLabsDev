@@ -22,7 +22,7 @@ public class ActiveDirectoryService
         var domainName = "nvlabs.com";
         try
         {
-            var setting = await _db.AppSettings.FirstOrDefaultAsync();
+            var setting = await _db.AppSettings.FirstOrDefaultAsync(s => s.Id == "global");
             if (setting != null && !string.IsNullOrEmpty(setting.DefaultDomainName))
             {
                 domainName = setting.DefaultDomainName;
@@ -68,6 +68,10 @@ public class ActiveDirectoryService
                     });
                 }
             }
+        }
+        catch (PrincipalServerDownException)
+        {
+            _logger.LogWarning("Failed to query AD domain {Domain}. Machine is likely not domain joined.", domainName);
         }
         catch (Exception ex)
         {

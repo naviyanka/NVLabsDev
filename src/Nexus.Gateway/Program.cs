@@ -79,7 +79,7 @@ try
     var optionsBuilder = new DbContextOptionsBuilder<NexusContext>();
     optionsBuilder.UseSqlite("Data Source=nexus.db");
     using var context = new NexusContext(optionsBuilder.Options);
-    var setting = context.AppSettings.FirstOrDefault();
+    var setting = context.AppSettings.FirstOrDefault(s => s.Id == "global");
     if (setting != null && setting.WebBindingPort > 0)
     {
         webBindingPort = setting.WebBindingPort;
@@ -142,7 +142,7 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
 
     var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-    var setting = db.AppSettings.FirstOrDefault();
+    var setting = db.AppSettings.FirstOrDefault(s => s.Id == "global");
     if (setting != null)
     {
         var appPort = configuration.GetValue<int?>("Nexus:WebBindingPort");

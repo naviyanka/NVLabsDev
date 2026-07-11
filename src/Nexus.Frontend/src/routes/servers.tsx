@@ -34,6 +34,7 @@ function ServersPage() {
 
   const [servers, setServers] = useState<Server[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [osFilters, setOsFilters] = useState<string[]>([]);
   const [q, setQ] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState("");
@@ -43,23 +44,41 @@ function ServersPage() {
 
   const loadServers = async () => {
     setLoading(true);
-    const data = await getServers();
-    setServers(data);
-    setLoading(false);
+    try {
+      const data = await getServers();
+      setServers(data);
+    } catch(e) {
+      toast.error("Failed to load servers");
+    } finally {
+      setLoading(false);
+    }
   };
   useEffect(() => { loadServers(); }, []);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    await addServer({ name: newName, ip: newIp, role: newRole });
-    setIsAdding(false);
-    setNewName(""); setNewIp(""); setNewRole("");
-    loadServers();
+    try {
+      await addServer({ name: newName, ip: newIp, role: newRole });
+      toast.success("Server added");
+      setIsAdding(false);
+      setNewName(""); setNewIp(""); setNewRole("");
+      loadServers();
+    } catch(e) {
+      toast.error("Failed to add server");
+    }
   };
 
+  const toggleOs = (os: string) => {
+    setOsFilters(prev =>
+      prev.includes(os) ? prev.filter(x => x !== os) : [...prev, os]
+    );
+  };
+
+  const osList = ["Windows Server 2016", "Windows Server 2019", "Windows Server 2022"];
   const filtered = servers.filter((s) =>
     (statusFilter === "all" || s.status === statusFilter) &&
-    (q === "" || s.name.toLowerCase().includes(q.toLowerCase()) || s.ip.includes(q))
+    (osFilters.length === 0 || osFilters.includes(s.os)) &&
+    (q === "" || s.name.toLowerCase().includes(q.toLowerCase()) || s.ip.includes(q) || s.role.toLowerCase().includes(q.toLowerCase()))
   );
 
   return (
