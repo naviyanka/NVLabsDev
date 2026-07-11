@@ -202,4 +202,104 @@ public class WindowsFilesController : ControllerBase
             return StatusCode(500, new { message = ex.Message });
         }
     }
+
+    [HttpPost("rename")]
+    public IActionResult Rename(string serverIp, [FromQuery] string path, [FromQuery] string newName)
+    {
+        try
+        {
+            var uncPath = BuildUncPath(serverIp, path);
+            var destPath = Path.Combine(Path.GetDirectoryName(uncPath) ?? "", newName);
+            if (Directory.Exists(uncPath))
+                Directory.Move(uncPath, destPath);
+            else if (System.IO.File.Exists(uncPath))
+                System.IO.File.Move(uncPath, destPath);
+            else return NotFound();
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("move")]
+    public IActionResult Move(string serverIp, [FromQuery] string path, [FromQuery] string destPath)
+    {
+        try
+        {
+            var uncPath = BuildUncPath(serverIp, path);
+            var uncDestPath = BuildUncPath(serverIp, destPath);
+            if (Directory.Exists(uncPath))
+                Directory.Move(uncPath, uncDestPath);
+            else if (System.IO.File.Exists(uncPath))
+                System.IO.File.Move(uncPath, uncDestPath);
+            else return NotFound();
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("copy")]
+    public IActionResult Copy(string serverIp, [FromQuery] string path, [FromQuery] string destPath)
+    {
+        try
+        {
+            var uncPath = BuildUncPath(serverIp, path);
+            var uncDestPath = BuildUncPath(serverIp, destPath);
+            if (Directory.Exists(uncPath))
+            {
+                // Simple recursive copy is not available in stdlib, so we do basic folder copy if needed, 
+                // but usually users copy files. For now, throw if trying to copy directory to keep it simple, or implement it.
+                return StatusCode(400, new { message = "Folder copy not implemented." });
+            }
+            else if (System.IO.File.Exists(uncPath))
+                System.IO.File.Copy(uncPath, uncDestPath, overwrite: true);
+            else return NotFound();
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("read-text")]
+    public async Task<IActionResult> ReadText(string serverIp, [FromQuery] string path)
+    {
+        try
+        {
+            var uncPath = BuildUncPath(serverIp, path);
+            if (!System.IO.File.Exists(uncPath)) return NotFound();
+            var content = await System.IO.File.ReadAllTextAsync(uncPath);
+            return Ok(new { content });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("write-text")]
+    public async Task<IActionResult> WriteText(string serverIp, [FromQuery] string path, [FromBody] FileContentDto dto)
+    {
+        try
+        {
+            var uncPath = BuildUncPath(serverIp, path);
+            await System.IO.File.WriteAllTextAsync(uncPath, dto.Content);
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+}
+
+public class FileContentDto
+{
+    public string Content { get; set; } = string.Empty;
 }

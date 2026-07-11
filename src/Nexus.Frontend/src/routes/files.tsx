@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
-import { Folder, File as FileIcon, ChevronRight, Upload, Plus, Trash2, Download } from "lucide-react";
+import { Folder, File as FileIcon, ChevronRight, Upload, Plus, Trash2, Download, Edit2, Copy, MoveRight, Type, X, Save } from "lucide-react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
 import { 
   FileSource, FileItem, getFilesSourcesClient, getFilesListClient, 
-  createFolderClient, deleteFileClient, uploadFileClient, getDownloadUrl 
+  createFolderClient, deleteFileClient, uploadFileClient, getDownloadUrl,
+  renameFileClient, moveFileClient, copyFileClient, readTextFileClient, writeTextFileClient
 } from "@/api/client";
 
 export const Route = createFileRoute("/files")({
@@ -22,6 +23,11 @@ function formatBytes(bytes: number, decimals = 2) {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
 }
 
+function isTextFile(ext: string) {
+  const textExtensions = ["txt", "json", "md", "csv", "ps1", "bat", "cmd", "xml", "ini", "log", "yaml", "yml", "js", "ts", "html", "css"];
+  return textExtensions.includes(ext.toLowerCase());
+}
+
 function FilesPage() {
   const [server, setServer] = useState("dc");
   const [sources, setSources] = useState<FileSource[]>([]);
@@ -29,6 +35,13 @@ function FilesPage() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Editor State
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [editorContent, setEditorContent] = useState("");
+  const [editorFile, setEditorFile] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchSources = async () => {
@@ -88,6 +101,52 @@ function FilesPage() {
     }
   };
 
+  const handleRename = async () => {
+    if (!selectedFile) return;
+    const newName = prompt(`Enter new name for ${selectedFile}:`, selectedFile);
+    if (!newName || newName === selectedFile) return;
+    try {
+      await renameFileClient(server, path.join("\\") + "\\" + selectedFile, newName);
+      fetchFiles();
+    } catch (e) {
+      alert("Failed to rename");
+    }
+  };
+
+  const handleMove = async () => {
+    if (!selectedFile) return;
+    const destPath = prompt(`Enter destination path for ${selectedFile}:\n(e.g., C:\\temp)`, path.join("\\"));
+    if (!destPath || destPath === path.join("\\")) return;
+    try {
+      await moveFileClient(server, path.join("\\") + "\\" + selectedFile, destPath + "\\" + selectedFile);
+      fetchFiles();
+    } catch (e) {
+      alert("Failed to move");
+    }
+  };
+
+  const handleCopy = async () => {
+    if (!selectedFile) return;
+    const destPath = prompt(`Enter destination path to copy ${selectedFile}:\n(e.g., C:\\temp)`, path.join("\\"));
+    if (!destPath) return;
+    
+    let fullDest = destPath;
+    if (!destPath.endsWith("\\" + selectedFile)) {
+      fullDest = destPath + "\\" + selectedFile;
+    }
+
+    if (fullDest === path.join("\\") + "\\" + selectedFile) {
+      fullDest = path.join("\\") + "\\Copy of " + selectedFile;
+    }
+
+    try {
+      await copyFileClient(server, path.join("\\") + "\\" + selectedFile, fullDest);
+      fetchFiles();
+    } catch (e) {
+      alert("Failed to copy. Folder copy is not supported.");
+    }
+  };
+
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
@@ -101,8 +160,34 @@ function FilesPage() {
     } catch (err) {
       alert("Failed to upload");
     }
-    // reset input
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const openEditor = async (fileName: string) => {
+    setEditorFile(fileName);
+    setEditorContent("Loading...");
+    setIsEditorOpen(true);
+    try {
+      const text = await readTextFileClient(server, path.join("\\") + "\\" + fileName);
+      setEditorContent(text);
+    } catch (e) {
+      setEditorContent("Failed to load file. It might be binary or too large.");
+    }
+  };
+
+  const saveEditor = async () => {
+    if (!editorFile) return;
+    setIsSaving(true);
+    try {
+      await writeTextFileClient(server, path.join("\\") + "\\" + editorFile, editorContent);
+      alert("File saved successfully.");
+      setIsEditorOpen(false);
+      fetchFiles();
+    } catch (e) {
+      alert("Failed to save file.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const disks = sources.filter(s => s.type === "Disk");
@@ -140,9 +225,9 @@ function FilesPage() {
           )}
         </aside>
 
-        <div className="nx-card overflow-hidden">
-          <div className="flex items-center justify-between border-b border-[var(--border-c)] p-3 bg-[#0a0f18]">
-            <div className="mono flex items-center gap-1 text-[12px]">
+        <div className="nx-card flex flex-col h-[calc(100vh-200px)]">
+          <div className="flex flex-wrap items-center justify-between border-b border-[var(--border-c)] p-3 bg-[#0a0f18] gap-2">
+            <div className="mono flex items-center gap-1 text-[12px] overflow-x-auto whitespace-nowrap hide-scrollbar">
               {path.map((p, i) => (
                 <span key={i} className="flex items-center gap-1">
                   <button 
@@ -154,55 +239,93 @@ function FilesPage() {
                 </span>
               ))}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
               <TBtn icon={Plus} label="New Folder" onClick={handleCreateFolder} />
-              <TBtn icon={Upload} label="Upload File" onClick={handleUploadClick} />
+              <TBtn icon={Upload} label="Upload" onClick={handleUploadClick} />
+              <div className="w-[1px] h-6 bg-[var(--border-dim)] mx-1" />
+              <TBtn icon={Type} label="Rename" onClick={handleRename} disabled={!selectedFile} />
+              <TBtn icon={Copy} label="Copy" onClick={handleCopy} disabled={!selectedFile} />
+              <TBtn icon={MoveRight} label="Move" onClick={handleMove} disabled={!selectedFile} />
               <TBtn icon={Trash2} label="Delete" onClick={handleDelete} disabled={!selectedFile} />
             </div>
           </div>
-          <table className="w-full text-[12px]">
-            <thead>
-              <tr className="eyebrow border-b border-[var(--border-c)] text-left bg-[#0a0f18]/50">
-                <th className="px-4 py-2">Name</th><th>Type</th><th>Size</th><th>Modified</th><th>Attributes</th>
-              </tr>
-            </thead>
-            <tbody className="mono">
-              {isLoading ? (
-                <tr><td colSpan={5} className="py-4 text-center text-[var(--text-sub)]">Loading...</td></tr>
-              ) : files.length === 0 ? (
-                <tr><td colSpan={5} className="py-4 text-center text-[var(--text-sub)]">Folder is empty</td></tr>
-              ) : (
-                files.map((f) => {
-                  const isSelected = selectedFile === f.name;
-                  return (
-                    <tr 
-                      key={f.name} 
-                      onClick={() => setSelectedFile(f.name)}
-                      onDoubleClick={() => {
-                        if (f.type === "folder") {
-                          setPath([...path, f.name]);
-                        } else {
-                          window.open(getDownloadUrl(server, path.join("\\") + "\\" + f.name), '_blank');
-                        }
-                      }}
-                      className={`cursor-pointer border-b border-[var(--border-dim)] hover:bg-[var(--bg-surface)] ${isSelected ? "bg-[var(--bg-surface)]" : ""}`}>
-                      <td className="flex items-center gap-2 px-4 py-2 text-[var(--text)]">
-                        {f.type === "folder" ? <Folder size={13} className="text-[var(--amber)]" /> : <FileIcon size={13} className="text-[var(--text-sub)]" />}
-                        {f.name}
-                      </td>
-                      <td className="text-[var(--text-sub)]">{f.type === "folder" ? "File folder" : f.type.toUpperCase() + " File"}</td>
-                      <td className="text-[var(--text-sub)]">{f.type === "folder" ? "" : formatBytes(f.size)}</td>
-                      <td className="text-[var(--text-sub)]">{f.modified}</td>
-                      <td className="text-[var(--text-sub)]">{f.attrs}</td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+          
+          <div className="overflow-auto flex-1">
+            <table className="w-full text-[12px] relative">
+              <thead className="sticky top-0 bg-[#0a0f18]/95 backdrop-blur-sm z-10 shadow-[0_1px_0_var(--border-c)]">
+                <tr className="eyebrow text-left">
+                  <th className="px-4 py-2 font-normal">Name</th>
+                  <th className="font-normal">Type</th>
+                  <th className="font-normal">Size</th>
+                  <th className="font-normal">Modified</th>
+                  <th className="font-normal">Attributes</th>
+                </tr>
+              </thead>
+              <tbody className="mono">
+                {isLoading ? (
+                  <tr><td colSpan={5} className="py-4 text-center text-[var(--text-sub)]">Loading...</td></tr>
+                ) : files.length === 0 ? (
+                  <tr><td colSpan={5} className="py-4 text-center text-[var(--text-sub)]">Folder is empty</td></tr>
+                ) : (
+                  files.map((f) => {
+                    const isSelected = selectedFile === f.name;
+                    return (
+                      <tr 
+                        key={f.name} 
+                        onClick={() => setSelectedFile(f.name)}
+                        onDoubleClick={() => {
+                          if (f.type === "folder") {
+                            setPath([...path, f.name]);
+                          } else if (isTextFile(f.type)) {
+                            openEditor(f.name);
+                          } else {
+                            window.open(getDownloadUrl(server, path.join("\\") + "\\" + f.name), '_blank');
+                          }
+                        }}
+                        className={`cursor-pointer border-b border-[var(--border-dim)] hover:bg-[var(--bg-surface)] ${isSelected ? "bg-[var(--bg-surface)]" : ""}`}>
+                        <td className="flex items-center gap-2 px-4 py-2 text-[var(--text)]">
+                          {f.type === "folder" ? <Folder size={13} className="text-[var(--amber)]" /> : <FileIcon size={13} className="text-[var(--text-sub)]" />}
+                          {f.name}
+                        </td>
+                        <td className="text-[var(--text-sub)]">{f.type === "folder" ? "File folder" : f.type.toUpperCase() + " File"}</td>
+                        <td className="text-[var(--text-sub)]">{f.type === "folder" ? "" : formatBytes(f.size)}</td>
+                        <td className="text-[var(--text-sub)]">{f.modified}</td>
+                        <td className="text-[var(--text-sub)]">{f.attrs}</td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
+
+      {isEditorOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="flex h-[80vh] w-[80vw] flex-col overflow-hidden rounded-lg border border-[var(--border-c)] bg-[#0a0f18] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--border-c)] bg-[var(--bg-surface)] px-4 py-2">
+              <div className="mono flex items-center gap-2 text-[12px] text-[var(--text)]">
+                <Edit2 size={14} className="text-[var(--amber)]" />
+                Editing: {editorFile}
+              </div>
+              <div className="flex items-center gap-2">
+                <TBtn icon={Save} label={isSaving ? "Saving..." : "Save"} onClick={saveEditor} disabled={isSaving} />
+                <button onClick={() => setIsEditorOpen(false)} className="rounded p-1 text-[var(--text-sub)] hover:bg-[var(--border-dim)] hover:text-white">
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+            <textarea
+              className="mono h-full w-full resize-none bg-transparent p-4 text-[13px] text-[var(--text)] outline-none"
+              value={editorContent}
+              onChange={(e) => setEditorContent(e.target.value)}
+              spellCheck={false}
+            />
+          </div>
+        </div>
+      )}
     </PageWrapper>
   );
 }

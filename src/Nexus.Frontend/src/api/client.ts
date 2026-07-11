@@ -298,6 +298,37 @@ export const getDownloadUrl = (serverIp: string, path: string): string => {
   return `${API_BASE}/servers/${serverIp}/files/download?path=${encodeURIComponent(path)}`;
 };
 
+export const renameFileClient = async (serverIp: string, path: string, newName: string): Promise<void> => {
+  const res = await fetch(`${API_BASE}/servers/${serverIp}/files/rename?path=${encodeURIComponent(path)}&newName=${encodeURIComponent(newName)}`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to rename");
+};
+
+export const moveFileClient = async (serverIp: string, path: string, destPath: string): Promise<void> => {
+  const res = await fetch(`${API_BASE}/servers/${serverIp}/files/move?path=${encodeURIComponent(path)}&destPath=${encodeURIComponent(destPath)}`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to move");
+};
+
+export const copyFileClient = async (serverIp: string, path: string, destPath: string): Promise<void> => {
+  const res = await fetch(`${API_BASE}/servers/${serverIp}/files/copy?path=${encodeURIComponent(path)}&destPath=${encodeURIComponent(destPath)}`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to copy");
+};
+
+export const readTextFileClient = async (serverIp: string, path: string): Promise<string> => {
+  const res = await fetch(`${API_BASE}/servers/${serverIp}/files/read-text?path=${encodeURIComponent(path)}`);
+  if (!res.ok) throw new Error("Failed to read text file");
+  const data = await res.json();
+  return data.content;
+};
+
+export const writeTextFileClient = async (serverIp: string, path: string, content: string): Promise<void> => {
+  const res = await fetch(`${API_BASE}/servers/${serverIp}/files/write-text?path=${encodeURIComponent(path)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content })
+  });
+  if (!res.ok) throw new Error("Failed to write text file");
+};
+
 export async function getDisksClient(serverId: string): Promise<Disk[]> {
   try {
     const res = await fetch(`${API_BASE}/servers/${serverId}/storage/disks`);
