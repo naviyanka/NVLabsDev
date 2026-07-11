@@ -196,9 +196,9 @@ public class AppsController : ControllerBase
                 cmd = $"Start-Process -FilePath \"{EscapePsArg(actualInstallerPath)}\" -ArgumentList \"{EscapePsArg(args)}\" -Wait -NoNewWindow";
             }
 
-            // Use single-quoted script block to prevent injection
+            // Use single-quoted script block with Invoke-Expression to execute
             var safeCmd = cmd.Replace("'", "''");
-            var script = $"Invoke-Command -ComputerName {ip} -ScriptBlock {{ '{safeCmd}' }}";
+            var script = $"Invoke-Command -ComputerName {ip} -ScriptBlock {{ Invoke-Expression '{safeCmd}' }}";
             var base64 = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
             
             var result = await _ps.ExecuteAsync($"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {base64}", HttpContext.RequestAborted);
@@ -279,9 +279,9 @@ public class AppsController : ControllerBase
             if (!IsValidUninstallString(cmd))
                 return BadRequest("UninstallString contains disallowed characters.");
 
-            // Use single-quoted script block to prevent injection
+            // Use single-quoted script block with Invoke-Expression to execute
             var safeCmd = cmd.Replace("'", "''");
-            var script = $"Invoke-Command -ComputerName {ip} -ScriptBlock {{ '{safeCmd}' }}";
+            var script = $"Invoke-Command -ComputerName {ip} -ScriptBlock {{ Invoke-Expression '{safeCmd}' }}";
             var base64 = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
             
             var result = await _ps.ExecuteAsync($"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {base64}", HttpContext.RequestAborted);
