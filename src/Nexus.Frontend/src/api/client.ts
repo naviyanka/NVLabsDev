@@ -276,12 +276,18 @@ export const getFilesListClient = async (serverIp: string, path: string): Promis
 
 export const createFolderClient = async (serverIp: string, path: string, name: string): Promise<void> => {
   const res = await fetch(`${API_BASE}/servers/${serverIp}/files/new-folder?path=${encodeURIComponent(path)}&name=${encodeURIComponent(name)}`, { method: "POST" });
-  if (!res.ok) throw new Error("Failed to create folder");
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Failed to create folder");
+  }
 };
 
 export const deleteFileClient = async (serverIp: string, path: string): Promise<void> => {
   const res = await fetch(`${API_BASE}/servers/${serverIp}/files/delete?path=${encodeURIComponent(path)}`, { method: "DELETE" });
-  if (!res.ok) throw new Error("Failed to delete");
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Failed to delete");
+  }
 };
 
 export const uploadFileClient = async (serverIp: string, path: string, file: File): Promise<void> => {
@@ -291,7 +297,10 @@ export const uploadFileClient = async (serverIp: string, path: string, file: Fil
     method: "POST",
     body: formData,
   });
-  if (!res.ok) throw new Error("Failed to upload");
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Failed to upload");
+  }
 };
 
 export const getDownloadUrl = (serverIp: string, path: string): string => {
@@ -300,17 +309,26 @@ export const getDownloadUrl = (serverIp: string, path: string): string => {
 
 export const renameFileClient = async (serverIp: string, path: string, newName: string): Promise<void> => {
   const res = await fetch(`${API_BASE}/servers/${serverIp}/files/rename?path=${encodeURIComponent(path)}&newName=${encodeURIComponent(newName)}`, { method: "POST" });
-  if (!res.ok) throw new Error("Failed to rename");
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Failed to rename");
+  }
 };
 
 export const moveFileClient = async (serverIp: string, path: string, destPath: string): Promise<void> => {
   const res = await fetch(`${API_BASE}/servers/${serverIp}/files/move?path=${encodeURIComponent(path)}&destPath=${encodeURIComponent(destPath)}`, { method: "POST" });
-  if (!res.ok) throw new Error("Failed to move");
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Failed to move");
+  }
 };
 
 export const copyFileClient = async (serverIp: string, path: string, destPath: string): Promise<void> => {
   const res = await fetch(`${API_BASE}/servers/${serverIp}/files/copy?path=${encodeURIComponent(path)}&destPath=${encodeURIComponent(destPath)}`, { method: "POST" });
-  if (!res.ok) throw new Error("Failed to copy");
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Failed to copy");
+  }
 };
 
 export const readTextFileClient = async (serverIp: string, path: string): Promise<string> => {
