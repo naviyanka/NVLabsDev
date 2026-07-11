@@ -63,6 +63,115 @@ function PromptDialog({ isOpen, title, description, initialValue, placeholder, o
   );
 }
 
+// Folder Picker Dialog for Move/Copy
+function FolderPickerDialog({ isOpen, server, title, initialPath, onConfirm, onCancel }: any) {
+  const [sources, setSources] = useState<FileSource[]>([]);
+  const [currentPath, setCurrentPath] = useState<string[]>([]);
+  const [folders, setFolders] = useState<FileItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialPath) {
+        setCurrentPath(initialPath.split("\\").filter(Boolean));
+      }
+      getFilesSourcesClient(server).then(setSources).catch(console.error);
+    }
+  }, [isOpen, server, initialPath]);
+
+  useEffect(() => {
+    if (isOpen && currentPath.length > 0) {
+      setIsLoading(true);
+      getFilesListClient(server, currentPath.join("\\"))
+        .then(data => setFolders(data.filter(f => f.type === "folder")))
+        .catch(() => setFolders([]))
+        .finally(() => setIsLoading(false));
+    } else {
+      setFolders([]);
+    }
+  }, [isOpen, currentPath, server]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+      <div className="flex h-[60vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-[var(--border-c)] bg-[#0a0f18] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[var(--border-c)] bg-[var(--bg-surface)] px-4 py-3">
+          <div className="eyebrow text-[var(--text)]">{title}</div>
+          <button onClick={onCancel} className="text-[var(--text-sub)] hover:text-white"><X size={16} /></button>
+        </div>
+        
+        <div className="flex flex-1 overflow-hidden">
+          <div className="w-48 border-r border-[var(--border-c)] bg-[var(--bg-surface)]/50 p-2 overflow-y-auto">
+            <div className="eyebrow mb-2 px-2 text-[10px]">Sources</div>
+            {sources.map(s => (
+              <button 
+                key={s.path}
+                onClick={() => setCurrentPath([s.path])}
+                className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-[12px] ${currentPath[0] === s.path ? "bg-[var(--amber-low)] text-[var(--amber)]" : "text-[var(--text-sub)] hover:bg-[var(--border-c)] hover:text-white"}`}
+              >
+                <Folder size={12} className={s.type === "Disk" ? "text-[var(--amber)]" : "text-[var(--teal)]"} /> {s.name}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-1 flex-col overflow-hidden">
+            <div className="border-b border-[var(--border-c)] p-2">
+              <div className="mono text-[11px] text-[var(--text-sub)] overflow-x-auto whitespace-nowrap hide-scrollbar flex items-center gap-1">
+                {currentPath.map((p, i) => (
+                  <span key={i} className="flex items-center gap-1">
+                    <button 
+                      onClick={() => setCurrentPath(currentPath.slice(0, i + 1))}
+                      className="hover:text-[var(--amber)]"
+                    >
+                      {p}
+                    </button>
+                    {i < currentPath.length - 1 && <ChevronRight size={10} />}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2">
+              {isLoading ? (
+                <div className="text-center text-[12px] text-[var(--text-sub)] p-4">Loading...</div>
+              ) : folders.length === 0 ? (
+                <div className="text-center text-[12px] text-[var(--text-sub)] p-4">No folders</div>
+              ) : (
+                folders.map(f => (
+                  <button
+                    key={f.name}
+                    onDoubleClick={() => setCurrentPath([...currentPath, f.name])}
+                    className="flex w-full items-center gap-2 rounded p-2 text-left text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)]"
+                  >
+                    <Folder size={14} className="text-[var(--amber)]" />
+                    {f.name}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-[var(--border-c)] bg-[var(--bg-surface)] p-3">
+          <div className="mono text-[11px] text-[var(--text-sub)] truncate max-w-[300px]">
+            Target: {currentPath.join("\\")}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={onCancel} className="rounded px-4 py-1.5 text-[12px] font-medium text-[var(--text-sub)] hover:text-white">Cancel</button>
+            <button 
+              onClick={() => onConfirm(currentPath.join("\\"))}
+              disabled={currentPath.length === 0}
+              className="rounded bg-[var(--amber)] px-4 py-1.5 text-[12px] font-semibold text-black hover:bg-[var(--amber-hover)] disabled:opacity-50"
+            >
+              Select Folder
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FilesPage() {
   const [server, setServer] = useState("dc");
   const [sources, setSources] = useState<FileSource[]>([]);
@@ -83,7 +192,7 @@ function FilesPage() {
   // Modals State
   const [promptState, setPromptState] = useState<{
     isOpen: boolean;
-    type: 'rename' | 'move' | 'copy' | 'newFolder' | null;
+    type: 'rename' | 'newFolder' | null;
     title: string;
     description: string;
     initialValue: string;
@@ -91,6 +200,12 @@ function FilesPage() {
   }>({
     isOpen: false, type: null, title: "", description: "", initialValue: "", placeholder: ""
   });
+
+  const [folderPickerState, setFolderPickerState] = useState<{
+    isOpen: boolean;
+    type: 'move' | 'copy' | null;
+    title: string;
+  }>({ isOpen: false, type: null, title: "" });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -154,25 +269,19 @@ function FilesPage() {
 
   const handleMove = () => {
     if (!selectedFile) return;
-    setPromptState({
+    setFolderPickerState({
       isOpen: true,
       type: 'move',
-      title: 'Move Item',
-      description: `Enter destination path for ${selectedFile.name}.`,
-      initialValue: path.join("\\"),
-      placeholder: 'C:\\Destination'
+      title: `Move ${selectedFile.name} To...`
     });
   };
 
   const handleCopy = () => {
     if (!selectedFile) return;
-    setPromptState({
+    setFolderPickerState({
       isOpen: true,
       type: 'copy',
-      title: 'Copy Item',
-      description: `Enter destination path to copy ${selectedFile.name}.`,
-      initialValue: path.join("\\"),
-      placeholder: 'C:\\Destination'
+      title: `Copy ${selectedFile.name} To...`
     });
   };
 
@@ -186,10 +295,23 @@ function FilesPage() {
         await createFolderClient(server, path.join("\\"), val);
       } else if (type === 'rename' && selectedFile && val !== selectedFile.name) {
         await renameFileClient(server, path.join("\\") + "\\" + selectedFile.name, val);
-      } else if (type === 'move' && selectedFile && val !== path.join("\\")) {
-        await moveFileClient(server, path.join("\\") + "\\" + selectedFile.name, val + "\\" + selectedFile.name);
-      } else if (type === 'copy' && selectedFile) {
-        let fullDest = val;
+      }
+      fetchFiles();
+    } catch (e: any) {
+      alert(`Operation failed: ${e.message || "Unknown error"}`);
+    }
+  };
+
+  const handleFolderPickerConfirm = async (destPath: string) => {
+    if (!destPath || !selectedFile) return;
+    const { type } = folderPickerState;
+    setFolderPickerState(p => ({ ...p, isOpen: false }));
+    
+    try {
+      if (type === 'move' && destPath !== path.join("\\")) {
+        await moveFileClient(server, path.join("\\") + "\\" + selectedFile.name, destPath + "\\" + selectedFile.name);
+      } else if (type === 'copy') {
+        let fullDest = destPath;
         if (!fullDest.endsWith("\\" + selectedFile.name)) {
           fullDest = fullDest + "\\" + selectedFile.name;
         }
@@ -405,7 +527,16 @@ function FilesPage() {
         placeholder={promptState.placeholder}
         onConfirm={handlePromptConfirm}
         onCancel={() => setPromptState(p => ({ ...p, isOpen: false }))}
-        confirmLabel={promptState.type === 'delete' ? 'Delete' : 'Confirm'}
+        confirmLabel="Confirm"
+      />
+
+      <FolderPickerDialog
+        isOpen={folderPickerState.isOpen}
+        server={server}
+        title={folderPickerState.title}
+        initialPath={path.join("\\")}
+        onConfirm={handleFolderPickerConfirm}
+        onCancel={() => setFolderPickerState(p => ({ ...p, isOpen: false }))}
       />
 
       {isEditorOpen && (
