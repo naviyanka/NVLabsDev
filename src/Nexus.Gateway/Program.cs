@@ -72,8 +72,13 @@ builder.Services.AddHostedService<LogPersistenceService>();
 builder.Services.AddHostedService<AdSyncBackgroundService>();
 builder.Services.AddSignalR();
 
+// Environment variable overrides
+var isDev = Environment.GetEnvironmentVariable("DEV") == "1";
+var isProd = Environment.GetEnvironmentVariable("PROD") == "1";
+
 // Load port dynamically from database's WebBindingPort setting at startup
-int webBindingPort = 5011;
+int webBindingPort = 5011; // Default prod port
+
 try
 {
     var optionsBuilder = new DbContextOptionsBuilder<NexusContext>();
@@ -88,6 +93,16 @@ try
 catch
 {
     // Fallback if database is not initialized/migrated yet
+}
+
+// Apply env overrides (highest priority)
+if (isDev)
+{
+    webBindingPort = 5173; // Vite dev server port
+}
+else if (isProd)
+{
+    webBindingPort = 5011; // Production port
 }
 
 // Configure YARP for unified port proxying to Node.js frontend
