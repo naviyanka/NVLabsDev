@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
-import { Folder, File as FileIcon, ChevronRight, Upload, Plus, Trash2, Download, Edit2, Copy, MoveRight, Type, X, Save } from "lucide-react";
+import { Folder, File as FileIcon, ChevronRight, Upload, Plus, Trash2, Download, Edit2, Copy, MoveRight, Type, X, Save, FolderOpen } from "lucide-react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
 import { 
@@ -28,12 +28,50 @@ function isTextFile(ext: string) {
   return textExtensions.includes(ext.toLowerCase());
 }
 
+// Simple Dialog component for prompts
+function PromptDialog({ isOpen, title, description, initialValue, placeholder, onConfirm, onCancel, confirmLabel = "Save" }: any) {
+  const [value, setValue] = useState(initialValue || "");
+  useEffect(() => { if (isOpen) setValue(initialValue || ""); }, [isOpen, initialValue]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+      <div className="w-full max-w-md overflow-hidden rounded-xl border border-[var(--border-c)] bg-[#0a0f18] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[var(--border-c)] bg-[var(--bg-surface)] px-4 py-3">
+          <div className="eyebrow text-[var(--text)]">{title}</div>
+          <button onClick={onCancel} className="text-[var(--text-sub)] hover:text-white"><X size={16} /></button>
+        </div>
+        <div className="p-5">
+          {description && <p className="text-[12px] text-[var(--text-sub)] mb-3">{description}</p>}
+          <input 
+            type="text" 
+            autoFocus
+            value={value}
+            onChange={e => setValue(e.target.value)}
+            placeholder={placeholder}
+            onKeyDown={e => { if (e.key === 'Enter') onConfirm(value); if (e.key === 'Escape') onCancel(); }}
+            className="mono w-full rounded border border-[var(--border-c)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text)] outline-none focus:border-[var(--amber)]"
+          />
+          <div className="mt-5 flex justify-end gap-3">
+            <button onClick={onCancel} className="rounded px-4 py-1.5 text-[12px] font-medium text-[var(--text-sub)] hover:text-white">Cancel</button>
+            <button onClick={() => onConfirm(value)} className="rounded bg-[var(--amber)] px-4 py-1.5 text-[12px] font-semibold text-black hover:bg-[var(--amber-hover)]">{confirmLabel}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FilesPage() {
   const [server, setServer] = useState("dc");
   const [sources, setSources] = useState<FileSource[]>([]);
   const [path, setPath] = useState<string[]>([]);
   const [files, setFiles] = useState<FileItem[]>([]);
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  
+  // Selection State
+  const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
+  
   const [isLoading, setIsLoading] = useState(false);
   
   // Editor State
@@ -41,6 +79,18 @@ function FilesPage() {
   const [editorContent, setEditorContent] = useState("");
   const [editorFile, setEditorFile] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Modals State
+  const [promptState, setPromptState] = useState<{
+    isOpen: boolean;
+    type: 'rename' | 'move' | 'copy' | 'newFolder' | null;
+    title: string;
+    description: string;
+    initialValue: string;
+    placeholder: string;
+  }>({
+    isOpen: false, type: null, title: "", description: "", initialValue: "", placeholder: ""
+  });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -79,71 +129,89 @@ function FilesPage() {
     fetchFiles();
   }, [path, server]);
 
-  const handleCreateFolder = async () => {
-    const name = prompt("Enter folder name:");
-    if (!name) return;
+  const handleCreateFolder = () => {
+    setPromptState({
+      isOpen: true,
+      type: 'newFolder',
+      title: 'New Folder',
+      description: 'Enter a name for the new folder.',
+      initialValue: '',
+      placeholder: 'New folder'
+    });
+  };
+
+  const handleRename = () => {
+    if (!selectedFile) return;
+    setPromptState({
+      isOpen: true,
+      type: 'rename',
+      title: 'Rename',
+      description: `Enter a new name for ${selectedFile.name}.`,
+      initialValue: selectedFile.name,
+      placeholder: 'New name'
+    });
+  };
+
+  const handleMove = () => {
+    if (!selectedFile) return;
+    setPromptState({
+      isOpen: true,
+      type: 'move',
+      title: 'Move Item',
+      description: `Enter destination path for ${selectedFile.name}.`,
+      initialValue: path.join("\\"),
+      placeholder: 'C:\\Destination'
+    });
+  };
+
+  const handleCopy = () => {
+    if (!selectedFile) return;
+    setPromptState({
+      isOpen: true,
+      type: 'copy',
+      title: 'Copy Item',
+      description: `Enter destination path to copy ${selectedFile.name}.`,
+      initialValue: path.join("\\"),
+      placeholder: 'C:\\Destination'
+    });
+  };
+
+  const handlePromptConfirm = async (val: string) => {
+    if (!val) return;
+    const { type } = promptState;
+    setPromptState(p => ({ ...p, isOpen: false }));
+    
     try {
-      await createFolderClient(server, path.join("\\"), name);
+      if (type === 'newFolder') {
+        await createFolderClient(server, path.join("\\"), val);
+      } else if (type === 'rename' && selectedFile && val !== selectedFile.name) {
+        await renameFileClient(server, path.join("\\") + "\\" + selectedFile.name, val);
+      } else if (type === 'move' && selectedFile && val !== path.join("\\")) {
+        await moveFileClient(server, path.join("\\") + "\\" + selectedFile.name, val + "\\" + selectedFile.name);
+      } else if (type === 'copy' && selectedFile) {
+        let fullDest = val;
+        if (!fullDest.endsWith("\\" + selectedFile.name)) {
+          fullDest = fullDest + "\\" + selectedFile.name;
+        }
+        if (fullDest === path.join("\\") + "\\" + selectedFile.name) {
+          fullDest = path.join("\\") + "\\Copy of " + selectedFile.name;
+        }
+        await copyFileClient(server, path.join("\\") + "\\" + selectedFile.name, fullDest);
+      }
       fetchFiles();
-    } catch (e) {
-      alert("Failed to create folder");
+    } catch (e: any) {
+      alert(`Operation failed: ${e.message || "Unknown error"}`);
     }
   };
 
   const handleDelete = async () => {
     if (!selectedFile) return;
-    if (!confirm(`Are you sure you want to delete ${selectedFile}?`)) return;
+    if (!confirm(`Are you sure you want to delete ${selectedFile.name}?`)) return;
     try {
-      await deleteFileClient(server, path.join("\\") + "\\" + selectedFile);
+      await deleteFileClient(server, path.join("\\") + "\\" + selectedFile.name);
       fetchFiles();
     } catch (e) {
       alert("Failed to delete");
-    }
-  };
-
-  const handleRename = async () => {
-    if (!selectedFile) return;
-    const newName = prompt(`Enter new name for ${selectedFile}:`, selectedFile);
-    if (!newName || newName === selectedFile) return;
-    try {
-      await renameFileClient(server, path.join("\\") + "\\" + selectedFile, newName);
-      fetchFiles();
-    } catch (e) {
-      alert("Failed to rename");
-    }
-  };
-
-  const handleMove = async () => {
-    if (!selectedFile) return;
-    const destPath = prompt(`Enter destination path for ${selectedFile}:\n(e.g., C:\\temp)`, path.join("\\"));
-    if (!destPath || destPath === path.join("\\")) return;
-    try {
-      await moveFileClient(server, path.join("\\") + "\\" + selectedFile, destPath + "\\" + selectedFile);
-      fetchFiles();
-    } catch (e) {
-      alert("Failed to move");
-    }
-  };
-
-  const handleCopy = async () => {
-    if (!selectedFile) return;
-    const destPath = prompt(`Enter destination path to copy ${selectedFile}:\n(e.g., C:\\temp)`, path.join("\\"));
-    if (!destPath) return;
-    
-    let fullDest = destPath;
-    if (!destPath.endsWith("\\" + selectedFile)) {
-      fullDest = destPath + "\\" + selectedFile;
-    }
-
-    if (fullDest === path.join("\\") + "\\" + selectedFile) {
-      fullDest = path.join("\\") + "\\Copy of " + selectedFile;
-    }
-
-    try {
-      await copyFileClient(server, path.join("\\") + "\\" + selectedFile, fullDest);
-      fetchFiles();
-    } catch (e) {
-      alert("Failed to copy. Folder copy is not supported.");
     }
   };
 
@@ -154,11 +222,14 @@ function FilesPage() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setIsLoading(true);
     try {
       await uploadFileClient(server, path.join("\\"), file);
       fetchFiles();
     } catch (err) {
       alert("Failed to upload");
+    } finally {
+      setIsLoading(false);
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -188,6 +259,22 @@ function FilesPage() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleOpenItem = (f: FileItem) => {
+    if (f.type === "folder") {
+      setPath([...path, f.name]);
+    } else if (isTextFile(f.type)) {
+      openEditor(f.name);
+    } else {
+      window.open(getDownloadUrl(server, path.join("\\") + "\\" + f.name), '_blank');
+    }
+  };
+
+  const handleDownload = () => {
+    if (!selectedFile) return;
+    // Download endpoint automatically zips if it's a folder!
+    window.open(getDownloadUrl(server, path.join("\\") + "\\" + selectedFile.name), '_blank');
   };
 
   const disks = sources.filter(s => s.type === "Disk");
@@ -241,9 +328,19 @@ function FilesPage() {
             </div>
             <div className="flex gap-2 flex-wrap">
               <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
+              
               <TBtn icon={Plus} label="New Folder" onClick={handleCreateFolder} />
               <TBtn icon={Upload} label="Upload" onClick={handleUploadClick} />
+              
               <div className="w-[1px] h-6 bg-[var(--border-dim)] mx-1" />
+              
+              {selectedFile?.type === "folder" ? (
+                <TBtn icon={FolderOpen} label="Open" onClick={() => handleOpenItem(selectedFile)} />
+              ) : (
+                <TBtn icon={Edit2} label="Edit" disabled={!selectedFile || !isTextFile(selectedFile.type)} onClick={() => selectedFile && openEditor(selectedFile.name)} />
+              )}
+              
+              <TBtn icon={Download} label="Download" disabled={!selectedFile} onClick={handleDownload} />
               <TBtn icon={Type} label="Rename" onClick={handleRename} disabled={!selectedFile} />
               <TBtn icon={Copy} label="Copy" onClick={handleCopy} disabled={!selectedFile} />
               <TBtn icon={MoveRight} label="Move" onClick={handleMove} disabled={!selectedFile} />
@@ -251,8 +348,8 @@ function FilesPage() {
             </div>
           </div>
           
-          <div className="overflow-auto flex-1">
-            <table className="w-full text-[12px] relative">
+          <div className="overflow-auto flex-1 outline-none" onClick={(e) => { if (e.target === e.currentTarget) setSelectedFile(null); }}>
+            <table className="w-full text-[12px] relative select-none">
               <thead className="sticky top-0 bg-[#0a0f18]/95 backdrop-blur-sm z-10 shadow-[0_1px_0_var(--border-c)]">
                 <tr className="eyebrow text-left">
                   <th className="px-4 py-2 font-normal">Name</th>
@@ -269,24 +366,22 @@ function FilesPage() {
                   <tr><td colSpan={5} className="py-4 text-center text-[var(--text-sub)]">Folder is empty</td></tr>
                 ) : (
                   files.map((f) => {
-                    const isSelected = selectedFile === f.name;
+                    const isSelected = selectedFile?.name === f.name;
                     return (
                       <tr 
                         key={f.name} 
-                        onClick={() => setSelectedFile(f.name)}
-                        onDoubleClick={() => {
-                          if (f.type === "folder") {
-                            setPath([...path, f.name]);
-                          } else if (isTextFile(f.type)) {
-                            openEditor(f.name);
-                          } else {
-                            window.open(getDownloadUrl(server, path.join("\\") + "\\" + f.name), '_blank');
-                          }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedFile(f);
                         }}
-                        className={`cursor-pointer border-b border-[var(--border-dim)] hover:bg-[var(--bg-surface)] ${isSelected ? "bg-[var(--bg-surface)]" : ""}`}>
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenItem(f);
+                        }}
+                        className={`cursor-pointer border-b border-[var(--border-dim)] transition-colors ${isSelected ? "bg-[var(--amber-low)]/20" : "hover:bg-[var(--bg-surface)]"}`}>
                         <td className="flex items-center gap-2 px-4 py-2 text-[var(--text)]">
                           {f.type === "folder" ? <Folder size={13} className="text-[var(--amber)]" /> : <FileIcon size={13} className="text-[var(--text-sub)]" />}
-                          {f.name}
+                          <span className={isSelected ? "text-[var(--amber)] font-medium" : ""}>{f.name}</span>
                         </td>
                         <td className="text-[var(--text-sub)]">{f.type === "folder" ? "File folder" : f.type.toUpperCase() + " File"}</td>
                         <td className="text-[var(--text-sub)]">{f.type === "folder" ? "" : formatBytes(f.size)}</td>
@@ -302,10 +397,21 @@ function FilesPage() {
         </div>
       </div>
 
+      <PromptDialog 
+        isOpen={promptState.isOpen}
+        title={promptState.title}
+        description={promptState.description}
+        initialValue={promptState.initialValue}
+        placeholder={promptState.placeholder}
+        onConfirm={handlePromptConfirm}
+        onCancel={() => setPromptState(p => ({ ...p, isOpen: false }))}
+        confirmLabel={promptState.type === 'delete' ? 'Delete' : 'Confirm'}
+      />
+
       {isEditorOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="flex h-[80vh] w-[80vw] flex-col overflow-hidden rounded-lg border border-[var(--border-c)] bg-[#0a0f18] shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[var(--border-c)] bg-[var(--bg-surface)] px-4 py-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <div className="flex h-[80vh] w-[80vw] flex-col overflow-hidden rounded-xl border border-[var(--border-c)] bg-[#0a0f18] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--border-c)] bg-[var(--bg-surface)] px-4 py-3">
               <div className="mono flex items-center gap-2 text-[12px] text-[var(--text)]">
                 <Edit2 size={14} className="text-[var(--amber)]" />
                 Editing: {editorFile}

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Nexus.Gateway.Models;
 using Nexus.Gateway.Services;
 using System.IO;
+using System.IO.Compression;
 using Microsoft.AspNetCore.Authorization;
 
 namespace Nexus.Gateway.Controllers;
@@ -192,10 +193,23 @@ public class WindowsFilesController : ControllerBase
         try
         {
             var uncPath = BuildUncPath(serverIp, path);
-            if (!System.IO.File.Exists(uncPath)) return NotFound();
+
+            if (Directory.Exists(uncPath))
+            {
+                var tempZipFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".zip");
+                ZipFile.CreateFromDirectory(uncPath, tempZipFile, CompressionLevel.Fastest, includeBaseDirectory: false);
+                
+                var stream = new FileStream(tempZipFile, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.DeleteOnClose);
+                var folderName = new DirectoryInfo(uncPath).Name;
+                return File(stream, "application/zip", folderName + ".zip");
+            }
+            else if (System.IO.File.Exists(uncPath))
+            {
+                var fileName = Path.GetFileName(uncPath);
+                return PhysicalFile(uncPath, "application/octet-stream", fileName);
+            }
             
-            var fileName = Path.GetFileName(uncPath);
-            return PhysicalFile(uncPath, "application/octet-stream", fileName);
+            return NotFound();
         }
         catch (Exception ex)
         {
