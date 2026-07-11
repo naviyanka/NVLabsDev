@@ -69,6 +69,7 @@ builder.Services.AddTransient<NotificationService>();
 builder.Services.AddTransient<IPowerShellExecutionService, PowerShellExecutionService>();
 builder.Services.AddHostedService<TelemetryBackgroundService>();
 builder.Services.AddHostedService<LogPersistenceService>();
+builder.Services.AddHostedService<AdSyncBackgroundService>();
 builder.Services.AddSignalR();
 
 // Load port dynamically from database's WebBindingPort setting at startup

@@ -42,31 +42,10 @@ public class ServerService
                 _db.Servers.Add(localServer);
                 await _db.SaveChangesAsync();
             }
-
-            var adServers = await _adService.GetDomainComputersAsync();
-            
-            foreach (var adServer in adServers)
-            {
-                var existing = await _db.Servers.FirstOrDefaultAsync(s => s.Id == adServer.Id);
-                if (existing == null)
-                {
-                    adServer.IsAdFetched = true;
-                    _db.Servers.Add(adServer);
-                    _ = Task.Run(() => _cimService.EnableWinRmAsync(adServer.Ip)); // Fire and forget
-                }
-                else
-                {
-                    if (existing.IsAdFetched && existing.Ip != adServer.Ip && adServer.Ip != adServer.Name)
-                    {
-                        existing.Ip = adServer.Ip;
-                    }
-                }
-            }
-            await _db.SaveChangesAsync();
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to sync AD servers to DB.");
+            _logger.LogWarning(ex, "Failed to ensure local server in DB.");
         }
 
         return await _db.Servers.ToListAsync();

@@ -20,15 +20,22 @@ export function HorizonDashboard() {
   if (hour >= 5 && hour < 12) greeting = "Good morning";
   else if (hour >= 12 && hour < 17) greeting = "Good afternoon";
 
-  const [userName, setUserName] = useState("Admin");
-  useEffect(() => {
+  const [userName, setUserName] = useState(() => {
     try {
       const userStr = localStorage.getItem("nexus-user");
-      if (userStr) setUserName(JSON.parse(userStr).username || "Admin");
-    } catch(e) {}
+      return userStr ? JSON.parse(userStr).username || "Admin" : "Admin";
+    } catch(e) { return "Admin"; }
+  });
+
+  useEffect(() => {
     loadData();
     getNotificationsClient().then(notifs => setNotifications(notifs));
-    const id = setInterval(loadData, 10000);
+
+    const id = setInterval(() => {
+      loadData();
+      getNotificationsClient().then(notifs => setNotifications(notifs));
+    }, 10000);
+
     return () => clearInterval(id);
   }, []);
 
