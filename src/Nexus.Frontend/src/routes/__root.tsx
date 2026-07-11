@@ -25,24 +25,41 @@ import { Topbar } from "@/components/layout/Topbar";
 
 if (typeof window !== "undefined" && !(window as any).__nexus_fetch_patched) {
   const originalFetch = window.fetch;
-  window.fetch = async (...args) => {
-    let [resource, config] = args;
-    
-    if (!config) config = {};
-    if (!config.headers) config.headers = {};
-    
-    const token = localStorage.getItem("nexus_token");
-    if (token) {
-      const newHeaders = new Headers(config.headers);
-      newHeaders.set("Authorization", `Bearer ${token}`);
-      config.headers = newHeaders;
+  window.fetch = async (input, init) => {
+    let requestUrl = "";
+    if (typeof input === "string") {
+      requestUrl = input;
+    } else if (input instanceof Request) {
+      requestUrl = input.url;
     }
 
-    const response = await originalFetch(resource, config);
+    const token = localStorage.getItem("nexus_token");
+    
+    if (token && (requestUrl.includes("/api/") || requestUrl.includes("/hub/"))) {
+      if (input instanceof Request) {
+        try {
+          input.headers.set("Authorization", `Bearer ${token}`);
+        } catch (e) {
+          const newHeaders = new Headers(input.headers);
+          newHeaders.set("Authorization", `Bearer ${token}`);
+          input = new Request(input, { headers: newHeaders });
+        }
+      } else {
+        if (!init) init = {};
+        if (!init.headers) init.headers = {};
+        const newHeaders = new Headers(init.headers);
+        newHeaders.set("Authorization", `Bearer ${token}`);
+        init.headers = newHeaders;
+      }
+    }
+
+    const response = await originalFetch(input, init);
     
     if (response.status === 401 && window.location.pathname !== "/login") {
-      localStorage.removeItem("nexus_token");
-      window.location.href = "/login";
+      if (requestUrl.includes("/api/") || requestUrl.includes("/hub/")) {
+        localStorage.removeItem("nexus_token");
+        window.location.href = "/login";
+      }
     }
     
     return response;
@@ -196,6 +213,15 @@ function RootComponent() {
         if (data.terminalTheme) {
           document.documentElement.setAttribute("data-terminal-theme", data.terminalTheme);
           try { localStorage.setItem("nexus-terminal-theme", data.terminalTheme); } catch(e) {}
+        }
+
+        if (data.animationsEnabled !== undefined) {
+          try { localStorage.setItem("nexus-animations", data.animationsEnabled ? "true" : "false"); } catch(e) {}
+          if (!data.animationsEnabled) {
+            document.documentElement.classList.add("no-animations");
+          } else {
+            document.documentElement.classList.remove("no-animations");
+          }
         }
       })
       .catch(() => {});

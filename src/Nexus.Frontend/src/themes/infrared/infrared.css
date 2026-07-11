@@ -1,4 +1,4 @@
-:root, [data-theme="infrared"] {
+:root[data-theme="infrared"] {
   --bg-void:    #05050a;
   --bg-surface: #0c0b14;
   --bg-card:    #13121f;

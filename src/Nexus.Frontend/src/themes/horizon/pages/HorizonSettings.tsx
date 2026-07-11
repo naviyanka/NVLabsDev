@@ -122,7 +122,7 @@ export function HorizonSettings() {
     <div className="max-w-6xl mx-auto space-y-8 font-sans">
       {/* Page Header */}
       <div className="mb-8">
-        <h2 className="text-3xl font-extrabold text-[var(--text)]">Settings & Preferences</h2>
+        <h1 className="text-3xl font-extrabold text-[var(--text)]">Global Settings</h1>
         <p className="text-sm text-[var(--text-sub)] mt-1">Configure your Horizon environment, plugins, and system preferences.</p>
       </div>
 

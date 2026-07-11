@@ -1,4 +1,4 @@
-:root, [data-theme="stealth"] {
+:root[data-theme="stealth"] {
   --bg-void: #000000;
   --bg-surface: #0a0a0a;
   --bg-card: #050505;

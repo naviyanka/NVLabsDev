@@ -134,10 +134,10 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
       {/* SideNavBar */}
       <nav className="fixed left-0 top-0 h-screen w-[240px] bg-[var(--bg-surface)] border-r border-[var(--border-c)] shadow-sm flex flex-col py-8 px-4 space-y-2 z-50">
         <div className="mb-8 px-4 shrink-0">
-          <h1 className="text-2xl font-extrabold tracking-tight text-[var(--amber)] flex items-center gap-2">
+          <div className="text-2xl font-extrabold tracking-tight text-[var(--amber)] flex items-center gap-2">
             <span className="inline-block w-3 h-3 rounded-full bg-[var(--amber)] animate-pulse shrink-0"></span>
             <span className="truncate">{brand.name}</span>
-          </h1>
+          </div>
           <p className="text-xs text-[var(--text-sub)] uppercase tracking-widest mt-1 truncate" title={brand.subtitle}>{brand.subtitle}</p>
         </div>
         

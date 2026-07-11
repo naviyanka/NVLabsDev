@@ -1,4 +1,4 @@
-:root, [data-theme="light"] {
+:root[data-theme="light"] {
   --bg-void: #f8fafc;
   --bg-surface: #ffffff;
   --bg-card: #ffffff;

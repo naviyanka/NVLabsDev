@@ -1,4 +1,4 @@
-:root, [data-theme="slate"] {
+:root[data-theme="slate"] {
   --bg-void: #0f172a;
   --bg-surface: #1e293b;
   --bg-card: #1e293b;

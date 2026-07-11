@@ -108,6 +108,14 @@ function GlobalSettingsPage() {
       document.documentElement.setAttribute("data-terminal-theme", p.terminalTheme);
       try { localStorage.setItem("nexus-terminal-theme", p.terminalTheme); } catch(e) {}
     }
+    if (p.animationsEnabled !== undefined) {
+      try { localStorage.setItem("nexus-animations", p.animationsEnabled ? "true" : "false"); } catch(e) {}
+      if (!p.animationsEnabled) {
+        document.documentElement.classList.add("no-animations");
+      } else {
+        document.documentElement.classList.remove("no-animations");
+      }
+    }
     
     fetch("/api/settings", {
       method: "PATCH",

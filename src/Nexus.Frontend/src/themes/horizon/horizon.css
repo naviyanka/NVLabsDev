@@ -1,4 +1,4 @@
-:root, [data-theme="horizon"] {
+:root[data-theme="horizon"] {
   --bg-void:    #fafaf9;
   --bg-surface: #ffffff;
   --bg-card:    #ffffff;

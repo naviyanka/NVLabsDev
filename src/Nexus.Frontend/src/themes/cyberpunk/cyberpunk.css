@@ -1,4 +1,4 @@
-:root, [data-theme="cyberpunk"] {
+:root[data-theme="cyberpunk"] {
   --bg-void:    #0a0a12;
   --bg-surface: hsl(255, 22%, 7%);
   --bg-card:    hsla(255, 30%, 10%, 0.55);
