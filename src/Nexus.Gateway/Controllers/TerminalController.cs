@@ -49,7 +49,10 @@ public class TerminalController : ControllerBase
             Environment = new Dictionary<string, string>()
         };
 
-        if (!serverId.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+        if (!serverId.Equals("localhost", StringComparison.OrdinalIgnoreCase) && 
+            !serverId.Equals("127.0.0.1") && 
+            !serverId.Equals("::1") && 
+            !serverId.Equals(Environment.MachineName, StringComparison.OrdinalIgnoreCase))
         {
             options.CommandLine = new[] { "-NoExit", "-Command", $"Enter-PSSession -ComputerName '{serverId}'" };
         }

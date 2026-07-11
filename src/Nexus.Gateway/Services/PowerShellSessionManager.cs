@@ -40,14 +40,25 @@ public class PowerShellSessionManager : IDisposable
 
             try
             {
-                // Always use WSManConnectionInfo to ensure each session gets a distinct wsmprovhost.exe process.
-                // This prevents in-process runspaces from sharing the Gateway's PID.
-                var connectionInfo = new WSManConnectionInfo
+                if (string.IsNullOrEmpty(serverId) || 
+                    serverId.Equals("localhost", StringComparison.OrdinalIgnoreCase) || 
+                    serverId.Equals("127.0.0.1") || 
+                    serverId.Equals("::1") || 
+                    serverId.Equals(Environment.MachineName, StringComparison.OrdinalIgnoreCase))
                 {
-                    ComputerName = serverId
-                };
-                
-                Runspace = RunspaceFactory.CreateRunspace(connectionInfo);
+                    Runspace = RunspaceFactory.CreateRunspace();
+                }
+                else
+                {
+                    // Always use WSManConnectionInfo to ensure each session gets a distinct wsmprovhost.exe process.
+                    // This prevents in-process runspaces from sharing the Gateway's PID.
+                    var connectionInfo = new WSManConnectionInfo
+                    {
+                        ComputerName = serverId
+                    };
+                    
+                    Runspace = RunspaceFactory.CreateRunspace(connectionInfo);
+                }
                 Runspace.Open();
             }
             catch (Exception ex)

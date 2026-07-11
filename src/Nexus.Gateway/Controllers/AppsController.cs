@@ -42,9 +42,9 @@ public class AppsController : ControllerBase
     // Validate UninstallString only allows msiexec or known safe patterns
     private static bool IsValidUninstallString(string cmd)
     {
-        // Only allow msiexec.exe /x patterns or known safe uninstallers
+        // Only allow msiexec.exe /x patterns or a single quoted path
         return Regex.IsMatch(cmd, @"^msiexec\.exe\s+/[xXiI]\s+", RegexOptions.IgnoreCase)
-            || Regex.IsMatch(cmd, @"^\"[^\"]*\"$", RegexOptions.None); // Quoted path only
+            || Regex.IsMatch(cmd, "^\"[^\"]*\"$", RegexOptions.None);
     }
 
     [HttpGet]

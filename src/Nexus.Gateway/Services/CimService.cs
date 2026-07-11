@@ -36,8 +36,21 @@ public class CimService : IDisposable
             }
         }
 
-        var options = new DComSessionOptions { Timeout = TimeSpan.FromSeconds(3) };
-        var session = CimSession.Create(ip, options);
+        CimSession session;
+        if (string.IsNullOrEmpty(ip) || 
+            ip.Equals("localhost", StringComparison.OrdinalIgnoreCase) || 
+            ip.Equals("127.0.0.1") || 
+            ip.Equals("::1") || 
+            ip.Equals(Environment.MachineName, StringComparison.OrdinalIgnoreCase))
+        {
+            session = CimSession.Create(null);
+        }
+        else
+        {
+            var options = new DComSessionOptions { Timeout = TimeSpan.FromSeconds(3) };
+            session = CimSession.Create(ip, options);
+        }
+
         _sessions.TryAdd(ip, session);
         return session;
     }

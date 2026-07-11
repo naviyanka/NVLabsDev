@@ -23,6 +23,26 @@ public class ServerService
     {
         try
         {
+            // Ensure local machine is present
+            var localMachineName = Environment.MachineName;
+            var localId = localMachineName.ToLowerInvariant();
+            var localExists = await _db.Servers.AnyAsync(s => s.Id == localId || s.Id == "localhost" || s.Ip == "127.0.0.1");
+            if (!localExists)
+            {
+                var localServer = new Server
+                {
+                    Id = localId,
+                    Name = localMachineName,
+                    Ip = "127.0.0.1",
+                    Role = "Local Server",
+                    Site = "Local",
+                    IsAdFetched = false,
+                    Status = "offline"
+                };
+                _db.Servers.Add(localServer);
+                await _db.SaveChangesAsync();
+            }
+
             var adServers = await _adService.GetDomainComputersAsync();
             
             foreach (var adServer in adServers)
