@@ -2,11 +2,13 @@ using Microsoft.AspNetCore.Mvc;
 using Nexus.Gateway.Models;
 using Nexus.Gateway.Services;
 using System.IO;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Nexus.Gateway.Controllers;
 
 [ApiController]
 [Route("api/servers/{serverIp}/files")]
+[Authorize]
 public class WindowsFilesController : ControllerBase
 {
     private readonly CimService _cimService;
@@ -58,8 +60,19 @@ public class WindowsFilesController : ControllerBase
         }
     }
 
+    // Reject paths containing '..' sequences to prevent traversal
+    private static bool ContainsTraversal(string path)
+    {
+        return path.Contains("..", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("%2e%2e", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("%252e%252e", StringComparison.OrdinalIgnoreCase);
+    }
+
     private string BuildUncPath(string serverIp, string path)
     {
+        if (ContainsTraversal(path))
+            throw new ArgumentException("Path traversal is not allowed.");
+
         if (path.Length >= 2 && path[1] == ':')
         {
             char drive = path[0];
@@ -156,8 +169,8 @@ public class WindowsFilesController : ControllerBase
     }
 
     [HttpPost("upload")]
-    [RequestSizeLimit(long.MaxValue)]
-    [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
+    [RequestSizeLimit(1073741824)] // 1GB max
+    [RequestFormLimits(MultipartBodyLengthLimit = 1073741824)]
     public async Task<IActionResult> Upload(string serverIp, [FromQuery] string path, [FromForm] IFormFile file)
     {
         try

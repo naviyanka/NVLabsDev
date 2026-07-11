@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
+using System.Text.RegularExpressions;
 
 namespace Nexus.Gateway.Services;
 
@@ -94,11 +95,42 @@ public class PowerShellSessionManager : IDisposable
         return sessionId;
     }
 
+        // Block dangerous commands that could escape the intended PS session scope
+        private static readonly string[] BlockedPatterns = new[]
+        {
+            @"\bInvoke-Expression\b", @"\bIEX\b", @"\bInvoke-WebRequest\b", @"\bInvoke-RestMethod\b",
+            @"\bStart-Process\b", @"\bStart-Job\b", @"\bRegister-ScheduledTask\b",
+            @"\bNew-Item\s+HKLM:", @"\bRemove-Item\b.*-Recurse\b.*-Force\b",
+            @"\bFormat-Table\b.*\|\s*Out-File\b", @"\bSet-Content\b", @"\bAdd-Content\b",
+            @"\bInvoke-Command\b", @"\bEnter-PSSession\b", @"\bNew-PSSession\b",
+            @"\bInvoke-WmiMethod\b", @"\bInvoke-CimMethod\b",
+            @"\b[System\.Net\.WebClient]\b", @"\bInvoke-WebRequest\b", @"\bInvoke-RestMethod\b",
+            @"\bDownloadString\b", @"\bDownloadFile\b",
+            @"\bcertutil\b", @"\bbitsadmin\b"
+        };
+
+        private static bool ContainsBlockedCommand(string command)
+        {
+            foreach (var pattern in BlockedPatterns)
+            {
+                if (Regex.IsMatch(command, pattern, RegexOptions.IgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+
         public async IAsyncEnumerable<string> ExecuteStreamAsync(string sessionId, string command, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             if (!_sessions.TryGetValue(sessionId, out var session))
             {
                 yield return $"ERR:Session '{sessionId}' not found.";
+                yield break;
+            }
+
+            // Block dangerous commands before execution
+            if (ContainsBlockedCommand(command))
+            {
+                yield return $"ERR:Command blocked — contains disallowed operation.";
                 yield break;
             }
 
@@ -110,7 +142,8 @@ public class PowerShellSessionManager : IDisposable
             {
                 session.LastUsed = DateTime.UtcNow;
                 session.PowerShell.Commands.Clear();
-                session.PowerShell.AddScript($". {{ {command} }} | Out-String -Stream");
+                // Use single-quoted script block to prevent injection via command string
+                session.PowerShell.AddScript($". {{ '{command.Replace("'", "''")}' }} | Out-String -Stream");
 
                 var outputBuffer = new PSDataCollection<PSObject>();
                 outputBuffer.DataAdded += (s, e) =>

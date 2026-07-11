@@ -49,13 +49,28 @@ export function Sidebar() {
     return () => window.removeEventListener("plugins-updated", fetchPlugins);
   }, []);
 
-  // Group plugins by Category
+  // Group plugins by Category — restrict plugin targetRoute to safe in-app routes
+  const ALLOWED_SCHEMES = ["http:", "https:", "mailto:"];
   const groupedPlugins: Record<string, Item[]> = {};
   plugins.forEach(p => {
     const cat = p.category || "Custom";
     if (!groupedPlugins[cat]) groupedPlugins[cat] = [];
+    let target = p.targetRoute || `/plugin/${p.id}`;
+    // Reject javascript:/data: and external URLs from API-provided plugin routes
+    try {
+      const u = new URL(target, window.location.origin);
+      if (ALLOWED_SCHEMES.includes(u.protocol) && u.origin !== window.location.origin) {
+        // External link — don't render as a router Link
+        target = `/plugin/${p.id}`;
+      } else if (!ALLOWED_SCHEMES.includes(u.protocol)) {
+        target = `/plugin/${p.id}`;
+      }
+    } catch {
+      // Not a URL — treat as in-app route, but strip any scheme-prefix injection
+      target = target.replace(/^[a-z]+:/i, "");
+    }
     groupedPlugins[cat].push({
-      to: p.targetRoute || `/plugin/${p.id}`,
+      to: target,
       label: p.name,
       icon: ICONS[p.icon] || Puzzle
     });

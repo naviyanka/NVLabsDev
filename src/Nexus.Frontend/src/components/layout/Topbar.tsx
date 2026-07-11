@@ -68,16 +68,18 @@ export function Topbar() {
     // Initial fetch
     fetchNotifications();
 
-    // Setup SignalR
-    const t = localStorage.getItem("nexus_token") || "";
+    // Setup SignalR — re-read token on every (re)connect so refreshed tokens are used
     const connection = new signalR.HubConnectionBuilder()
-      .withUrl("/hub/notifications", { accessTokenFactory: () => t })
+      .withUrl("/hub/notifications", {
+        accessTokenFactory: () => localStorage.getItem("nexus_token") || ""
+      })
       .withAutomaticReconnect()
       .build();
 
+    const MAX_NOTIFICATIONS = 100;
     connection.on("ReceiveNotification", (n: Notification) => {
-      // Add to state
-      setNotifications(prev => [n, ...prev]);
+      // Add to state, capped to prevent unbounded memory growth
+      setNotifications(prev => [n, ...prev].slice(0, MAX_NOTIFICATIONS));
       
       const lastRead = Number(localStorage.getItem("nexus_notifications_read") || "0");
       if (new Date(n.timestamp).getTime() > lastRead) {

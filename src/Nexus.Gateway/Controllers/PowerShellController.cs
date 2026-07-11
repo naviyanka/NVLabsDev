@@ -6,7 +6,7 @@ namespace Nexus.Gateway.Controllers;
 
 [ApiController]
 [Route("api/powershell")]
-[AllowAnonymous]
+[Authorize]
 public class PowerShellController : ControllerBase
 {
     private readonly PowerShellSessionManager _sessionManager;

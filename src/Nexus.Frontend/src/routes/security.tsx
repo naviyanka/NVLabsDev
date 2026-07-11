@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
@@ -64,8 +64,15 @@ function SecurityPage() {
   }, [server]);
 
   const score = data ? Math.max(0, 100 - (data.failedLogins24h / 10) - (data.openPorts.length / 2)) : 100;
-  // We mock the hour-by-hour chart based on total failed logins
-  const loginHist = Array.from({ length: 24 }, (_, h) => ({ hour: `${h}:00`, fails: data ? Math.floor(Math.random() * (data.failedLogins24h / 10)) : 0 }));
+  // We mock the hour-by-hour chart based on total failed logins — memoized so it doesn't
+  // regenerate (and flicker) on every re-render
+  const loginHist = useMemo(
+    () => Array.from({ length: 24 }, (_, h) => ({
+      hour: `${h}:00`,
+      fails: data ? Math.floor(Math.random() * (data.failedLogins24h / 10)) : 0
+    })),
+    [data]
+  );
 
   return (
     <PageWrapper>

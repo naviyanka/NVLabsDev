@@ -61,13 +61,18 @@ namespace Nexus.Gateway.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Authentication error: " + ex.Message });
+                // Log full error server-side but return generic message to prevent info leak
+                return StatusCode(500, new { message = "Authentication service error." });
             }
         }
 
         private string GenerateJwtToken(string username, string role)
         {
-            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"] ?? "nexus-super-secret-key-1234567890-very-secure"));
+            var jwtKey = _config["Jwt:Key"];
+            if (string.IsNullOrEmpty(jwtKey) || jwtKey.Length < 32)
+                throw new InvalidOperationException("Jwt:Key must be configured in appsettings with at least 32 characters. Refusing to use hardcoded fallback.");
+
+            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
             var claims = new[]

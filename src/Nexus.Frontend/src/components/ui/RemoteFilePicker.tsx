@@ -40,11 +40,13 @@ export function RemoteFilePicker({ targetServer, isOpen, onOpenChange, onSelect 
 
   useEffect(() => {
     if (path && activeTab === "remote") {
+      const controller = new AbortController();
       setIsLoading(true);
       getFilesListClient(activeServer, path)
         .then(setFiles)
-        .catch(() => setFiles([]))
-        .finally(() => setIsLoading(false));
+        .catch(() => { if (!controller.signal.aborted) setFiles([]); })
+        .finally(() => { if (!controller.signal.aborted) setIsLoading(false); });
+      return () => controller.abort();
     } else {
       setFiles([]);
     }

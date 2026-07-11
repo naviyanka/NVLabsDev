@@ -3,11 +3,13 @@ using Microsoft.EntityFrameworkCore;
 using Nexus.Gateway.Data;
 using Nexus.Gateway.Models;
 using Nexus.Gateway.Services;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Nexus.Gateway.Controllers;
 
 [ApiController]
 [Route("api/plugins")]
+[Authorize]
 public class PluginsController : ControllerBase
 {
     private readonly NexusContext _db;
@@ -37,17 +39,30 @@ public class PluginsController : ControllerBase
     }
 
     [HttpPost("{id}/upload")]
+    [Authorize(Roles = "Administrators,Domain Admins")]
     public async Task<IActionResult> UploadScript(string id, IFormFile file)
     {
         var plugin = await _db.Plugins.FindAsync(id);
         if (plugin == null) return NotFound();
 
+        // Reject scripts containing dangerous commands
         using (var reader = new StreamReader(file.OpenReadStream()))
         {
-            plugin.ScriptContent = await reader.ReadToEndAsync();
+            var content = await reader.ReadToEndAsync();
+            var dangerousPatterns = new[] {
+                "Remove-Item", "Invoke-Expression", "IEX", "Invoke-WebRequest",
+                "Start-Process", "Format-Table", "Set-Content", "Add-Content",
+                "certutil", "bitsadmin", "Invoke-WmiMethod", "Invoke-CimMethod"
+            };
+            foreach (var p in dangerousPatterns)
+            {
+                if (content.Contains(p, StringComparison.OrdinalIgnoreCase))
+                    return BadRequest($"Script contains disallowed command: {p}");
+            }
+            plugin.ScriptContent = content;
             plugin.SourceType = "file";
         }
-        
+
         await _db.SaveChangesAsync();
         return Ok(plugin);
     }
@@ -56,7 +71,7 @@ public class PluginsController : ControllerBase
     public async Task<IActionResult> Update(string id, PluginEntity plugin)
     {
         if (id != plugin.Id) return BadRequest();
-        
+
         var existing = await _db.Plugins.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id);
         if (existing == null) return NotFound();
 
@@ -89,6 +104,7 @@ public class PluginsController : ControllerBase
     }
 
     [HttpPost("{id}/run")]
+    [Authorize(Roles = "Administrators,Domain Admins")]
     public async Task<IActionResult> Run(string id, [FromQuery] string[] serverIps)
     {
         if (serverIps == null || serverIps.Length == 0) return BadRequest("No servers specified");

@@ -44,14 +44,24 @@ public class LogPersistenceService : BackgroundService
                     await db.SaveChangesAsync(stoppingToken);
                 }
 
-                // Prune logs older than 3 days
+                // Prune logs older than 3 days in batches to bound memory use
                 var cutoff = DateTime.UtcNow.AddDays(-3);
-                var oldLogs = await db.LogEntries.Where(e => e.Timestamp < cutoff).ToListAsync(stoppingToken);
-                if (oldLogs.Any())
+                const int pruneBatchSize = 1000;
+                int pruned;
+                do
                 {
-                    db.LogEntries.RemoveRange(oldLogs);
-                    await db.SaveChangesAsync(stoppingToken);
-                }
+                    var batch = await db.LogEntries
+                        .Where(e => e.Timestamp < cutoff)
+                        .OrderBy(e => e.Id)
+                        .Take(pruneBatchSize)
+                        .ToListAsync(stoppingToken);
+                    pruned = batch.Count;
+                    if (pruned > 0)
+                    {
+                        db.LogEntries.RemoveRange(batch);
+                        await db.SaveChangesAsync(stoppingToken);
+                    }
+                } while (pruned == pruneBatchSize && !stoppingToken.IsCancellationRequested);
             }
             catch (Exception)
             {

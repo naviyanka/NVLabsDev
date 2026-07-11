@@ -2,6 +2,7 @@ using Microsoft.Management.Infrastructure;
 using Microsoft.Management.Infrastructure.Options;
 using Nexus.Gateway.Models;
 using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
 
 namespace Nexus.Gateway.Services;
 
@@ -15,11 +16,24 @@ public class CimService : IDisposable
         _logger = logger;
     }
 
+    private const int MaxSessions = 256;
+
     public CimSession GetSession(string ip)
     {
         if (_sessions.TryGetValue(ip, out var existingSession))
         {
             return existingSession;
+        }
+
+        // Bound the session cache to prevent unbounded resource leak.
+        // If at capacity, evict an arbitrary session and dispose it.
+        if (_sessions.Count >= MaxSessions)
+        {
+            var evictKey = _sessions.Keys.First();
+            if (_sessions.TryRemove(evictKey, out var evicted))
+            {
+                try { evicted.Dispose(); } catch { }
+            }
         }
 
         var options = new DComSessionOptions { Timeout = TimeSpan.FromSeconds(3) };
@@ -28,19 +42,23 @@ public class CimService : IDisposable
         return session;
     }
 
+    private bool IsDevEnvironment =>
+        Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development"
+        || Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") == "Development";
+
     public async Task UpdateServerStatusAsync(Server server)
     {
         try
         {
             var session = GetSession(server.Ip);
-            
+
             var osInstances = session.QueryInstances(@"root\cimv2", "WQL", "SELECT Caption, FreePhysicalMemory, TotalVisibleMemorySize FROM Win32_OperatingSystem").ToList();
             if (osInstances.Any())
             {
                 var os = osInstances.First();
                 server.Status = "online";
                 server.Os = os.CimInstanceProperties["Caption"]?.Value?.ToString() ?? server.Os;
-                
+
                 if (double.TryParse(os.CimInstanceProperties["TotalVisibleMemorySize"]?.Value?.ToString(), out var totalMem) &&
                     double.TryParse(os.CimInstanceProperties["FreePhysicalMemory"]?.Value?.ToString(), out var freeMem))
                 {
@@ -63,12 +81,19 @@ public class CimService : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Failed to reach CIM on {Ip}. Using mock fallback for testing.", server.Ip);
-            // Fallback for local UI testing
-            server.Status = "online";
-            var rnd = new Random();
-            server.Cpu = rnd.Next(10, 85);
-            server.Mem = rnd.Next(20, 90);
+            _logger.LogWarning(ex, "Failed to reach CIM on {Ip}.", server.Ip);
+            // Only fabricate mock data in Development; mark server offline in production
+            if (IsDevEnvironment)
+            {
+                server.Status = "online";
+                var rnd = new Random();
+                server.Cpu = rnd.Next(10, 85);
+                server.Mem = rnd.Next(20, 90);
+            }
+            else
+            {
+                server.Status = "offline";
+            }
         }
     }
 
@@ -277,12 +302,20 @@ public class CimService : IDisposable
         return svcs.OrderBy(s => s.DisplayName).ToList();
     }
 
+    // Validate service name contains only safe characters (alphanumeric, underscore, hyphen, dot, space)
+    private static readonly Regex SafeServiceName = new(@"^[a-zA-Z0-9_\-\. ]+$", RegexOptions.Compiled);
+
     public async Task<bool> ControlServiceAsync(string ip, string serviceName, string action)
     {
+        if (!SafeServiceName.IsMatch(serviceName))
+            throw new ArgumentException($"Invalid service name: {serviceName}");
+
         try
         {
             var session = GetSession(ip);
-            var svcInstance = session.QueryInstances(@"root\cimv2", "WQL", $"SELECT * FROM Win32_Service WHERE Name = '{serviceName}'").FirstOrDefault();
+            // Escape single quotes in service name for WQL safety
+            var safeName = serviceName.Replace("'", "''");
+            var svcInstance = session.QueryInstances(@"root\cimv2", "WQL", $"SELECT * FROM Win32_Service WHERE Name = '{safeName}'").FirstOrDefault();
             if (svcInstance != null)
             {
                 string method = action.ToLower() switch

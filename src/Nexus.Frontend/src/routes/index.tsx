@@ -47,15 +47,18 @@ function Dashboard() {
     // Poll for servers
     const id = setInterval(loadData, 10000);
 
-    // Setup SignalR
-    const token = localStorage.getItem("nexus_token") || "";
+    // Setup SignalR — re-read token on every (re)connect so refreshed tokens are used
     const connection = new signalR.HubConnectionBuilder()
-      .withUrl("/hub/notifications", { accessTokenFactory: () => token })
+      .withUrl("/hub/notifications", {
+        accessTokenFactory: () => localStorage.getItem("nexus_token") || ""
+      })
       .withAutomaticReconnect()
       .build();
 
+    const MAX_NOTIFICATIONS = 100;
     connection.on("ReceiveNotification", (notification: Notification) => {
-      setNotifications(prev => [notification, ...prev]);
+      // Cap array to prevent unbounded memory growth in long sessions
+      setNotifications(prev => [notification, ...prev].slice(0, MAX_NOTIFICATIONS));
     });
 
     connection.start().catch(err => console.error("SignalR Connection Error: ", err));

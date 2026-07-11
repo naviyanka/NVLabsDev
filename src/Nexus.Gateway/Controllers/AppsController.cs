@@ -5,11 +5,13 @@ using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Nexus.Gateway.Services;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Nexus.Gateway.Controllers;
 
 [ApiController]
 [Route("api/servers/{ip}/[controller]")]
+[Authorize]
 public class AppsController : ControllerBase
 {
     private readonly NexusContext _db;
@@ -21,6 +23,28 @@ public class AppsController : ControllerBase
         _db = db;
         _logger = logger;
         _ps = ps;
+    }
+
+    // Validate that SourceServerIp is a managed server to prevent SSRF
+    private bool IsValidSourceServer(string sourceIp, string targetIp)
+    {
+        if (string.IsNullOrEmpty(sourceIp)) return true; // No source = no copy
+        if (sourceIp.Equals(targetIp, StringComparison.OrdinalIgnoreCase)) return true; // Same server
+        return _db.Servers.Any(s => s.Ip == sourceIp); // Must be in managed servers list
+    }
+
+    // Escape double quotes in PowerShell arguments to prevent injection
+    private static string EscapePsArg(string arg)
+    {
+        return arg.Replace("\"", "`\"");
+    }
+
+    // Validate UninstallString only allows msiexec or known safe patterns
+    private static bool IsValidUninstallString(string cmd)
+    {
+        // Only allow msiexec.exe /x patterns or known safe uninstallers
+        return Regex.IsMatch(cmd, @"^msiexec\.exe\s+/[xXiI]\s+", RegexOptions.IgnoreCase)
+            || Regex.IsMatch(cmd, @"^\"[^\"]*\"$", RegexOptions.None); // Quoted path only
     }
 
     [HttpGet]
@@ -138,7 +162,14 @@ public class AppsController : ControllerBase
 
             if (!string.IsNullOrEmpty(request.SourceServerIp) && !request.SourceServerIp.Equals(ip, StringComparison.OrdinalIgnoreCase))
             {
+                // Validate source server is managed (prevent SSRF)
+                if (!IsValidSourceServer(request.SourceServerIp, ip))
+                    return BadRequest("Source server is not in the managed servers list.");
+
                 // Source path on source server
+                if (request.InstallerPath.Length < 3)
+                    return BadRequest("InstallerPath too short.");
+
                 var driveLetter = request.InstallerPath.Substring(0, 1);
                 var restOfPath = request.InstallerPath.Substring(3); // skip "C:\"
                 var sourceSmb = $@"\\{request.SourceServerIp}\{driveLetter}$\{restOfPath}";
@@ -148,24 +179,26 @@ public class AppsController : ControllerBase
                 var targetSmbFile = $@"{targetSmbFolder}\{filename}";
 
                 System.IO.File.Copy(sourceSmb, targetSmbFile, true);
-                
+
                 actualInstallerPath = $@"C:\Windows\Temp\{filename}";
                 copiedFile = true;
             }
 
-            // Run process via WMI or Invoke-Command. Let's use Invoke-Command
+            // Run process via Invoke-Command with escaped arguments
             // Note: msiexec might return immediately and run in background. We just start it.
             string cmd;
             if (ext == ".msi")
             {
-                cmd = $"msiexec.exe /i \"{actualInstallerPath}\" {args}";
+                cmd = $"msiexec.exe /i \"{EscapePsArg(actualInstallerPath)}\" {EscapePsArg(args)}";
             }
             else
             {
-                cmd = $"Start-Process -FilePath \"{actualInstallerPath}\" -ArgumentList \"{args}\" -Wait -NoNewWindow";
+                cmd = $"Start-Process -FilePath \"{EscapePsArg(actualInstallerPath)}\" -ArgumentList \"{EscapePsArg(args)}\" -Wait -NoNewWindow";
             }
 
-            var script = $"Invoke-Command -ComputerName {ip} -ScriptBlock {{ {cmd} }}";
+            // Use single-quoted script block to prevent injection
+            var safeCmd = cmd.Replace("'", "''");
+            var script = $"Invoke-Command -ComputerName {ip} -ScriptBlock {{ '{safeCmd}' }}";
             var base64 = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
             
             var result = await _ps.ExecuteAsync($"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {base64}", HttpContext.RequestAborted);
@@ -199,8 +232,8 @@ public class AppsController : ControllerBase
     }
 
     [HttpPost("upload-installer")]
-    [RequestSizeLimit(long.MaxValue)]
-    [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
+    [RequestSizeLimit(2147483648)] // 2GB max
+    [RequestFormLimits(MultipartBodyLengthLimit = 2147483648)]
     public async Task<IActionResult> UploadInstaller(string ip, [FromForm] IFormFile file)
     {
         try
@@ -242,7 +275,13 @@ public class AppsController : ControllerBase
                 }
             }
 
-            var script = $"Invoke-Command -ComputerName {ip} -ScriptBlock {{ {cmd} }}";
+            // Validate UninstallString only contains safe commands
+            if (!IsValidUninstallString(cmd))
+                return BadRequest("UninstallString contains disallowed characters.");
+
+            // Use single-quoted script block to prevent injection
+            var safeCmd = cmd.Replace("'", "''");
+            var script = $"Invoke-Command -ComputerName {ip} -ScriptBlock {{ '{safeCmd}' }}";
             var base64 = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
             
             var result = await _ps.ExecuteAsync($"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {base64}", HttpContext.RequestAborted);

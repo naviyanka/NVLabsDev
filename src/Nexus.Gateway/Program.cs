@@ -118,7 +118,13 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.SetIsOriginAllowed(origin =>
+            {
+                // Allow localhost origins only (for dev + reverse proxy scenarios)
+                var uri = new Uri(origin);
+                return uri.Host == "localhost" || uri.Host == "127.0.0.1"
+                    || uri.Host.Equals("::1", StringComparison.OrdinalIgnoreCase);
+            })
               .AllowAnyMethod()
               .AllowAnyHeader();
     });

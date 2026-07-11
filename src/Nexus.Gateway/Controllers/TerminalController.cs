@@ -4,17 +4,28 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Text;
 using System;
+using System.Text.RegularExpressions;
 using Porta.Pty;
 
 namespace Nexus.Gateway.Controllers;
 
 [ApiController]
 [Route("api/terminal")]
+[Microsoft.AspNetCore.Authorization.Authorize]
 public class TerminalController : ControllerBase
 {
+    // Validate serverId is a safe hostname/IP — blocks shell metacharacters and injection
+    private static readonly Regex SafeServerId = new(@"^[a-zA-Z0-9._-]+$", RegexOptions.Compiled);
+
     [HttpGet("ws")]
     public async Task Connect([FromQuery] string serverId)
     {
+        if (string.IsNullOrEmpty(serverId) || !SafeServerId.IsMatch(serverId))
+        {
+            HttpContext.Response.StatusCode = 400;
+            return;
+        }
+
         if (HttpContext.WebSockets.IsWebSocketRequest)
         {
             using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
@@ -38,9 +49,9 @@ public class TerminalController : ControllerBase
             Environment = new Dictionary<string, string>()
         };
 
-        if (!string.IsNullOrEmpty(serverId) && !serverId.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+        if (!serverId.Equals("localhost", StringComparison.OrdinalIgnoreCase))
         {
-            options.CommandLine = new[] { "-NoExit", "-Command", $"Enter-PSSession -ComputerName {serverId}" };
+            options.CommandLine = new[] { "-NoExit", "-Command", $"Enter-PSSession -ComputerName '{serverId}'" };
         }
 
         using var pty = await PtyProvider.SpawnAsync(options, default);

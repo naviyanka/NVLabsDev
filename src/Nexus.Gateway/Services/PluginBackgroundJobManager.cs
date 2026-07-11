@@ -52,6 +52,8 @@ public class PluginBackgroundJobManager
         job.Output.AppendLine($"[{DateTime.UtcNow:HH:mm:ss}] Starting native PowerShell runspace session on {serverIp}...");
         job.StartTime = DateTime.UtcNow;
         job.EndTime = null;
+        // Dispose prior CTS to prevent unmanaged timer handle leak on repeated StartJob calls
+        job.Cts?.Dispose();
         job.Cts = new CancellationTokenSource();
 
         var token = job.Cts.Token;
@@ -136,6 +138,9 @@ Remove-Item $tempFile -ErrorAction SilentlyContinue
                 {
                     _sessionManager.DestroySession(sessionId);
                 }
+                // Dispose CTS after job ends to release unmanaged timer handle
+                job.Cts?.Dispose();
+                job.Cts = null;
             }
         });
     }

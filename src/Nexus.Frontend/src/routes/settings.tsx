@@ -71,7 +71,8 @@ function GlobalSettingsPage() {
     fetch("/api/settings/logs")
       .then(res => res.json())
       .then(data => {
-        setLogs(data.logs || []);
+        // Cap log array to bound memory growth in long-running sessions
+        setLogs((data.logs || []).slice(0, 500));
         if (data.enabled !== undefined) setLogsEnabled(data.enabled);
       })
       .catch(() => toast.error("Failed to fetch logs"))
