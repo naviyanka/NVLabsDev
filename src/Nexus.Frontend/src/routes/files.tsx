@@ -37,7 +37,7 @@ function PromptDialog({ isOpen, title, description, initialValue, placeholder, o
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-      <div className="w-full max-w-md overflow-hidden rounded-xl border border-[var(--border-c)] bg-[#0a0f18] shadow-2xl">
+      <div className="w-full max-w-md overflow-hidden rounded-xl border border-[var(--border-c)] bg-[var(--bg-card)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--border-c)] bg-[var(--bg-surface)] px-4 py-3">
           <div className="eyebrow text-[var(--text)]">{title}</div>
           <button onClick={onCancel} className="text-[var(--text-sub)] hover:text-white"><X size={16} /></button>
@@ -95,7 +95,7 @@ function FolderPickerDialog({ isOpen, server, title, initialPath, onConfirm, onC
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-      <div className="flex h-[60vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-[var(--border-c)] bg-[#0a0f18] shadow-2xl">
+      <div className="flex h-[60vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-[var(--border-c)] bg-[var(--bg-card)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--border-c)] bg-[var(--bg-surface)] px-4 py-3">
           <div className="eyebrow text-[var(--text)]">{title}</div>
           <button onClick={onCancel} className="text-[var(--text-sub)] hover:text-white"><X size={16} /></button>
@@ -439,7 +439,7 @@ function FilesPage() {
         </aside>
 
         <div className="nx-card flex flex-col h-[calc(100vh-200px)]">
-          <div className="flex flex-wrap items-center justify-between border-b border-[var(--border-c)] p-3 bg-[#0a0f18] gap-2">
+          <div className="flex flex-wrap items-center justify-between border-b border-[var(--border-c)] p-3 bg-[var(--bg-card)] gap-2">
             <div className="flex-1 flex items-center gap-2">
               <input 
                 type="text"
@@ -459,7 +459,7 @@ function FilesPage() {
               
               <div className="relative group">
                 <TBtn icon={Plus} label="" />
-                <div className="absolute right-0 top-full mt-1 hidden w-40 flex-col overflow-hidden rounded border border-[var(--border-c)] bg-[#0a0f18] shadow-xl group-hover:flex z-50">
+                <div className="absolute right-0 top-full mt-1 hidden w-40 flex-col overflow-hidden rounded border border-[var(--border-c)] bg-[var(--bg-card)] shadow-xl group-hover:flex z-50">
                   <button onClick={handleCreateFolder} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)]"><FolderPlus size={14} /> New Folder</button>
                   <button onClick={() => {
                     setPromptState({
@@ -471,7 +471,7 @@ function FilesPage() {
 
               <div className="relative group">
                 <TBtn icon={MoreHorizontal} label="" />
-                <div className="absolute right-0 top-full mt-1 hidden w-40 flex-col overflow-hidden rounded border border-[var(--border-c)] bg-[#0a0f18] shadow-xl group-hover:flex z-50">
+                <div className="absolute right-0 top-full mt-1 hidden w-40 flex-col overflow-hidden rounded border border-[var(--border-c)] bg-[var(--bg-card)] shadow-xl group-hover:flex z-50">
                   <button onClick={handleUploadClick} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)]"><Upload size={14} /> Upload</button>
                   <div className="my-1 h-[1px] bg-[var(--border-dim)]" />
                   <button onClick={handleDownload} disabled={!selectedFile} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)] disabled:opacity-50"><Download size={14} /> Download</button>
@@ -492,7 +492,7 @@ function FilesPage() {
           
           <div className="overflow-auto flex-1 outline-none" onClick={(e) => { if (e.target === e.currentTarget) setSelectedFile(null); }}>
             <table className="w-full text-[12px] relative select-none">
-              <thead className="sticky top-0 bg-[#0a0f18]/95 backdrop-blur-sm z-10 shadow-[0_1px_0_var(--border-c)]">
+              <thead className="sticky top-0 bg-[var(--bg-card)]/95 backdrop-blur-sm z-10 shadow-[0_1px_0_var(--border-c)]">
                 <tr className="eyebrow text-left">
                   <th className="px-4 py-2 font-normal">Name</th>
                   <th className="font-normal">Type</th>
@@ -561,7 +561,7 @@ function FilesPage() {
 
       {isEditorOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="flex h-[80vh] w-[80vw] flex-col overflow-hidden rounded-xl border border-[var(--border-c)] bg-[#0a0f18] shadow-2xl">
+          <div className="flex h-[80vh] w-[80vw] flex-col overflow-hidden rounded-xl border border-[var(--border-c)] bg-[var(--bg-card)] shadow-2xl">
             <div className="flex items-center justify-between border-b border-[var(--border-c)] bg-[var(--bg-surface)] px-4 py-3">
               <div className="mono flex items-center gap-2 text-[12px] text-[var(--text)]">
                 <Edit2 size={14} className="text-[var(--amber)]" />
