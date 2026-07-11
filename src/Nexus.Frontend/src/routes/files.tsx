@@ -418,7 +418,8 @@ function FilesPage() {
             <button 
               key={d.path} 
               onClick={() => setPath([d.path])}
-              className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] hover:bg-[var(--bg-surface)] hover:text-[var(--text)] ${path[0] === d.path ? "bg-[var(--bg-surface)] text-[var(--text)]" : "text-[var(--text-sub)]"}`}>
+              title={`Open ${d.name}`}
+              className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] transition-colors hover:bg-[var(--amber-low)]/50 hover:text-[var(--amber)] ${path[0] === d.path ? "bg-[var(--amber-low)] text-[var(--amber)]" : "text-[var(--text-sub)]"}`}>
               <Folder size={13} className="text-[var(--amber)]" /> {d.name}
             </button>
           ))}
@@ -430,7 +431,8 @@ function FilesPage() {
                 <button 
                   key={d.path} 
                   onClick={() => setPath([d.path])}
-                  className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] hover:bg-[var(--bg-surface)] hover:text-[var(--text)] ${path[0] === d.path ? "bg-[var(--bg-surface)] text-[var(--text)]" : "text-[var(--text-sub)]"}`}>
+                  title={`Open Network Share ${d.name}`}
+                  className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] transition-colors hover:bg-[var(--teal-low)]/50 hover:text-[var(--teal)] ${path[0] === d.path ? "bg-[var(--teal-low)] text-[var(--teal)]" : "text-[var(--text-sub)]"}`}>
                   <Folder size={13} className="text-[var(--teal)]" /> {d.name}
                 </button>
               ))}
@@ -450,7 +452,8 @@ function FilesPage() {
                     setPath(pathInput.split("\\").filter(Boolean));
                   }
                 }}
-                className="mono w-full flex-1 rounded border border-[var(--border-c)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text)] outline-none focus:border-[var(--amber)] transition-colors"
+                title="Type path here and press Enter to navigate"
+                className="mono w-full flex-1 rounded border border-[var(--border-c)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text)] outline-none focus:border-[var(--amber)] transition-colors hover:border-[var(--amber-low)]"
                 placeholder="C:\Path\To\Folder"
               />
             </div>
@@ -458,33 +461,33 @@ function FilesPage() {
               <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
               
               <div className="relative group">
-                <TBtn icon={Plus} label="" />
+                <TBtn icon={Plus} label="" title="Create New (Folder/File)" />
                 <div className="absolute right-0 top-full mt-1 hidden w-40 flex-col overflow-hidden rounded border border-[var(--border-c)] bg-[var(--bg-card)] shadow-xl group-hover:flex z-50">
-                  <button onClick={handleCreateFolder} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)]"><FolderPlus size={14} /> New Folder</button>
+                  <button onClick={handleCreateFolder} title="Create a new folder in this directory" className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] transition-colors hover:bg-[var(--amber-low)] hover:text-[var(--amber)]"><FolderPlus size={14} /> New Folder</button>
                   <button onClick={() => {
                     setPromptState({
                       isOpen: true, type: 'newFile', title: 'New File', description: 'Enter a name for the new file.', initialValue: '', placeholder: 'newfile.txt'
                     });
-                  }} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)]"><FilePlus size={14} /> New File</button>
+                  }} title="Create a new text file" className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] transition-colors hover:bg-[var(--amber-low)] hover:text-[var(--amber)]"><FilePlus size={14} /> New File</button>
                 </div>
               </div>
 
               <div className="relative group">
-                <TBtn icon={MoreHorizontal} label="" />
+                <TBtn icon={MoreHorizontal} label="" title="More Actions" />
                 <div className="absolute right-0 top-full mt-1 hidden w-40 flex-col overflow-hidden rounded border border-[var(--border-c)] bg-[var(--bg-card)] shadow-xl group-hover:flex z-50">
-                  <button onClick={handleUploadClick} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)]"><Upload size={14} /> Upload</button>
+                  <button onClick={handleUploadClick} title="Upload file to this folder" className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] transition-colors hover:bg-[var(--amber-low)] hover:text-[var(--amber)]"><Upload size={14} /> Upload</button>
                   <div className="my-1 h-[1px] bg-[var(--border-dim)]" />
-                  <button onClick={handleDownload} disabled={!selectedFile} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)] disabled:opacity-50"><Download size={14} /> Download</button>
+                  <button onClick={handleDownload} disabled={!selectedFile} title="Download selected item" className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] transition-colors hover:bg-[var(--amber-low)] hover:text-[var(--amber)] disabled:opacity-50"><Download size={14} /> Download</button>
                   {selectedFile?.type === "folder" ? (
-                    <button onClick={() => handleOpenItem(selectedFile)} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)]"><FolderOpen size={14} /> Open</button>
+                    <button onClick={() => handleOpenItem(selectedFile)} title="Open selected folder" className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] transition-colors hover:bg-[var(--amber-low)] hover:text-[var(--amber)]"><FolderOpen size={14} /> Open</button>
                   ) : (
-                    <button onClick={() => selectedFile && openEditor(selectedFile.name)} disabled={!selectedFile || !isTextFile(selectedFile.type)} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)] disabled:opacity-50"><Edit2 size={14} /> Edit</button>
+                    <button onClick={() => selectedFile && openEditor(selectedFile.name)} disabled={!selectedFile || !isTextFile(selectedFile.type)} title="Edit selected text file" className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] transition-colors hover:bg-[var(--amber-low)] hover:text-[var(--amber)] disabled:opacity-50"><Edit2 size={14} /> Edit</button>
                   )}
-                  <button onClick={handleRename} disabled={!selectedFile} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)] disabled:opacity-50"><Type size={14} /> Rename</button>
-                  <button onClick={handleCopy} disabled={!selectedFile} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)] disabled:opacity-50"><Copy size={14} /> Copy</button>
-                  <button onClick={handleMove} disabled={!selectedFile} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] hover:bg-[var(--bg-surface)] disabled:opacity-50"><MoveRight size={14} /> Move</button>
+                  <button onClick={handleRename} disabled={!selectedFile} title="Rename selected item" className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] transition-colors hover:bg-[var(--amber-low)] hover:text-[var(--amber)] disabled:opacity-50"><Type size={14} /> Rename</button>
+                  <button onClick={handleCopy} disabled={!selectedFile} title="Copy selected item to another location" className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] transition-colors hover:bg-[var(--amber-low)] hover:text-[var(--amber)] disabled:opacity-50"><Copy size={14} /> Copy</button>
+                  <button onClick={handleMove} disabled={!selectedFile} title="Move selected item to another location" className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text)] transition-colors hover:bg-[var(--amber-low)] hover:text-[var(--amber)] disabled:opacity-50"><MoveRight size={14} /> Move</button>
                   <div className="my-1 h-[1px] bg-[var(--border-dim)]" />
-                  <button onClick={handleDelete} disabled={!selectedFile} className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--red)] hover:bg-[var(--bg-surface)] disabled:opacity-50"><Trash2 size={14} /> Delete</button>
+                  <button onClick={handleDelete} disabled={!selectedFile} title="Delete selected item" className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--red)] transition-colors hover:bg-[var(--crit)]/20 hover:text-[var(--crit)] disabled:opacity-50"><Trash2 size={14} /> Delete</button>
                 </div>
               </div>
             </div>
@@ -520,7 +523,8 @@ function FilesPage() {
                           e.stopPropagation();
                           handleOpenItem(f);
                         }}
-                        className={`cursor-pointer border-b border-[var(--border-dim)] transition-colors ${isSelected ? "bg-[var(--amber-low)]/20" : "hover:bg-[var(--bg-surface)]"}`}>
+                        title={`Double-click to open ${f.name}`}
+                        className={`cursor-pointer border-b border-[var(--border-dim)] transition-colors ${isSelected ? "bg-[var(--amber-low)]/40" : "hover:bg-[var(--amber-low)]/15"}`}>
                         <td className="flex items-center gap-2 px-4 py-2 text-[var(--text)]">
                           {f.type === "folder" ? <Folder size={13} className="text-[var(--amber)]" /> : <FileIcon size={13} className="text-[var(--text-sub)]" />}
                           <span className={isSelected ? "text-[var(--amber)] font-medium" : ""}>{f.name}</span>
@@ -587,11 +591,12 @@ function FilesPage() {
   );
 }
 
-function TBtn({ icon: Icon, label, onClick, disabled }: { icon: React.ComponentType<{ size?: number }>; label: string; onClick?: () => void; disabled?: boolean }) {
+function TBtn({ icon: Icon, label, onClick, disabled, title }: { icon: React.ComponentType<{ size?: number }>; label: string; onClick?: () => void; disabled?: boolean; title?: string }) {
   return (
     <button 
       onClick={onClick}
       disabled={disabled}
+      title={title || label || "Options"}
       className={`mono flex items-center gap-1.5 rounded-md border border-[var(--border-c)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[10px] uppercase tracking-[0.2em] transition-colors ${disabled ? 'opacity-50 cursor-not-allowed text-[var(--text-sub)]' : 'text-[var(--text)] hover:border-[var(--amber)] hover:bg-[var(--amber-low)] hover:text-[var(--amber)]'}`}>
       <Icon size={12} /> {label}
     </button>
