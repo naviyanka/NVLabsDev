@@ -214,6 +214,16 @@ export async function getLiveProcessesClient(serverId: string): Promise<Process[
   return [];
 }
 
+export async function getProcessDetailsClient(serverId: string, pid: number): Promise<Process | null> {
+  try {
+    const res = await fetch(`${API_BASE}/performance/${serverId}/processes/${pid}`);
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.error("Failed to fetch process details", e);
+  }
+  return null;
+}
+
 export async function killProcessClient(serverId: string, pid: number): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/performance/${serverId}/processes/${pid}`, {

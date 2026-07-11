@@ -64,6 +64,19 @@ public class PerformanceController : ControllerBase
         return Ok(data);
     }
 
+    [HttpGet("{id}/processes/{pid}")]
+    public async Task<ActionResult<ProcessModel>> GetProcessDetails(string id, int pid)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return BadRequest();
+        
+        var server = await _db.Servers.FindAsync(id);
+        var targetIp = server != null ? server.Ip : id;
+        
+        var data = await _cimService.GetProcessDetailsAsync(targetIp, pid);
+        if (data == null) return NotFound();
+        return Ok(data);
+    }
+
     [HttpDelete("{id}/processes/{pid}")]
     public async Task<IActionResult> KillProcess(string id, int pid)
     {

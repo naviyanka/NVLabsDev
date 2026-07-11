@@ -237,6 +237,30 @@ public class WindowsFilesController : ControllerBase
         }
     }
 
+    private void CopyDirectory(string sourceDir, string destinationDir, bool recursive)
+    {
+        var dir = new DirectoryInfo(sourceDir);
+        if (!dir.Exists) throw new DirectoryNotFoundException($"Source directory not found: {dir.FullName}");
+
+        DirectoryInfo[] dirs = dir.GetDirectories();
+        Directory.CreateDirectory(destinationDir);
+
+        foreach (FileInfo file in dir.GetFiles())
+        {
+            string targetFilePath = Path.Combine(destinationDir, file.Name);
+            file.CopyTo(targetFilePath, true);
+        }
+
+        if (recursive)
+        {
+            foreach (DirectoryInfo subDir in dirs)
+            {
+                string newDestinationDir = Path.Combine(destinationDir, subDir.Name);
+                CopyDirectory(subDir.FullName, newDestinationDir, true);
+            }
+        }
+    }
+
     [HttpPost("move")]
     public IActionResult Move(string serverIp, [FromQuery] string path, [FromQuery] string destPath)
     {
@@ -245,9 +269,31 @@ public class WindowsFilesController : ControllerBase
             var uncPath = BuildUncPath(serverIp, path);
             var uncDestPath = BuildUncPath(serverIp, destPath);
             if (Directory.Exists(uncPath))
-                Directory.Move(uncPath, uncDestPath);
+            {
+                try
+                {
+                    Directory.Move(uncPath, uncDestPath);
+                }
+                catch (IOException)
+                {
+                    // Fallback for moving across volumes
+                    CopyDirectory(uncPath, uncDestPath, true);
+                    Directory.Delete(uncPath, true);
+                }
+            }
             else if (System.IO.File.Exists(uncPath))
-                System.IO.File.Move(uncPath, uncDestPath);
+            {
+                try
+                {
+                    System.IO.File.Move(uncPath, uncDestPath);
+                }
+                catch (IOException)
+                {
+                    // Fallback for moving across volumes
+                    System.IO.File.Copy(uncPath, uncDestPath, true);
+                    System.IO.File.Delete(uncPath);
+                }
+            }
             else return NotFound();
             return Ok();
         }
@@ -266,12 +312,12 @@ public class WindowsFilesController : ControllerBase
             var uncDestPath = BuildUncPath(serverIp, destPath);
             if (Directory.Exists(uncPath))
             {
-                // Simple recursive copy is not available in stdlib, so we do basic folder copy if needed, 
-                // but usually users copy files. For now, throw if trying to copy directory to keep it simple, or implement it.
-                return StatusCode(400, new { message = "Folder copy not implemented." });
+                CopyDirectory(uncPath, uncDestPath, true);
             }
             else if (System.IO.File.Exists(uncPath))
+            {
                 System.IO.File.Copy(uncPath, uncDestPath, overwrite: true);
+            }
             else return NotFound();
             return Ok();
         }

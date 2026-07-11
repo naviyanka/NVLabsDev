@@ -32,7 +32,8 @@ function rand(seed: number) { let x = Math.sin(seed) * 10000; return x - Math.fl
 // --- Processes
 export interface Process {
   pid: number; name: string; cpu: number; memMB: number; memPct: number;
-  handles: number; threads: number; user: string; status: "Running" | "Suspended" | "Background";
+  handles: number; threads: number; user: string; status: string;
+  commandLine?: string; executablePath?: string;
 }
 
 // --- Services

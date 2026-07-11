@@ -256,6 +256,31 @@ public class CimService : IDisposable
         return limit == int.MaxValue ? sorted : sorted.Take(limit).ToList();
     }
 
+    public async Task<ProcessModel?> GetProcessDetailsAsync(string ip, int pid)
+    {
+        try
+        {
+            var session = GetSession(ip);
+            var pInstance = session.QueryInstances(@"root\cimv2", "WQL", $"SELECT ProcessId, Name, ExecutablePath, CommandLine FROM Win32_Process WHERE ProcessId = {pid}").FirstOrDefault();
+            
+            if (pInstance != null)
+            {
+                return new ProcessModel
+                {
+                    Pid = pid,
+                    Name = pInstance.CimInstanceProperties["Name"]?.Value?.ToString() ?? "Unknown",
+                    ExecutablePath = pInstance.CimInstanceProperties["ExecutablePath"]?.Value?.ToString(),
+                    CommandLine = pInstance.CimInstanceProperties["CommandLine"]?.Value?.ToString()
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to get process details for {Pid} on {Ip}", pid, ip);
+        }
+        return null;
+    }
+
     public async Task<bool> KillProcessAsync(string ip, int pid)
     {
         try

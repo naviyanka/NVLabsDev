@@ -20,4 +20,6 @@ public class ProcessModel
     public int Threads { get; set; }
     public string User { get; set; } = string.Empty;
     public string Status { get; set; } = "Running";
+    public string? CommandLine { get; set; }
+    public string? ExecutablePath { get; set; }
 }
