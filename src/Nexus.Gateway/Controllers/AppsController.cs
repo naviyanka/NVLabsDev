@@ -75,43 +75,53 @@ public class AppsController : ControllerBase
                 }
             }
 
-            var script = "Invoke-Command -ComputerName " + ip + " -ScriptBlock { Get-ItemProperty -Path @('HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*', 'HKLM:\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*') -ErrorAction SilentlyContinue | Where-Object DisplayName | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate, InstallLocation, EstimatedSize, UninstallString | ConvertTo-Csv -NoTypeInformation }";
+            var script = "Invoke-Command -ComputerName " + ip + " -ScriptBlock { @(Get-ItemProperty -Path @('HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*', 'HKLM:\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*', 'Registry::HKEY_USERS\\*\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*') -ErrorAction SilentlyContinue | Where-Object DisplayName | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate, InstallLocation, EstimatedSize, UninstallString) | ConvertTo-Json -Compress }";
             var base64 = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
             
             var result = await _ps.ExecuteAsync($"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {base64}", HttpContext.RequestAborted);
             var output = result.StandardOutput;
 
             var apps = new List<InstalledAppEntity>();
-            var lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Skip(1);
-
-            foreach (var line in lines)
+            
+            if (!string.IsNullOrWhiteSpace(output))
             {
-                var matches = Regex.Matches(line, @"(?:^|,)(?:""(?<val>[^""]*)""|(?<val>[^,]*))");
-                var parts = matches.Cast<Match>().Select(m => m.Groups["val"].Value).ToList();
-
-                if (parts.Count >= 7)
+                try
                 {
-                    var sizeStr = parts[5];
-                    if (int.TryParse(sizeStr, out var sizeKb))
+                    var parsed = System.Text.Json.JsonSerializer.Deserialize<List<Dictionary<string, System.Text.Json.JsonElement>>>(output);
+                    if (parsed != null)
                     {
-                        sizeStr = (sizeKb / 1024).ToString();
-                    }
-                    else
-                    {
-                        sizeStr = "0";
-                    }
+                        foreach (var item in parsed)
+                        {
+                            var name = item.TryGetValue("DisplayName", out var n) && n.ValueKind != System.Text.Json.JsonValueKind.Null ? n.ToString() : "Unknown";
+                            if (string.IsNullOrEmpty(name)) continue;
 
-                    apps.Add(new InstalledAppEntity
-                    {
-                        ServerIp = ip,
-                        Name = parts[0],
-                        Version = parts[1],
-                        Publisher = parts[2],
-                        InstallDate = parts[3],
-                        Location = parts[4],
-                        SizeMB = sizeStr,
-                        UninstallString = parts[6]
-                    });
+                            var sizeStr = item.TryGetValue("EstimatedSize", out var sz) && sz.ValueKind != System.Text.Json.JsonValueKind.Null ? sz.ToString() : "0";
+                            if (int.TryParse(sizeStr, out var sizeKb))
+                            {
+                                sizeStr = (sizeKb / 1024).ToString();
+                            }
+                            else
+                            {
+                                sizeStr = "0";
+                            }
+
+                            apps.Add(new InstalledAppEntity
+                            {
+                                ServerIp = ip,
+                                Name = name,
+                                Version = item.TryGetValue("DisplayVersion", out var v) && v.ValueKind != System.Text.Json.JsonValueKind.Null ? v.ToString() : "",
+                                Publisher = item.TryGetValue("Publisher", out var p) && p.ValueKind != System.Text.Json.JsonValueKind.Null ? p.ToString() : "",
+                                InstallDate = item.TryGetValue("InstallDate", out var d) && d.ValueKind != System.Text.Json.JsonValueKind.Null ? d.ToString() : "",
+                                Location = item.TryGetValue("InstallLocation", out var l) && l.ValueKind != System.Text.Json.JsonValueKind.Null ? l.ToString() : "",
+                                SizeMB = sizeStr,
+                                UninstallString = item.TryGetValue("UninstallString", out var u) && u.ValueKind != System.Text.Json.JsonValueKind.Null ? u.ToString() : ""
+                            });
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to parse JSON output: {Output}", output);
                 }
             }
 
