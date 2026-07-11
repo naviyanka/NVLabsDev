@@ -75,7 +75,9 @@ public class AppsController : ControllerBase
                 }
             }
 
-            var script = "Invoke-Command -ComputerName " + ip + " -ScriptBlock { @(Get-ItemProperty -Path @('HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*', 'HKLM:\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*', 'Registry::HKEY_USERS\\*\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*') -ErrorAction SilentlyContinue | Where-Object DisplayName | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate, InstallLocation, EstimatedSize, UninstallString) | ConvertTo-Json -Compress }";
+            var isLocal = ip.Equals("localhost", StringComparison.OrdinalIgnoreCase) || ip == "127.0.0.1" || ip == "::1";
+            var innerScript = "@(Get-ItemProperty -Path @('HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*', 'HKLM:\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*', 'Registry::HKEY_USERS\\*\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*') -ErrorAction SilentlyContinue | Where-Object DisplayName | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate, InstallLocation, EstimatedSize, UninstallString) | ConvertTo-Json -Compress";
+            var script = isLocal ? innerScript : $"Invoke-Command -ComputerName {ip} -ScriptBlock {{ {innerScript} }}";
             var base64 = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
             
             var result = await _ps.ExecuteAsync($"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {base64}", HttpContext.RequestAborted);
@@ -185,7 +187,8 @@ public class AppsController : ControllerBase
                 var sourceSmb = $@"\\{request.SourceServerIp}\{driveLetter}$\{restOfPath}";
 
                 var filename = Path.GetFileName(request.InstallerPath);
-                var targetSmbFolder = $@"\\{ip}\C$\Windows\Temp";
+                var isLocal = ip.Equals("localhost", StringComparison.OrdinalIgnoreCase) || ip == "127.0.0.1" || ip == "::1";
+                var targetSmbFolder = isLocal ? @"C:\Windows\Temp" : $@"\\{ip}\C$\Windows\Temp";
                 var targetSmbFile = $@"{targetSmbFolder}\{filename}";
 
                 System.IO.File.Copy(sourceSmb, targetSmbFile, true);
@@ -206,9 +209,10 @@ public class AppsController : ControllerBase
                 cmd = $"Start-Process -FilePath \"{EscapePsArg(actualInstallerPath)}\" -ArgumentList \"{EscapePsArg(args)}\" -Wait -NoNewWindow";
             }
 
-            // Use single-quoted script block with Invoke-Expression to execute
+            // Use single-quoted script block with Invoke-Expression to execute if remote
+            var isLocalIp = ip.Equals("localhost", StringComparison.OrdinalIgnoreCase) || ip == "127.0.0.1" || ip == "::1";
             var safeCmd = cmd.Replace("'", "''");
-            var script = $"Invoke-Command -ComputerName {ip} -ScriptBlock {{ Invoke-Expression '{safeCmd}' }}";
+            var script = isLocalIp ? cmd : $"Invoke-Command -ComputerName {ip} -ScriptBlock {{ Invoke-Expression '{safeCmd}' }}";
             var base64 = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
             
             var result = await _ps.ExecuteAsync($"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {base64}", HttpContext.RequestAborted);
@@ -218,7 +222,8 @@ public class AppsController : ControllerBase
             {
                 try
                 {
-                    var targetSmbFile = $@"\\{ip}\C$\Windows\Temp\{Path.GetFileName(request.InstallerPath)}";
+                    var isLocal = ip.Equals("localhost", StringComparison.OrdinalIgnoreCase) || ip == "127.0.0.1" || ip == "::1";
+                    var targetSmbFile = isLocal ? $@"C:\Windows\Temp\{Path.GetFileName(request.InstallerPath)}" : $@"\\{ip}\C$\Windows\Temp\{Path.GetFileName(request.InstallerPath)}";
                     System.IO.File.Delete(targetSmbFile);
                 }
                 catch (Exception deleteEx)
@@ -250,7 +255,8 @@ public class AppsController : ControllerBase
         {
             if (file == null || file.Length == 0) return BadRequest("No file uploaded");
 
-            var targetSmbFolder = $@"\\{ip}\C$\Windows\Temp";
+            var isLocal = ip.Equals("localhost", StringComparison.OrdinalIgnoreCase) || ip == "127.0.0.1" || ip == "::1";
+            var targetSmbFolder = isLocal ? @"C:\Windows\Temp" : $@"\\{ip}\C$\Windows\Temp";
             var targetSmbFile = $@"{targetSmbFolder}\{file.FileName}";
 
             using (var stream = new FileStream(targetSmbFile, FileMode.Create))
@@ -290,8 +296,9 @@ public class AppsController : ControllerBase
                 return BadRequest("UninstallString contains disallowed characters.");
 
             // Use single-quoted script block with Invoke-Expression to execute
+            var isLocal = ip.Equals("localhost", StringComparison.OrdinalIgnoreCase) || ip == "127.0.0.1" || ip == "::1";
             var safeCmd = cmd.Replace("'", "''");
-            var script = $"Invoke-Command -ComputerName {ip} -ScriptBlock {{ Invoke-Expression '{safeCmd}' }}";
+            var script = isLocal ? cmd : $"Invoke-Command -ComputerName {ip} -ScriptBlock {{ Invoke-Expression '{safeCmd}' }}";
             var base64 = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
             
             var result = await _ps.ExecuteAsync($"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {base64}", HttpContext.RequestAborted);
