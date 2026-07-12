@@ -38,9 +38,11 @@ export interface Process {
 
 // --- Services
 export interface Service {
-  name: string; displayName: string; status: "Running" | "Stopped" | "Paused";
-  startupType: "Automatic" | "Manual" | "Disabled" | "Automatic (Delayed)";
+  name: string; displayName: string; status: string;
+  startupType: string;
   logOnAs: string; description: string;
+  processId?: number; pathName?: string;
+  acceptStop?: boolean; acceptPause?: boolean;
 }
 
 // --- Storage

@@ -308,7 +308,7 @@ public class CimService : IDisposable
         try
         {
             var session = GetSession(ip);
-            var wmiSvcs = session.QueryInstances(@"root\cimv2", "WQL", "SELECT Name, DisplayName, State, StartMode, StartName, Description FROM Win32_Service").ToList();
+            var wmiSvcs = session.QueryInstances(@"root\cimv2", "WQL", "SELECT Name, DisplayName, State, StartMode, StartName, Description, ProcessId, PathName, AcceptStop, AcceptPause FROM Win32_Service").ToList();
             
             foreach (var s in wmiSvcs)
             {
@@ -322,7 +322,11 @@ public class CimService : IDisposable
                     Status = s.CimInstanceProperties["State"]?.Value?.ToString() ?? "",
                     StartupType = mode,
                     LogOnAs = s.CimInstanceProperties["StartName"]?.Value?.ToString() ?? "",
-                    Description = s.CimInstanceProperties["Description"]?.Value?.ToString() ?? ""
+                    Description = s.CimInstanceProperties["Description"]?.Value?.ToString() ?? "",
+                    ProcessId = int.TryParse(s.CimInstanceProperties["ProcessId"]?.Value?.ToString(), out var pid) ? pid : 0,
+                    PathName = s.CimInstanceProperties["PathName"]?.Value?.ToString() ?? "",
+                    AcceptStop = bool.TryParse(s.CimInstanceProperties["AcceptStop"]?.Value?.ToString(), out var acceptStop) && acceptStop,
+                    AcceptPause = bool.TryParse(s.CimInstanceProperties["AcceptPause"]?.Value?.ToString(), out var acceptPause) && acceptPause
                 });
             }
         }
