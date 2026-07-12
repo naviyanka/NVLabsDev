@@ -10,6 +10,9 @@ import {
 } from "@/api/client";
 
 export const Route = createFileRoute("/files")({
+  validateSearch: (search: Record<string, unknown>): { path?: string } => {
+    return { path: search.path as string | undefined };
+  },
   head: () => ({ meta: [{ title: "Files — NEXUS" }, { name: "description", content: "Browse files and network shares." }] }),
   component: FilesPage,
 });
@@ -173,9 +176,10 @@ function FolderPickerDialog({ isOpen, server, title, initialPath, onConfirm, onC
 }
 
 function FilesPage() {
+  const { path: queryPath } = Route.useSearch();
   const [server, setServer] = useState("dc");
   const [sources, setSources] = useState<FileSource[]>([]);
-  const [path, setPath] = useState<string[]>([]);
+  const [path, setPath] = useState<string[]>(queryPath ? queryPath.split("\\").filter(Boolean) : []);
   const [pathInput, setPathInput] = useState("");
   const [files, setFiles] = useState<FileItem[]>([]);
   
@@ -214,7 +218,7 @@ function FilesPage() {
     try {
       const data = await getFilesSourcesClient(server);
       setSources(data);
-      if (data.length > 0 && path.length === 0) {
+      if (data.length > 0 && path.length === 0 && !queryPath) {
         setPath([data[0].path]);
       }
     } catch (e) {
