@@ -134,16 +134,21 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.SetIsOriginAllowed(origin =>
-            {
-                // Allow localhost origins only (for dev + reverse proxy scenarios)
-                var uri = new Uri(origin);
-                return uri.Host == "localhost" || uri.Host == "127.0.0.1"
-                    || uri.Host.Equals("::1", StringComparison.OrdinalIgnoreCase);
-            })
+        // Allow any origin for remote frontend (Render.com) connecting via tunnel
+        policy.SetIsOriginAllowed(_ => true)
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials(); // Required for SignalR WebSocket transport
     });
+});
+
+// Support forwarded headers from tunnel proxies (ngrok, Cloudflare, Tailscale)
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor 
+                             | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
 });
 
 var app = builder.Build();
@@ -174,12 +179,15 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+app.UseForwardedHeaders();
 app.UseCors("AllowAll");
 app.UseWebSockets();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<NotificationHub>("/hub/notifications");
+
+app.MapGet("/api/health", () => Results.Ok(new { status = "Healthy" })).AllowAnonymous();
 
 app.MapReverseProxy();
 

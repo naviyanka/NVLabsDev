@@ -1,4 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { getApiUrl } from "@/lib/backend";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Server, Activity, AppWindow, Cog, HardDrive, FolderOpen,
@@ -37,7 +38,7 @@ export function Sidebar() {
   const online = MOCK_SERVERS.filter((s) => s.status === "online").length;
 
   const fetchPlugins = () => {
-    fetch("/api/plugins")
+    fetch(getApiUrl("/plugins"))
       .then(r => r.json())
       .then(data => setPlugins(data.filter((p: any) => p.isActive)))
       .catch(() => {});

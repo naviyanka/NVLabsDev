@@ -27,13 +27,17 @@ function ServicesPage() {
   const [actionTarget, setActionTarget] = useState<{ action: string, service: Service } | null>(null);
 
   const loadServices = () => {
-    getServicesClient(server).then((data) => {
-      setServices(data);
-      if (selected) {
-        const updatedSelected = data.find(s => s.name === selected.name);
-        if (updatedSelected) setSelected(updatedSelected);
-      }
-    });
+    getServicesClient(server)
+      .then((data) => {
+        setServices(data);
+        if (selected) {
+          const updatedSelected = data.find(s => s.name === selected.name);
+          if (updatedSelected) setSelected(updatedSelected);
+        }
+      })
+      .catch(err => {
+        console.error("Failed to load services", err);
+      });
   };
 
   useEffect(() => {
@@ -48,10 +52,15 @@ function ServicesPage() {
     const { action, service } = actionTarget;
     setLoading(true);
     setActionTarget(null);
-    await controlServiceClient(server, service.name, action);
-    setTimeout(() => loadServices(), 500); 
-    setTimeout(() => loadServices(), 2500);
-    setLoading(false);
+    try {
+      await controlServiceClient(server, service.name, action);
+      setTimeout(() => loadServices(), 500); 
+      setTimeout(() => loadServices(), 2500);
+    } catch (err) {
+      console.error("Failed to control service", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSort = (col: keyof Service) => {

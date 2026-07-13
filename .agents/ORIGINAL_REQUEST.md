@@ -82,3 +82,42 @@ Implement an explicit mechanism to bypass Session 0 isolation on remote servers.
 - [ ] Playwright E2E tests pass, confirming an app can be successfully installed across servers.
 - [ ] Playwright E2E tests verify the option to select "Interactive Mode" triggers the interactive installer bypassing Session 0.
 - [ ] No regression on retrieving the apps list via WMI.
+
+## Follow-up — 2026-07-12T13:16:33Z
+
+<USER_REQUEST>
+Make the frontend fully resilient to backend outages. All pages and buttons must remain interactive even when the backend is offline. Backend-dependent actions should gracefully degrade with toast notifications, and a global indicator must display the backend's real-time connection status (online/dead).
+
+Working directory: c:\Users\nv\Documents\NVLabsDev
+Integrity mode: development
+
+## Requirements
+
+### R1. Global Backend Status Indicator
+Implement a persistent visual indicator on the frontend that actively monitors and displays whether the backend API is online or offline.
+
+### R2. Resilient UI Components
+Ensure all frontend pages render without crashing when initial backend data fetches fail. UI elements (buttons, inputs) should remain accessible.
+
+### R3. Graceful Degradation & Toast Notifications
+Intercept failed API calls (e.g., due to backend downtime) globally or per-action. Instead of failing silently or crashing, the app must display a user-friendly toast notification indicating that the backend is unreachable.
+
+### R4. Programmatic Verification
+Create a programmatic UI test script (e.g., Playwright) that specifically kills the backend process, interacts with the frontend, and verifies that the toast notifications appear and the global status indicator turns red/offline.
+
+## Acceptance Criteria
+
+### Resiliency
+- [ ] Shutting down the backend process does not cause a white screen or React crash on any frontend route.
+- [ ] Navigating between pages while the backend is dead works smoothly.
+
+### Notifications
+- [ ] Attempting a backend-dependent action (e.g., stopping a service, enabling a network adapter) while the backend is offline triggers a toast notification (e.g., "Backend is dead/unreachable").
+
+### Status Indicator
+- [ ] The global indicator turns red/offline within a reasonable timeframe when the backend drops, and green/online when it recovers.
+
+### Verification
+- [ ] A programmatic UI test passes by correctly identifying that the frontend gracefully handles backend failure.
+</USER_REQUEST>
+

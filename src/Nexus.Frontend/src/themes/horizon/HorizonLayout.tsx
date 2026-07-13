@@ -1,4 +1,5 @@
 import React, { ReactNode, useState, useEffect } from "react";
+import { getApiUrl, getFullUrl } from "@/lib/backend";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { 
   LayoutDashboard, Server, Bell, Settings as SettingsIcon, Search, HelpCircle, Terminal, Cpu, Shield, FileCode, Activity, Moon, Sun, AppWindow, Cog, HardDrive, FolderOpen, Calendar, Package, Layers, RefreshCw, Monitor, BadgeCheck, Users, KeyRound, Network, DatabaseZap, GitBranch, CopySlash, ScrollText, Puzzle, Hexagon, X, LogOut, User
@@ -38,14 +39,14 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
   const [brand, setBrand] = useState({ name: "NEXUS", subtitle: "Horizon UI Shell" });
 
   useEffect(() => {
-    fetch("/api/settings").then(r => r.json()).then(s => {
+    fetch(getApiUrl("/settings")).then(r => r.json()).then(s => {
       setBrand({ name: s.appName || "NEXUS", subtitle: s.appSubtitle || "Horizon UI Shell" });
       if (s.theme) {
         document.documentElement.setAttribute("data-theme", s.theme);
       }
     }).catch(()=>{});
     
-    fetch("/api/notifications").then(r => r.json()).then(n => {
+    fetch(getApiUrl("/notifications")).then(r => r.json()).then(n => {
       if (Array.isArray(n)) {
         setNotifications(n.map((x: any) => ({ id: x.id.toString(), msg: x.message, time: new Date(x.timestamp) })));
       }
@@ -74,7 +75,7 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
     // @ts-ignore
     toast.success = (msg: string, data?: any) => {
       setNotifications(prev => [{ id: Math.random().toString(), msg, time: new Date() }, ...prev]);
-      fetch('/api/notifications/custom', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ type: 'Success', message: msg }) }).catch(()=>{});
+      fetch(getApiUrl('/notifications/custom'), { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ type: 'Success', message: msg }) }).catch(()=>{});
       let toastId: string | number;
       toastId = originalSuccess(msg, { ...data, onClick: () => toast.dismiss(toastId) });
       return toastId;
@@ -83,7 +84,7 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
     // @ts-ignore
     toast.error = (msg: string, data?: any) => {
       setNotifications(prev => [{ id: Math.random().toString(), msg, time: new Date() }, ...prev]);
-      fetch('/api/notifications/custom', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ type: 'Error', message: msg }) }).catch(()=>{});
+      fetch(getApiUrl('/notifications/custom'), { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ type: 'Error', message: msg }) }).catch(()=>{});
       let toastId: string | number;
       toastId = originalError(msg, { ...data, onClick: () => toast.dismiss(toastId) });
       return toastId;
@@ -97,7 +98,7 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
   }, []);
 
   const fetchPlugins = () => {
-    fetch("/api/plugins")
+    fetch(getApiUrl("/plugins"))
       .then(r => r.json())
       .then(data => setPlugins(data.filter((p: any) => p.isActive)))
       .catch(() => {});

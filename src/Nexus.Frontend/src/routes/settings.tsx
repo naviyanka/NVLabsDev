@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { getApiUrl } from "@/lib/backend";
 import { useEffect, useState, useContext } from "react";
 import { toast } from "sonner";
 import { RefreshCw, Download } from "lucide-react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { testNotificationClient } from "@/api/client";
-import { ThemeContext } from "./__root";
 import { HorizonSettings } from "../themes/horizon/pages/HorizonSettings";
+import { getBackendUrl, setBackendUrl, clearBackendUrl, testBackendConnection } from "@/lib/backend";
+import { ThemeContext } from "./__root";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Global Settings — NEXUS" }] }),
@@ -66,9 +68,13 @@ function GlobalSettingsPage() {
   const [exportTimeFilter, setExportTimeFilter] = useState("all");
   const [logsEnabled, setLogsEnabled] = useState(true);
 
+  // Backend Connection State
+  const [backendInput, setBackendInput] = useState(getBackendUrl());
+  const [backendStatus, setBackendStatus] = useState<"unknown" | "testing" | "success" | "error">("unknown");
+
   function fetchLogs() {
     setLoadingLogs(true);
-    fetch("/api/settings/logs")
+    fetch(getApiUrl("/settings/logs"))
       .then(res => res.json())
       .then(data => {
         // Cap log array to bound memory growth in long-running sessions
@@ -86,7 +92,7 @@ function GlobalSettingsPage() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/settings")
+    fetch(getApiUrl("/settings"))
       .then(res => res.json())
       .then(data => {
         setS(data);
@@ -117,7 +123,7 @@ function GlobalSettingsPage() {
       }
     }
     
-    fetch("/api/settings", {
+    fetch(getApiUrl("/settings"), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(next)
@@ -141,6 +147,59 @@ function GlobalSettingsPage() {
         <div className="nx-card p-6">
           {sec === "General" && (
             <Group title="General Settings">
+              <div className="mb-6 rounded-lg border border-[var(--border-dim)] bg-[var(--bg-card)] p-4 shadow-sm">
+                <div className="flex items-center justify-between pb-3">
+                  <h3 className="font-semibold text-[14px]">Backend Connection</h3>
+                  {backendStatus === "testing" && <span className="text-[12px] text-[var(--amber)] animate-pulse">Testing...</span>}
+                  {backendStatus === "success" && <span className="text-[12px] text-[var(--ok)] font-medium flex items-center gap-1">Connected</span>}
+                  {backendStatus === "error" && <span className="text-[12px] text-rose-400 font-medium">Connection Failed</span>}
+                </div>
+                <p className="text-[12px] text-[var(--text-sub)] pb-4">
+                  Set a custom backend URL (e.g., ngrok, Cloudflare Tunnel) if hosting the frontend remotely. Leave blank for local development.
+                </p>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="text"
+                    value={backendInput}
+                    onChange={(e) => setBackendInput(e.target.value)}
+                    placeholder="https://abc1234.ngrok-free.app"
+                    className="flex-1 mono w-full rounded-md border border-[var(--border-c)] bg-[var(--bg-surface)] px-3 py-2 text-[12px] text-[var(--text)] focus:border-[var(--amber)] focus:outline-none"
+                  />
+                  <button 
+                    onClick={async () => {
+                      setBackendStatus("testing");
+                      const ok = await testBackendConnection(backendInput);
+                      setBackendStatus(ok ? "success" : "error");
+                    }}
+                    className="px-3 py-2 text-[12px] rounded border border-[var(--border-c)] hover:bg-[var(--bg-surface)]"
+                  >
+                    Test
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (!backendInput.trim()) clearBackendUrl();
+                      else setBackendUrl(backendInput);
+                      toast.success("Backend URL saved. Reloading app...");
+                      setTimeout(() => window.location.reload(), 1000);
+                    }}
+                    className="px-4 py-2 text-[12px] font-medium rounded bg-[var(--amber)] text-black hover:bg-[var(--amber-low)] hover:text-[var(--amber)] transition-colors"
+                  >
+                    Save
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setBackendInput("");
+                      clearBackendUrl();
+                      toast.success("Reverted to local backend. Reloading...");
+                      setTimeout(() => window.location.reload(), 1000);
+                    }}
+                    className="px-3 py-2 text-[12px] rounded border border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+
               <Row label="Language / Locale">
                 <select value={s.language} onChange={(e) => patch({ language: e.target.value })} className="mono w-full rounded-md border border-[var(--border-c)] bg-[var(--bg-surface)] px-3 py-2 text-[12px]">
                   {["en-US", "en-GB", "fr-FR", "de-DE"].map((x) => <option key={x} value={x}>{x}</option>)}
@@ -304,7 +363,7 @@ function GlobalSettingsPage() {
                 <div className="flex items-center gap-2 mr-auto">
                   <button 
                     onClick={() => {
-                      fetch("/api/settings/logs/toggle", { method: "POST" })
+                      fetch(getApiUrl("/settings/logs/toggle"), { method: "POST" })
                         .then(res => res.json())
                         .then(data => {
                           setLogsEnabled(data.enabled);

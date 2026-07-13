@@ -1,4 +1,5 @@
 import { Bell, RefreshCw, Search, X, CheckCircle, AlertTriangle, Info, LogOut, User } from "lucide-react";
+import { getFullUrl } from "@/lib/backend";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { getNotificationsClient, clearNotificationClient, clearAllNotificationsClient, type Notification } from "@/api/client";
@@ -18,7 +19,12 @@ export function Topbar() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const seenIds = useRef<Set<number>>(new Set());
-  const [isLive, setIsLive] = useState(false);
+  const [isLive, setIsLive] = useState(() => {
+    if (typeof window !== "undefined" && (window as any).__nexus_backend_online !== undefined) {
+      return (window as any).__nexus_backend_online;
+    }
+    return true;
+  });
   const navigate = useNavigate();
 
   const token = typeof window !== "undefined" ? localStorage.getItem("nexus_token") : null;
@@ -70,7 +76,7 @@ export function Topbar() {
 
     // Setup SignalR — re-read token on every (re)connect so refreshed tokens are used
     const connection = new signalR.HubConnectionBuilder()
-      .withUrl("/hub/notifications", {
+      .withUrl(getFullUrl("/hub/notifications"), {
         accessTokenFactory: () => localStorage.getItem("nexus_token") || ""
       })
       .withAutomaticReconnect()
@@ -96,19 +102,33 @@ export function Topbar() {
       }
     });
 
-    connection.onreconnecting(() => setIsLive(false));
-    connection.onreconnected(() => setIsLive(true));
-    connection.onclose(() => setIsLive(false));
+    connection.onreconnecting(() => {
+      if (typeof window !== "undefined") (window as any).__nexus_set_backend_offline();
+    });
+    connection.onreconnected(() => {
+      if (typeof window !== "undefined") (window as any).__nexus_set_backend_online();
+    });
+    connection.onclose(() => {
+      if (typeof window !== "undefined") (window as any).__nexus_set_backend_offline();
+    });
 
     connection.start()
-      .then(() => setIsLive(true))
+      .then(() => {
+        if (typeof window !== "undefined") (window as any).__nexus_set_backend_online();
+      })
       .catch(err => {
         console.error("SignalR Topbar Error: ", err);
-        setIsLive(false);
+        if (typeof window !== "undefined") (window as any).__nexus_set_backend_offline();
       });
+
+    const handleStatusChange = (e: any) => {
+      setIsLive(e.detail.online);
+    };
+    window.addEventListener("nexus-backend-status", handleStatusChange as any);
 
     return () => {
       connection.stop();
+      window.removeEventListener("nexus-backend-status", handleStatusChange as any);
     };
   }, []);
 

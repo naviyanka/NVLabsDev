@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { getApiUrl } from "@/lib/backend";
 import { useEffect, useMemo, useState, useRef, useContext } from "react";
 import { 
   Search, Plus, X, Trash2, Edit2, LayoutDashboard, Server, Activity, AppWindow, Cog, HardDrive, FolderOpen,
@@ -54,12 +55,12 @@ function PluginsPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "disabled">("all");
 
   function load() {
-    fetch("/api/plugins")
+    fetch(getApiUrl("/plugins"))
       .then(r => r.json())
       .then(setPlugins)
       .catch(() => toast.error("Failed to load plugins"));
 
-    fetch("/api/settings")
+    fetch(getApiUrl("/settings"))
       .then(r => r.json())
       .then(data => {
         if (data.pluginCategories) {
@@ -87,7 +88,7 @@ function PluginsPage() {
   function toggle(p: PluginEntity) {
     const next = { ...p, isActive: !p.isActive };
     setPlugins(ps => ps.map(x => x.id === p.id ? next : x));
-    fetch(`/api/plugins/${p.id}`, {
+    fetch(getApiUrl(`/plugins/${p.id}`), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(next)
@@ -101,7 +102,7 @@ function PluginsPage() {
 
   function deletePlugin(id: string) {
     if (!confirm("Delete this plugin permanently?")) return;
-    fetch(`/api/plugins/${id}`, { method: "DELETE" })
+    fetch(getApiUrl(`/plugins/${id}`), { method: "DELETE" })
       .then((r) => {
         if (!r.ok) throw new Error("Failed");
         load();
@@ -183,7 +184,7 @@ function PluginModal({ plugin, categories, onClose, onSaved }: { plugin: PluginE
 
   function save() {
     const isNew = !plugin;
-    const url = isNew ? "/api/plugins" : `/api/plugins/${plugin.id}`;
+    const url = isNew ? getApiUrl("/plugins") : getApiUrl(`/plugins/${plugin.id}`);
     fetch(url, {
       method: isNew ? "POST" : "PUT",
       headers: { "Content-Type": "application/json" },

@@ -86,15 +86,30 @@ function PluginRunnerPage() {
   if (theme === 'horizon') return <HorizonPlugin />;
   const { id } = Route.useParams();
   const [plugin, setPlugin] = useState<PluginEntity | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [serverIps, setServerIps] = useState<string[]>([]);
   const [jobs, setJobs] = useState<JobState[]>([]);
   const [selectedTabIp, setSelectedTabIp] = useState<string>("");
 
   useEffect(() => {
     fetch(`/api/plugins`)
-      .then(r => r.json())
-      .then(data => setPlugin(data.find((p: PluginEntity) => p.id === id) || null))
-      .catch(() => toast.error("Failed to load plugin details"));
+      .then(r => {
+        if (!r.ok) throw new Error("Backend offline");
+        return r.json();
+      })
+      .then(data => {
+        const found = data.find((p: PluginEntity) => p.id === id);
+        if (found) {
+          setPlugin(found);
+          setError(null);
+        } else {
+          setError("Plugin not found");
+        }
+      })
+      .catch(() => {
+        toast.error("Failed to load plugin details");
+        setError("Plugin data unavailable (backend offline)");
+      });
   }, [id]);
 
   function fetchJobs() {
@@ -150,6 +165,16 @@ function PluginRunnerPage() {
         fetchJobs();
       })
       .catch(() => toast.error(`Failed to stop job on ${ip}`));
+  }
+
+  if (error) {
+    return (
+      <PageWrapper>
+        <div className="text-[12px] text-[var(--crit)] bg-[var(--crit)]/10 border border-[var(--crit)]/30 rounded-lg p-4 max-w-md mx-auto text-center mt-8">
+          {error}
+        </div>
+      </PageWrapper>
+    );
   }
 
   if (!plugin) return <PageWrapper><div className="text-[12px] text-[var(--text-sub)]">Loading plugin...</div></PageWrapper>;

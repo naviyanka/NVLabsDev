@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { getFullUrl } from "@/lib/backend";
 import { useEffect, useMemo, useState, useContext } from "react";
 import { ChevronDown, ChevronUp, Monitor, Terminal, RefreshCw, ScrollText, Hexagon } from "lucide-react";
 import { PageWrapper } from "@/components/layout/PageWrapper";
@@ -49,7 +50,7 @@ function Dashboard() {
 
     // Setup SignalR — re-read token on every (re)connect so refreshed tokens are used
     const connection = new signalR.HubConnectionBuilder()
-      .withUrl("/hub/notifications", {
+      .withUrl(getFullUrl("/hub/notifications"), {
         accessTokenFactory: () => localStorage.getItem("nexus_token") || ""
       })
       .withAutomaticReconnect()

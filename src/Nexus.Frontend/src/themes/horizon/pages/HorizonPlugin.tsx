@@ -1,3 +1,4 @@
+import { getApiUrl } from "@/lib/backend";
 import { createFileRoute, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, useContext } from "react";
 import { Play, Terminal as TerminalIcon, CheckSquare, Square, StopCircle, Server as ServerIcon } from "lucide-react";
@@ -83,14 +84,14 @@ export function HorizonPlugin() {  const id = useRouterState({ select: (s) => s.
   const [selectedTabIp, setSelectedTabIp] = useState<string>("");
 
   useEffect(() => {
-    fetch(`/api/plugins`)
+    fetch(getApiUrl(`/plugins`))
       .then(r => r.json())
       .then(data => setPlugin(data.find((p: PluginEntity) => p.id === id) || null))
       .catch(() => toast.error("Failed to load plugin details"));
   }, [id]);
 
   function fetchJobs() {
-    fetch(`/api/plugins/${id}/jobs`)
+    fetch(getApiUrl(`/plugins/${id}/jobs`))
       .then(r => r.json())
       .then(data => {
         setJobs(data);
@@ -112,7 +113,7 @@ export function HorizonPlugin() {  const id = useRouterState({ select: (s) => s.
 
     const queryParams = serverIps.map(ip => `serverIps=${encodeURIComponent(ip)}`).join("&");
 
-    fetch(`/api/plugins/${id}/run?${queryParams}`, {
+    fetch(getApiUrl(`/plugins/${id}/run?${queryParams}`), {
       method: "POST"
     })
       .then(r => r.json())
@@ -125,7 +126,7 @@ export function HorizonPlugin() {  const id = useRouterState({ select: (s) => s.
   }
 
   function stopAll() {
-    fetch(`/api/plugins/${id}/stop`, { method: "POST" })
+    fetch(getApiUrl(`/plugins/${id}/stop`), { method: "POST" })
       .then(r => r.json())
       .then(() => {
         toast.success("Stop command issued to all running jobs");
@@ -135,7 +136,7 @@ export function HorizonPlugin() {  const id = useRouterState({ select: (s) => s.
   }
 
   function stopOne(ip: string) {
-    fetch(`/api/plugins/${id}/stop?serverIp=${encodeURIComponent(ip)}`, { method: "POST" })
+    fetch(getApiUrl(`/plugins/${id}/stop?serverIp=${encodeURIComponent(ip)}`), { method: "POST" })
       .then(r => r.json())
       .then(() => {
         toast.success(`Stop command issued for ${ip}`);

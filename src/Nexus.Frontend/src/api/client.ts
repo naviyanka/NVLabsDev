@@ -1,11 +1,11 @@
 import { type Server, type PerfSample, type Process, type Service, type Disk, type Volume, type ScheduledTask, type InstalledApp } from "./mock";
 export type { Server, PerfSample, Process, Service, Disk, Volume, ScheduledTask, InstalledApp };
 
-const API_BASE = "/api";
+import { getApiUrl } from "@/lib/backend";
 
 export async function getAppsClient(serverId: string, refresh: boolean = false): Promise<InstalledApp[]> {
   try {
-    const res = await fetch(`${API_BASE}/servers/${serverId}/apps?refresh=${refresh}`);
+    const res = await fetch(getApiUrl(`/servers/${serverId}/apps?refresh=${refresh}`));
     if (res.ok) return await res.json();
   } catch (e) {
     console.error("Failed to fetch apps", e);
@@ -15,7 +15,7 @@ export async function getAppsClient(serverId: string, refresh: boolean = false):
 
 export async function installAppClient(serverId: string, installerPath: string, args: string, sourceServerIp: string = ""): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/servers/${serverId}/apps/install`, {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/apps/install`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ installerPath, arguments: args, sourceServerIp })
@@ -31,7 +31,7 @@ export async function uploadInstallerClient(serverId: string, file: File): Promi
   try {
     const formData = new FormData();
     formData.append("file", file);
-    const res = await fetch(`${API_BASE}/servers/${serverId}/apps/upload-installer`, {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/apps/upload-installer`), {
       method: "POST",
       body: formData
     });
@@ -48,7 +48,7 @@ export async function uploadInstallerClient(serverId: string, file: File): Promi
 
 export async function uninstallAppClient(serverId: string, uninstallString: string): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/servers/${serverId}/apps/uninstall`, {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/apps/uninstall`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ uninstallString })
@@ -68,7 +68,7 @@ export interface WindowsRole {
 
 export async function getRolesClient(serverId: string, refresh: boolean = false): Promise<WindowsRole[]> {
   try {
-    const res = await fetch(`${API_BASE}/servers/${serverId}/roles?refresh=${refresh}`);
+    const res = await fetch(getApiUrl(`/servers/${serverId}/roles?refresh=${refresh}`));
     if (res.ok) return await res.json();
   } catch (e) {
     console.error("Failed to fetch roles", e);
@@ -78,7 +78,7 @@ export async function getRolesClient(serverId: string, refresh: boolean = false)
 
 export async function installRoleClient(serverId: string, name: string, featureType: string): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/servers/${serverId}/roles/install`, {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/roles/install`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, featureType })
@@ -92,7 +92,7 @@ export async function installRoleClient(serverId: string, name: string, featureT
 
 export async function uninstallRoleClient(serverId: string, name: string, featureType: string): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/servers/${serverId}/roles/uninstall`, {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/roles/uninstall`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, featureType })
@@ -106,7 +106,7 @@ export async function uninstallRoleClient(serverId: string, name: string, featur
 
 export async function getTasksClient(serverId: string): Promise<ScheduledTask[]> {
   try {
-    const res = await fetch(`${API_BASE}/servers/${serverId}/tasks`);
+    const res = await fetch(getApiUrl(`/servers/${serverId}/tasks`));
     if (res.ok) return await res.json();
   } catch (e) {
     console.error("Failed to fetch tasks", e);
@@ -116,7 +116,7 @@ export async function getTasksClient(serverId: string): Promise<ScheduledTask[]>
 
 export async function runTaskClient(serverId: string, taskPath: string): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/servers/${serverId}/tasks/run`, {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/tasks/run`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskPath })
@@ -130,7 +130,7 @@ export async function runTaskClient(serverId: string, taskPath: string): Promise
 
 export async function getServersClient(): Promise<Server[]> {
   try {
-    const res = await fetch(`${API_BASE}/servers`);
+    const res = await fetch(getApiUrl(`/servers`));
     if (res.ok) return await res.json();
   } catch (e) {
     console.error("Failed to fetch servers", e);
@@ -139,7 +139,7 @@ export async function getServersClient(): Promise<Server[]> {
 }
 
 export async function addServerClient(data: { name: string; ip: string; role: string }) {
-  await fetch(`${API_BASE}/servers`, {
+  await fetch(getApiUrl(`/servers`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
@@ -147,7 +147,7 @@ export async function addServerClient(data: { name: string; ip: string; role: st
 }
 
 export async function editServerClient(ip: string, data: { name: string; ip: string; role: string }) {
-  await fetch(`${API_BASE}/servers/${ip}`, {
+  await fetch(getApiUrl(`/servers/${ip}`), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
@@ -156,7 +156,7 @@ export async function editServerClient(ip: string, data: { name: string; ip: str
 
 export async function deleteServerClient(ip: string): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/servers/${ip}`, { method: "DELETE" });
+    const res = await fetch(getApiUrl(`/servers/${ip}`), { method: "DELETE" });
     return res.ok;
   } catch (e) {
     console.error("Failed to delete server", e);
@@ -166,7 +166,7 @@ export async function deleteServerClient(ip: string): Promise<boolean> {
 
 export async function restartServerClient(ip: string): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/servers/${ip}/restart`, { method: "POST" });
+    const res = await fetch(getApiUrl(`/servers/${ip}/restart`), { method: "POST" });
     return res.ok;
   } catch (e) {
     console.error("Failed to restart server", e);
@@ -176,7 +176,7 @@ export async function restartServerClient(ip: string): Promise<boolean> {
 
 export async function shutdownServerClient(ip: string): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/servers/${ip}/shutdown`, { method: "POST" });
+    const res = await fetch(getApiUrl(`/servers/${ip}/shutdown`), { method: "POST" });
     return res.ok;
   } catch (e) {
     console.error("Failed to shutdown server", e);
@@ -186,7 +186,7 @@ export async function shutdownServerClient(ip: string): Promise<boolean> {
 
 export async function getPerformanceHistoryClient(serverId: string): Promise<PerfSample[]> {
   try {
-    const res = await fetch(`${API_BASE}/performance/${serverId}`);
+    const res = await fetch(getApiUrl(`/performance/${serverId}`));
     if (res.ok) return await res.json();
   } catch (e) {
     console.error("Failed to fetch performance", e);
@@ -196,7 +196,7 @@ export async function getPerformanceHistoryClient(serverId: string): Promise<Per
 
 export async function getProcessesClient(serverId: string): Promise<Process[]> {
   try {
-    const res = await fetch(`${API_BASE}/performance/${serverId}/processes`);
+    const res = await fetch(getApiUrl(`/performance/${serverId}/processes`));
     if (res.ok) return await res.json();
   } catch (e) {
     console.error("Failed to fetch processes", e);
@@ -206,7 +206,7 @@ export async function getProcessesClient(serverId: string): Promise<Process[]> {
 
 export async function getLiveProcessesClient(serverId: string): Promise<Process[]> {
   try {
-    const res = await fetch(`${API_BASE}/performance/${serverId}/processes/live`);
+    const res = await fetch(getApiUrl(`/performance/${serverId}/processes/live`));
     if (res.ok) return await res.json();
   } catch (e) {
     console.error("Failed to fetch live processes", e);
@@ -216,7 +216,7 @@ export async function getLiveProcessesClient(serverId: string): Promise<Process[
 
 export async function getProcessDetailsClient(serverId: string, pid: number): Promise<Process | null> {
   try {
-    const res = await fetch(`${API_BASE}/performance/${serverId}/processes/${pid}`);
+    const res = await fetch(getApiUrl(`/performance/${serverId}/processes/${pid}`));
     if (res.ok) return await res.json();
   } catch (e) {
     console.error("Failed to fetch process details", e);
@@ -226,7 +226,7 @@ export async function getProcessDetailsClient(serverId: string, pid: number): Pr
 
 export async function killProcessClient(serverId: string, pid: number): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/performance/${serverId}/processes/${pid}`, {
+    const res = await fetch(getApiUrl(`/performance/${serverId}/processes/${pid}`), {
       method: 'DELETE'
     });
     return res.ok;
@@ -238,7 +238,7 @@ export async function killProcessClient(serverId: string, pid: number): Promise<
 
 export async function getServicesClient(serverId: string): Promise<Service[]> {
   try {
-    const res = await fetch(`${API_BASE}/servers/${serverId}/services`);
+    const res = await fetch(getApiUrl(`/servers/${serverId}/services`));
     if (res.ok) return await res.json();
   } catch (e) {
     console.error("Failed to fetch services", e);
@@ -248,7 +248,7 @@ export async function getServicesClient(serverId: string): Promise<Service[]> {
 
 export async function controlServiceClient(serverId: string, name: string, action: string): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/servers/${serverId}/services/${name}/${action}`, {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/services/${name}/${action}`), {
       method: 'POST'
     });
     return res.ok;
@@ -273,19 +273,19 @@ export interface FileItem {
 }
 
 export const getFilesSourcesClient = async (serverIp: string): Promise<FileSource[]> => {
-  const res = await fetch(`${API_BASE}/servers/${serverIp}/files/sources`);
+  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/sources`));
   if (!res.ok) return [];
   return res.json();
 };
 
 export const getFilesListClient = async (serverIp: string, path: string): Promise<FileItem[]> => {
-  const res = await fetch(`${API_BASE}/servers/${serverIp}/files/list?path=${encodeURIComponent(path)}`);
+  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/list?path=${encodeURIComponent(path)}`));
   if (!res.ok) throw new Error("Failed to list files");
   return res.json();
 };
 
 export const createFolderClient = async (serverIp: string, path: string, name: string): Promise<void> => {
-  const res = await fetch(`${API_BASE}/servers/${serverIp}/files/new-folder?path=${encodeURIComponent(path)}&name=${encodeURIComponent(name)}`, { method: "POST" });
+  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/new-folder?path=${encodeURIComponent(path)}&name=${encodeURIComponent(name)}`), { method: "POST" });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.message || "Failed to create folder");
@@ -293,7 +293,7 @@ export const createFolderClient = async (serverIp: string, path: string, name: s
 };
 
 export const deleteFileClient = async (serverIp: string, path: string): Promise<void> => {
-  const res = await fetch(`${API_BASE}/servers/${serverIp}/files/delete?path=${encodeURIComponent(path)}`, { method: "DELETE" });
+  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/delete?path=${encodeURIComponent(path)}`), { method: "DELETE" });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.message || "Failed to delete");
@@ -303,7 +303,7 @@ export const deleteFileClient = async (serverIp: string, path: string): Promise<
 export const uploadFileClient = async (serverIp: string, path: string, file: File): Promise<void> => {
   const formData = new FormData();
   formData.append("file", file);
-  const res = await fetch(`${API_BASE}/servers/${serverIp}/files/upload?path=${encodeURIComponent(path)}`, {
+  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/upload?path=${encodeURIComponent(path)}`), {
     method: "POST",
     body: formData,
   });
@@ -314,11 +314,11 @@ export const uploadFileClient = async (serverIp: string, path: string, file: Fil
 };
 
 export const getDownloadUrl = (serverIp: string, path: string): string => {
-  return `${API_BASE}/servers/${serverIp}/files/download?path=${encodeURIComponent(path)}`;
+  return getApiUrl(`/servers/${serverIp}/files/download?path=${encodeURIComponent(path)}`);
 };
 
 export const renameFileClient = async (serverIp: string, path: string, newName: string): Promise<void> => {
-  const res = await fetch(`${API_BASE}/servers/${serverIp}/files/rename?path=${encodeURIComponent(path)}&newName=${encodeURIComponent(newName)}`, { method: "POST" });
+  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/rename?path=${encodeURIComponent(path)}&newName=${encodeURIComponent(newName)}`), { method: "POST" });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.message || "Failed to rename");
@@ -326,7 +326,7 @@ export const renameFileClient = async (serverIp: string, path: string, newName: 
 };
 
 export const moveFileClient = async (serverIp: string, path: string, destPath: string): Promise<void> => {
-  const res = await fetch(`${API_BASE}/servers/${serverIp}/files/move?path=${encodeURIComponent(path)}&destPath=${encodeURIComponent(destPath)}`, { method: "POST" });
+  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/move?path=${encodeURIComponent(path)}&destPath=${encodeURIComponent(destPath)}`), { method: "POST" });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.message || "Failed to move");
@@ -334,7 +334,7 @@ export const moveFileClient = async (serverIp: string, path: string, destPath: s
 };
 
 export const copyFileClient = async (serverIp: string, path: string, destPath: string): Promise<void> => {
-  const res = await fetch(`${API_BASE}/servers/${serverIp}/files/copy?path=${encodeURIComponent(path)}&destPath=${encodeURIComponent(destPath)}`, { method: "POST" });
+  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/copy?path=${encodeURIComponent(path)}&destPath=${encodeURIComponent(destPath)}`), { method: "POST" });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.message || "Failed to copy");
@@ -342,14 +342,14 @@ export const copyFileClient = async (serverIp: string, path: string, destPath: s
 };
 
 export const readTextFileClient = async (serverIp: string, path: string): Promise<string> => {
-  const res = await fetch(`${API_BASE}/servers/${serverIp}/files/read-text?path=${encodeURIComponent(path)}`);
+  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/read-text?path=${encodeURIComponent(path)}`));
   if (!res.ok) throw new Error("Failed to read text file");
   const data = await res.json();
   return data.content;
 };
 
 export const writeTextFileClient = async (serverIp: string, path: string, content: string): Promise<void> => {
-  const res = await fetch(`${API_BASE}/servers/${serverIp}/files/write-text?path=${encodeURIComponent(path)}`, {
+  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/write-text?path=${encodeURIComponent(path)}`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content })
@@ -359,7 +359,7 @@ export const writeTextFileClient = async (serverIp: string, path: string, conten
 
 export async function getDisksClient(serverId: string): Promise<Disk[]> {
   try {
-    const res = await fetch(`${API_BASE}/servers/${serverId}/storage/disks`);
+    const res = await fetch(getApiUrl(`/servers/${serverId}/storage/disks`));
     if (res.ok) return await res.json();
   } catch (e) {
     console.error("Failed to fetch disks", e);
@@ -369,7 +369,7 @@ export async function getDisksClient(serverId: string): Promise<Disk[]> {
 
 export async function getVolumesClient(serverId: string): Promise<Volume[]> {
   try {
-    const res = await fetch(`${API_BASE}/servers/${serverId}/storage/volumes`);
+    const res = await fetch(getApiUrl(`/servers/${serverId}/storage/volumes`));
     if (res.ok) return await res.json();
   } catch (e) {
     console.error("Failed to fetch volumes", e);
@@ -394,7 +394,7 @@ export interface WindowsUpdate {
 
 export async function getNotificationsClient(): Promise<Notification[]> {
   try {
-    const res = await fetch(`${API_BASE}/notifications`);
+    const res = await fetch(getApiUrl(`/notifications`));
     if (res.ok) return await res.json();
   } catch (e) {
     console.error("Failed to fetch notifications", e);
@@ -405,7 +405,7 @@ export async function getNotificationsClient(): Promise<Notification[]> {
 export const testNotificationClient = async (type: string, message: string) => {
   try {
     const t = localStorage.getItem("nexus_token");
-    const res = await fetch(`${API_BASE}/notifications/test?type=${encodeURIComponent(type)}&message=${encodeURIComponent(message)}`, {
+    const res = await fetch(getApiUrl(`/notifications/test?type=${encodeURIComponent(type)}&message=${encodeURIComponent(message)}`), {
       method: "POST",
       headers: { Authorization: `Bearer ${t}` }
     });
@@ -419,7 +419,7 @@ export const testNotificationClient = async (type: string, message: string) => {
 
 export async function clearNotificationClient(id: number): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/notifications/${id}`, { method: "DELETE" });
+    const res = await fetch(getApiUrl(`/notifications/${id}`), { method: "DELETE" });
     return res.ok;
   } catch (e) {
     return false;
@@ -428,7 +428,7 @@ export async function clearNotificationClient(id: number): Promise<boolean> {
 
 export async function clearAllNotificationsClient(): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/notifications`, { method: "DELETE" });
+    const res = await fetch(getApiUrl(`/notifications`), { method: "DELETE" });
     return res.ok;
   } catch (e) {
     return false;
@@ -437,7 +437,7 @@ export async function clearAllNotificationsClient(): Promise<boolean> {
 
 export async function getUpdatesClient(serverIp: string): Promise<WindowsUpdate[]> {
   try {
-    const res = await fetch(`${API_BASE}/servers/${serverIp}/updates`);
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/updates`));
     if (res.ok) return await res.json();
   } catch (e) {
     console.error("Failed to fetch updates", e);
@@ -447,7 +447,7 @@ export async function getUpdatesClient(serverIp: string): Promise<WindowsUpdate[
 
 export async function checkUpdatesClient(serverIp: string): Promise<WindowsUpdate[]> {
   try {
-    const res = await fetch(`${API_BASE}/servers/${serverIp}/updates/check`, { method: "POST" });
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/updates/check`), { method: "POST" });
     if (res.ok) return await res.json();
   } catch (e) {
     console.error("Failed to check updates", e);
@@ -457,7 +457,7 @@ export async function checkUpdatesClient(serverIp: string): Promise<WindowsUpdat
 
 export async function installUpdatesClient(serverIp: string, titles: string[]): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/servers/${serverIp}/updates/install`, {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/updates/install`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ updateTitles: titles })
@@ -521,4 +521,125 @@ export interface AppSettings {
   enableRbac: boolean;
   healthCheckInterval: number;
   logFilePath: string;
+}
+
+export interface Certificate {
+  id: string;
+  thumbprint: string;
+  subject: string;
+  issuer: string;
+  from: string;
+  to: string;
+  purpose: string;
+}
+
+export async function getCertificatesClient(serverIp: string, store: string = "Personal"): Promise<Certificate[]> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/certificates?store=${encodeURIComponent(store)}`));
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.error("Failed to fetch certificates", e);
+  }
+  return [];
+}
+
+export interface LocalUser {
+  name: string;
+  fullName: string;
+  lastLogin: string;
+  enabled: boolean;
+  passwordNeverExpires: boolean;
+  groups: string[];
+}
+
+export interface LocalGroup {
+  name: string;
+  description: string;
+  members: string[];
+}
+
+export async function getUsersClient(serverIp: string): Promise<LocalUser[]> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/users`));
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.error("Failed to fetch users", e);
+  }
+  return [];
+}
+
+export async function getGroupsClient(serverIp: string): Promise<LocalGroup[]> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/users/groups`));
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.error("Failed to fetch groups", e);
+  }
+  return [];
+}
+
+export interface NetworkAdapter {
+  name: string;
+  description: string;
+  type: string;
+  status: string;
+  mac: string;
+  ipv4: string;
+  ipv6: string;
+  subnet: string;
+  gateway: string;
+  dns: string[];
+  dhcp: boolean;
+  speedMbps: number;
+  bytesIn: number;
+  bytesOut: number;
+}
+
+export async function getNetworksClient(serverIp: string): Promise<NetworkAdapter[]> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/networks`));
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.error("Failed to fetch networks", e);
+  }
+  return [];
+}
+
+export async function controlNetworkClient(serverIp: string, adapterName: string, action: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/networks/${encodeURIComponent(adapterName)}/${action}`), {
+      method: "POST"
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to control network adapter", e);
+    return false;
+  }
+}
+
+export interface RegistryValue {
+  name: string;
+  type: string;
+  data: string;
+}
+
+export interface RegistryNode {
+  name: string;
+  path: string;
+  hasSubKeys: boolean;
+}
+
+export interface RegistryContent {
+  subKeys: RegistryNode[];
+  values: RegistryValue[];
+}
+
+export async function getRegistryContentClient(serverIp: string, path: string): Promise<RegistryContent> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/registry?path=${encodeURIComponent(path)}`));
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.error("Failed to fetch registry", e);
+  }
+  return { subKeys: [], values: [] };
 }

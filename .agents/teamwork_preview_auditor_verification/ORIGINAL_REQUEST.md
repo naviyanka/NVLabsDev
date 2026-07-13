@@ -1,15 +1,15 @@
-## 2026-06-18T21:13:11Z
-You are teamwork_preview_auditor_verification.
-Your working directory is: c:\Users\OrgAdmin\Documents\NVLabs\.agents\teamwork_preview_auditor_verification
+## 2026-07-12T13:37:20Z
+Audit the changes made to the NEXUS application for the frontend resiliency feature.
+Inspect the changes in:
+- src/Nexus.Gateway/Program.cs (health check)
+- src/Nexus.Frontend/src/routes/__root.tsx (global interceptor, status state, poller)
+- src/Nexus.Frontend/src/components/layout/Topbar.tsx (badge state and events)
+- src/Nexus.Frontend/src/routes/users.tsx, services.tsx, certificates.tsx, plugin.$id.tsx (resilience, catch/finally blocks)
+- tests/resiliency.spec.ts (Playwright test verifying outage resiliency)
 
-Objective:
-1. Conduct a forensic audit on the generated report `C:\navishare\DCFiles\WACV2\wac_nexus_integration_report.md`.
-2. Verify that there are no integrity violations:
-   - No hardcoded test results.
-   - No fabricated verification outputs or placeholders.
-   - The file was created legitimately by the Worker agent.
-   - It cites at least 5 distinct DLL folder names as sources.
-   - It contains a clear section proposing how these patterns can be added to the Nexus project.
-3. Write a detailed `handoff.md` summarizing your audit results and provide a verdict (CLEAN or INTEGRITY VIOLATION).
+Verify that:
+1. No test results are hardcoded in source code or tests.
+2. The implementation is authentic, without dummy or mock facades replacing the required logic.
+3. No integrity violations or cheating are detected.
 
-Report back to the parent (Conversation ID: 22012783-bd9c-41d4-b356-8d9262c189fc) when done using send_message.
+Write your report to c:\Users\nv\Documents\NVLabsDev\.agents\teamwork_preview_auditor_verification\handoff.md.

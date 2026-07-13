@@ -8,7 +8,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, useState, createContext, type ReactNode } from "react";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import { HorizonLayout } from "../themes/horizon/HorizonLayout";
 
 import appCss from "../styles.css?url";
@@ -22,6 +22,37 @@ import horizonCssUrl from "../themes/horizon/horizon.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
+import { getApiUrl, getBackendUrl } from "@/lib/backend";
+
+if (typeof window !== "undefined") {
+  if ((window as any).__nexus_backend_online === undefined) {
+    (window as any).__nexus_backend_online = true;
+  }
+
+  (window as any).__nexus_set_backend_offline = (method?: string) => {
+    const wasOnline = (window as any).__nexus_backend_online;
+    (window as any).__nexus_backend_online = false;
+    
+    if (wasOnline) {
+      toast.error("Connection to backend lost. Running in offline mode.");
+    } else if (method && method.toUpperCase() !== "GET") {
+      toast.error("Backend is dead/unreachable. Action failed.");
+    }
+    
+    window.dispatchEvent(new CustomEvent("nexus-backend-status", { detail: { online: false } }));
+  };
+
+  (window as any).__nexus_set_backend_online = () => {
+    const wasOffline = !(window as any).__nexus_backend_online;
+    (window as any).__nexus_backend_online = true;
+    
+    if (wasOffline) {
+      toast.success("Backend connection restored.");
+    }
+    
+    window.dispatchEvent(new CustomEvent("nexus-backend-status", { detail: { online: true } }));
+  };
+}
 
 if (typeof window !== "undefined" && !(window as any).__nexus_fetch_patched) {
   const originalFetch = window.fetch;
@@ -53,16 +84,40 @@ if (typeof window !== "undefined" && !(window as any).__nexus_fetch_patched) {
       }
     }
 
-    const response = await originalFetch(input, init);
-    
-    if (response.status === 401 && window.location.pathname !== "/login") {
-      if (requestUrl.includes("/api/") || requestUrl.includes("/hub/")) {
-        localStorage.removeItem("nexus_token");
-        window.location.href = "/login";
-      }
+    let method = "GET";
+    if (init?.method) {
+      method = init.method;
+    } else if (input instanceof Request) {
+      method = input.method;
     }
-    
-    return response;
+
+    const isHealthCheck = requestUrl.includes("/api/health");
+    if (!(window as any).__nexus_backend_online && !isHealthCheck) {
+      (window as any).__nexus_set_backend_offline(method);
+      throw new TypeError("Failed to fetch (backend offline)");
+    }
+
+    try {
+      const response = await originalFetch(input, init);
+      
+      if (response.status >= 500) {
+        (window as any).__nexus_set_backend_offline(method);
+      } else {
+        (window as any).__nexus_set_backend_online();
+      }
+
+      if (response.status === 401 && window.location.pathname !== "/login") {
+        if (requestUrl.includes("/api/") || requestUrl.includes("/hub/")) {
+          localStorage.removeItem("nexus_token");
+          window.location.href = "/login";
+        }
+      }
+      
+      return response;
+    } catch (error) {
+      (window as any).__nexus_set_backend_offline(method);
+      throw error;
+    }
   };
   (window as any).__nexus_fetch_patched = true;
 }
@@ -200,7 +255,7 @@ function RootComponent() {
     };
     window.addEventListener('nexus-theme-change' as any, handleThemeChange as any);
 
-    fetch("/api/settings")
+    fetch(getApiUrl("/settings"))
       .then(res => res.json())
       .then(data => {
         // Apply app theme
@@ -229,6 +284,32 @@ function RootComponent() {
     return () => {
       window.removeEventListener('nexus-theme-change' as any, handleThemeChange as any);
     };
+  }, []);
+
+  useEffect(() => {
+    const pollHealth = () => {
+      const backendUrl = getBackendUrl();
+      const healthUrl = backendUrl ? `${backendUrl}/api/health` : "/api/health";
+      // Skip polling if no backend configured AND we're on a remote host (not localhost dev)
+      if (!backendUrl && typeof window !== "undefined" && !window.location.hostname.match(/^(localhost|127\.0\.0\.1)$/)) {
+        return;
+      }
+      fetch(healthUrl)
+        .then(res => {
+          if (res.status < 500) {
+            (window as any).__nexus_set_backend_online();
+          } else {
+            (window as any).__nexus_set_backend_offline("GET");
+          }
+        })
+        .catch(() => {
+          (window as any).__nexus_set_backend_offline("GET");
+        });
+    };
+
+    pollHealth();
+    const interval = setInterval(pollHealth, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   if (isLoginPage) {

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Palette, SlidersHorizontal, Terminal, FileCode, RefreshCw, Download, KeyRound, Plus, Trash2, Server, Database, Zap, DownloadCloud } from "lucide-react";
+import { getApiUrl, getFullUrl, getBackendUrl, setBackendUrl, clearBackendUrl, testBackendConnection } from "@/lib/backend";
 
 interface AppSettings {
   language: string;
@@ -49,9 +50,13 @@ export function HorizonSettings() {
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [exportTimeFilter, setExportTimeFilter] = useState("all");
 
+  // Backend Connection State
+  const [backendInput, setBackendInput] = useState(getBackendUrl());
+  const [backendStatus, setBackendStatus] = useState<"unknown" | "testing" | "success" | "error">("unknown");
+
   const fetchLogs = () => {
     setLoadingLogs(true);
-    fetch("/api/settings/logs")
+    fetch(getApiUrl("/settings/logs"))
       .then(res => res.json())
       .then(data => {
         setLogs(data.logs || []);
@@ -71,7 +76,7 @@ export function HorizonSettings() {
   }, [activeSection]);
 
   useEffect(() => {
-    fetch("/api/settings")
+    fetch(getApiUrl("/settings"))
       .then(res => res.json())
       .then(data => setS(data))
       .catch(err => toast.error("Failed to load settings"));
@@ -96,7 +101,7 @@ export function HorizonSettings() {
       window.dispatchEvent(new CustomEvent('nexus-branding-change', { detail: { appName: next.appName, appSubtitle: next.appSubtitle } }));
     }
     
-    fetch("/api/settings", {
+    fetch(getApiUrl("/settings"), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(next)
@@ -300,6 +305,60 @@ export function HorizonSettings() {
                 <p className="text-xs text-[var(--text-sub)] mt-1">Configure global platform behavior and refresh intervals.</p>
               </div>
               <div className="p-6 space-y-6">
+                {/* Backend Connection */}
+                <div className="mb-6 rounded-2xl border border-[var(--border-c)] bg-[var(--bg-void)] p-5 shadow-sm">
+                  <div className="flex items-center justify-between pb-3">
+                    <h3 className="font-semibold text-sm text-[var(--text)] uppercase tracking-widest">Backend Connection</h3>
+                    {backendStatus === "testing" && <span className="text-xs text-[var(--amber)] animate-pulse">Testing...</span>}
+                    {backendStatus === "success" && <span className="text-xs text-[var(--ok)] font-medium">Connected</span>}
+                    {backendStatus === "error" && <span className="text-xs text-rose-400 font-medium">Connection Failed</span>}
+                  </div>
+                  <p className="text-xs text-[var(--text-sub)] pb-4">
+                    Set a custom backend URL (e.g., ngrok, Cloudflare Tunnel) if hosting the frontend remotely. Leave blank for local development.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      value={backendInput}
+                      onChange={(e) => setBackendInput(e.target.value)}
+                      placeholder="https://abc1234.ngrok-free.app"
+                      className="flex-1 w-full bg-[var(--bg-surface)] border border-[var(--border-c)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] focus:outline-none focus:border-[var(--amber)] transition-colors"
+                    />
+                    <button 
+                      onClick={async () => {
+                        setBackendStatus("testing");
+                        const ok = await testBackendConnection(backendInput);
+                        setBackendStatus(ok ? "success" : "error");
+                      }}
+                      className="px-4 py-2 text-sm font-medium rounded-lg border border-[var(--border-c)] hover:bg-[var(--bg-surface)] text-[var(--text)] transition-colors"
+                    >
+                      Test
+                    </button>
+                    <button 
+                      onClick={() => {
+                        if (!backendInput.trim()) clearBackendUrl();
+                        else setBackendUrl(backendInput);
+                        toast.success("Backend URL saved. Reloading app...");
+                        setTimeout(() => window.location.reload(), 1000);
+                      }}
+                      className="px-4 py-2 text-sm font-bold rounded-lg bg-[var(--amber)] text-black hover:bg-[var(--amber-low)] hover:text-[var(--amber)] border border-[var(--amber)] transition-colors shadow-sm"
+                    >
+                      Save
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setBackendInput("");
+                        clearBackendUrl();
+                        toast.success("Reverted to local backend. Reloading...");
+                        setTimeout(() => window.location.reload(), 1000);
+                      }}
+                      className="px-4 py-2 text-sm font-medium rounded-lg border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-xs font-semibold text-[var(--text)] uppercase tracking-widest mb-2">App Name (Branding)</label>
@@ -437,7 +496,7 @@ export function HorizonSettings() {
                       onClick={() => {
                         const name = prompt("Name for new API key:");
                         if (!name) return;
-                        fetch("/api/settings/keys", {
+                        fetch(getApiUrl("/settings/keys"), {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({ name })
@@ -464,7 +523,7 @@ export function HorizonSettings() {
                         <button 
                           onClick={() => {
                             if (!confirm("Revoke this key?")) return;
-                            fetch(`/api/settings/keys/${k.id}`, { method: "DELETE" })
+                            fetch(getApiUrl(`/settings/keys/${k.id}`), { method: "DELETE" })
                               .then(() => patch({ apiKeys: s.apiKeys.filter(x => x.id !== k.id) }));
                           }}
                           className="text-[var(--crit)] hover:bg-[var(--crit)] hover:text-white p-1.5 rounded transition-colors"
@@ -481,7 +540,7 @@ export function HorizonSettings() {
                   <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-lg border border-[var(--border-c)] bg-[var(--bg-void)]">
                     <button 
                       onClick={() => {
-                        fetch("/api/settings/logs/toggle", { method: "POST" })
+                        fetch(getApiUrl("/settings/logs/toggle"), { method: "POST" })
                           .then(res => res.json())
                           .then(data => {
                             setLogsEnabled(data.enabled);

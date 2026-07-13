@@ -2,8 +2,8 @@ import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Terminal as TermIcon, Trash2, Plus, X } from "lucide-react";
 
-import { MOCK_SERVERS } from "@/api/mock";
 import { getServersClient, type Server } from "@/api/client";
+import { getWsUrl } from "@/lib/backend";
 
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
@@ -160,10 +160,8 @@ function TerminalSession({ session, isActive, theme }: { session: Session; isAct
     
     xterm.open(containerRef.current);
     
-    const wsHost = window.location.host;
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const token = localStorage.getItem("nexus_token") || "";
-    const wsUrl = `${protocol}//${wsHost}/api/terminal/ws?serverId=${session.serverId}&access_token=${token}`;
+    const wsUrl = getWsUrl(`/api/terminal/ws?serverId=${session.serverId}&access_token=${token}`);
     const ws = new WebSocket(wsUrl);
     
     ws.onopen = () => {
