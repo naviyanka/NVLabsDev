@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Palette, SlidersHorizontal, Terminal, FileCode, RefreshCw, Download, KeyRound, Plus, Trash2, Server, Database, Zap, DownloadCloud } from "lucide-react";
 import { getApiUrl, getFullUrl, BackendHost, getBackendHosts, setBackendHosts, isBackendEnabledGlobally, setBackendEnabledGlobally, testBackendConnection, BackendPingResult } from "@/lib/backend";
+import { getFrontendSettings, saveFrontendSettings, type FrontendSettings } from "@/lib/frontendSettings";
 
 interface AppSettings {
   language: string;
@@ -56,13 +57,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 export function HorizonSettings() {
   const [s, setS] = useState<AppSettings | null>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem("nexus-frontend-db-settings");
-        if (cached) return JSON.parse(cached);
-      } catch (e) {}
-    }
-    return DEFAULT_SETTINGS;
+    return { ...DEFAULT_SETTINGS, ...getFrontendSettings() } as AppSettings;
   });
   const [activeSection, setActiveSection] = useState("appearance");
   const [logs, setLogs] = useState<string[]>([]);
@@ -113,11 +108,9 @@ export function HorizonSettings() {
     fetch(getApiUrl("/settings"))
       .then(res => res.json())
       .then(data => {
-        setS(data);
-        localStorage.setItem("nexus-frontend-db-settings", JSON.stringify(data));
+        setS(prev => ({ ...prev, ...data }));
       })
       .catch(err => {
-        // Silent fallback since we have localStorage
         console.warn("Using offline settings cache.");
       });
   }, []);
@@ -126,15 +119,13 @@ export function HorizonSettings() {
     if (!s) return;
     const next = { ...s, ...updates };
     setS(next);
-    localStorage.setItem("nexus-frontend-db-settings", JSON.stringify(next));
+    
     if (updates.theme) {
       document.documentElement.setAttribute("data-theme", updates.theme);
-      try { localStorage.setItem("nexus-theme", updates.theme); } catch(e) {}
       window.dispatchEvent(new CustomEvent('nexus-theme-change', { detail: { theme: updates.theme } }));
     }
     if (updates.terminalTheme) {
       document.documentElement.setAttribute("data-terminal-theme", updates.terminalTheme);
-      try { localStorage.setItem("nexus-terminal-theme", updates.terminalTheme); } catch(e) {}
     }
     
     // Also dispatch branding change event
@@ -142,12 +133,29 @@ export function HorizonSettings() {
       window.dispatchEvent(new CustomEvent('nexus-branding-change', { detail: { appName: next.appName, appSubtitle: next.appSubtitle } }));
     }
     
-    fetch(getApiUrl("/settings"), {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(next)
+    const frontendKeys = ['theme', 'terminalTheme', 'animationsEnabled', 'appName', 'appSubtitle', 'companyLogoUrl', 'sidebarState'];
+    const hasFrontendUpdates = Object.keys(updates).some(k => frontendKeys.includes(k));
+    const hasBackendUpdates = Object.keys(updates).some(k => !frontendKeys.includes(k));
+
+    if (hasFrontendUpdates) {
+      saveFrontendSettings(updates as any);
+      if (!hasBackendUpdates) {
+        toast.success("Settings saved locally");
+        return;
+      }
+    }
+
+    if (!globalBackendEnabled || backendHostsState.length === 0) {
+      toast.warning("Saved locally. Backend offline or no host.");
+      return;
+    }
+
+    fetch(getFullUrl('/api/settings'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
     }).then(res => {
-      if(res.ok) toast.success("Settings saved successfully");
+      if(res.ok) toast.success("Settings saved to backend");
       else toast.warning("Saved locally. Backend sync failed.");
     }).catch(() => {
       toast.warning("Saved locally (Offline Mode).");

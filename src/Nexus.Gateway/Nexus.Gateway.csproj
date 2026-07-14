@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
-    <NoWarn>$(NoWarn);CS1998;CS0168</NoWarn>
+    <NoWarn>$(NoWarn);CS1998;CS0168;NU1608</NoWarn>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>f0c45f8c-2142-44b8-befd-71ca8c8213c9</UserSecretsId>
   </PropertyGroup>

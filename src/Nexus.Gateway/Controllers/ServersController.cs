@@ -68,4 +68,11 @@ public class ServersController : ControllerBase
         if (ok) return Ok();
         return StatusCode(500, "Failed to shutdown server");
     }
+
+    [HttpGet("{ip}/disks")]
+    public async Task<IActionResult> GetDisks(string ip, [FromServices] CimService cimService)
+    {
+        var disks = await cimService.GetDisksAsync(ip);
+        return Ok(disks);
+    }
 }

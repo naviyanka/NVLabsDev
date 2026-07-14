@@ -16,6 +16,7 @@ import { Route as UpdatesRouteImport } from './routes/updates'
 import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as StorageReplicaRouteImport } from './routes/storage-replica'
 import { Route as StorageRouteImport } from './routes/storage'
+import { Route as SharepointSetupRouteImport } from './routes/sharepoint-setup'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as ServersRouteImport } from './routes/servers'
@@ -71,6 +72,11 @@ const StorageReplicaRoute = StorageReplicaRouteImport.update({
 const StorageRoute = StorageRouteImport.update({
   id: '/storage',
   path: '/storage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SharepointSetupRoute = SharepointSetupRouteImport.update({
+  id: '/sharepoint-setup',
+  path: '/sharepoint-setup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -200,6 +206,7 @@ export interface FileRoutesByFullPath {
   '/servers': typeof ServersRoute
   '/services': typeof ServicesRoute
   '/settings': typeof SettingsRoute
+  '/sharepoint-setup': typeof SharepointSetupRoute
   '/storage': typeof StorageRoute
   '/storage-replica': typeof StorageReplicaRoute
   '/tasks': typeof TasksRoute
@@ -230,6 +237,7 @@ export interface FileRoutesByTo {
   '/servers': typeof ServersRoute
   '/services': typeof ServicesRoute
   '/settings': typeof SettingsRoute
+  '/sharepoint-setup': typeof SharepointSetupRoute
   '/storage': typeof StorageRoute
   '/storage-replica': typeof StorageReplicaRoute
   '/tasks': typeof TasksRoute
@@ -261,6 +269,7 @@ export interface FileRoutesById {
   '/servers': typeof ServersRoute
   '/services': typeof ServicesRoute
   '/settings': typeof SettingsRoute
+  '/sharepoint-setup': typeof SharepointSetupRoute
   '/storage': typeof StorageRoute
   '/storage-replica': typeof StorageReplicaRoute
   '/tasks': typeof TasksRoute
@@ -293,6 +302,7 @@ export interface FileRouteTypes {
     | '/servers'
     | '/services'
     | '/settings'
+    | '/sharepoint-setup'
     | '/storage'
     | '/storage-replica'
     | '/tasks'
@@ -323,6 +333,7 @@ export interface FileRouteTypes {
     | '/servers'
     | '/services'
     | '/settings'
+    | '/sharepoint-setup'
     | '/storage'
     | '/storage-replica'
     | '/tasks'
@@ -353,6 +364,7 @@ export interface FileRouteTypes {
     | '/servers'
     | '/services'
     | '/settings'
+    | '/sharepoint-setup'
     | '/storage'
     | '/storage-replica'
     | '/tasks'
@@ -384,6 +396,7 @@ export interface RootRouteChildren {
   ServersRoute: typeof ServersRoute
   ServicesRoute: typeof ServicesRoute
   SettingsRoute: typeof SettingsRoute
+  SharepointSetupRoute: typeof SharepointSetupRoute
   StorageRoute: typeof StorageRoute
   StorageReplicaRoute: typeof StorageReplicaRoute
   TasksRoute: typeof TasksRoute
@@ -443,6 +456,13 @@ declare module '@tanstack/react-router' {
       path: '/storage'
       fullPath: '/storage'
       preLoaderRoute: typeof StorageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sharepoint-setup': {
+      id: '/sharepoint-setup'
+      path: '/sharepoint-setup'
+      fullPath: '/sharepoint-setup'
+      preLoaderRoute: typeof SharepointSetupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -616,6 +636,7 @@ const rootRouteChildren: RootRouteChildren = {
   ServersRoute: ServersRoute,
   ServicesRoute: ServicesRoute,
   SettingsRoute: SettingsRoute,
+  SharepointSetupRoute: SharepointSetupRoute,
   StorageRoute: StorageRoute,
   StorageReplicaRoute: StorageReplicaRoute,
   TasksRoute: TasksRoute,

@@ -79,4 +79,40 @@ public class ActiveDirectoryService
         }
         return servers;
     }
+
+    public async Task<List<string>> SearchUsersAsync(string query)
+    {
+        var users = new List<string>();
+        var domainName = "nvlabs.com";
+        try
+        {
+            var setting = await _db.AppSettings.FirstOrDefaultAsync(s => s.Id == "global");
+            if (setting != null && !string.IsNullOrEmpty(setting.DefaultDomainName))
+            {
+                domainName = setting.DefaultDomainName;
+            }
+        }
+        catch { }
+
+        try
+        {
+            using var context = new PrincipalContext(ContextType.Domain, domainName);
+            using var searcher = new UserPrincipal(context);
+            searcher.SamAccountName = $"*{query}*";
+            using var search = new PrincipalSearcher(searcher);
+            
+            foreach (var result in search.FindAll().Take(20))
+            {
+                if (result is UserPrincipal user && !string.IsNullOrEmpty(user.SamAccountName))
+                {
+                    users.Add(user.SamAccountName);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to search AD users in domain {Domain}.", domainName);
+        }
+        return users;
+    }
 }

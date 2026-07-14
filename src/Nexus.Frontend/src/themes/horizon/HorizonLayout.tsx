@@ -5,6 +5,8 @@ import {
   LayoutDashboard, Server, Bell, Settings as SettingsIcon, Search, HelpCircle, Terminal, Cpu, Shield, FileCode, Activity, Moon, Sun, AppWindow, Cog, HardDrive, FolderOpen, Calendar, Package, Layers, RefreshCw, Monitor, BadgeCheck, Users, KeyRound, Network, DatabaseZap, GitBranch, CopySlash, ScrollText, Puzzle, Hexagon, X, LogOut, User
 } from "lucide-react";
 import { toast } from "sonner";
+import { BackendStatusModal } from "@/components/ui/BackendStatusModal";
+import { getFrontendSettings } from "@/lib/frontendSettings";
 
 type Item = { to: string; label: string; icon: React.ComponentType<{ className?: string; size?: number }> };
 type Group = { label: string; items: Item[] };
@@ -36,22 +38,33 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [userContext, setUserContext] = useState({ username: "Admin User", role: "Luminous Command", initials: "NX" });
-  const [brand, setBrand] = useState({ name: "NEXUS", subtitle: "Horizon UI Shell" });
+  const fs = getFrontendSettings();
+  const [brand, setBrand] = useState({ name: fs.appName || "NEXUS", subtitle: fs.appSubtitle || "Horizon UI Shell" });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [backendStatus, setBackendStatus] = useState({
-    enabled: isBackendEnabledGlobally(),
-    online: typeof window !== "undefined" ? ((window as any).__nexus_backend_online !== false) : true,
-    url: getBackendUrl()
-  });
+  
+  const [isBackendOnline, setIsBackendOnline] = useState(() => typeof window !== "undefined" ? (window as any).__nexus_backend_online !== false : true);
+  const [showBackendModal, setShowBackendModal] = useState(false);
 
   useEffect(() => {
-    fetch(getApiUrl("/settings")).then(r => r.json()).then(s => {
-      setBrand({ name: s.appName || "NEXUS", subtitle: s.appSubtitle || "Horizon UI Shell" });
-      if (s.theme) {
-        document.documentElement.setAttribute("data-theme", s.theme);
+    const handleBackendStatus = (e: any) => setIsBackendOnline(e.detail?.online);
+    window.addEventListener('nexus-backend-status', handleBackendStatus);
+    return () => window.removeEventListener('nexus-backend-status', handleBackendStatus);
+  }, []);
+
+  useEffect(() => {
+    const handleBrandingChange = (e: any) => {
+      if (e.detail) {
+        setBrand({ 
+          name: e.detail.appName || "NEXUS", 
+          subtitle: e.detail.appSubtitle || "Horizon UI Shell" 
+        });
       }
-    }).catch(()=>{});
-    
+    };
+    window.addEventListener('nexus-branding-change', handleBrandingChange);
+    return () => window.removeEventListener('nexus-branding-change', handleBrandingChange);
+  }, []);
+
+  useEffect(() => {
     fetch(getApiUrl("/notifications")).then(r => r.json()).then(n => {
       if (Array.isArray(n)) {
         setNotifications(n.map((x: any) => ({ id: x.id.toString(), msg: x.message, time: new Date(x.timestamp) })));
@@ -286,6 +299,13 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
           </div>
 
           <button 
+            onClick={() => setShowBackendModal(true)}
+            className="text-[var(--text-sub)] hover:bg-[var(--amber-low)] hover:text-[var(--amber)] rounded-full p-2 transition-all relative"
+            title={isBackendOnline ? "Backend Online" : "Backend Offline"}
+          >
+            <Activity size={18} className={isBackendOnline ? "text-[var(--ok)]" : "text-[var(--crit)] animate-pulse"} />
+          </button>
+          <button 
             onClick={() => document.documentElement.classList.toggle('dark')} 
             className="text-[var(--text-sub)] hover:bg-[var(--amber-low)] hover:text-[var(--amber)] rounded-full p-2 transition-all relative"
             title="Toggle Dark Mode"
@@ -338,6 +358,12 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
       <main className="mt-16 p-4 md:p-8 w-full md:w-[calc(100%-240px)] md:ml-[240px] h-[calc(100vh-64px)] overflow-y-auto bg-[var(--bg-void)] text-[var(--text)]">
         {children}
       </main>
+
+      <BackendStatusModal 
+        isOpen={showBackendModal} 
+        onClose={() => setShowBackendModal(false)} 
+        isOnline={isBackendOnline} 
+      />
     </div>
   );
 }

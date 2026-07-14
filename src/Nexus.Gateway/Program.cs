@@ -71,6 +71,7 @@ builder.Services.AddHostedService<TelemetryBackgroundService>();
 builder.Services.AddHostedService<LogPersistenceService>();
 builder.Services.AddHostedService<AdSyncBackgroundService>();
 builder.Services.AddSignalR();
+builder.Services.AddHttpClient();
 
 // Environment variable overrides
 var isDev = Environment.GetEnvironmentVariable("DEV") == "1";
