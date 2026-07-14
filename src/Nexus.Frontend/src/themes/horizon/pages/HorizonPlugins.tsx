@@ -113,21 +113,23 @@ export function HorizonPlugins() {
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 pb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pb-6">
         <Stat label="Total Plugins" value={stats.total} color="var(--text)" active={statusFilter === "all"} onClick={() => setStatusFilter("all")} />
         <Stat label="Active" value={stats.active} color="var(--ok)" active={statusFilter === "active"} onClick={() => setStatusFilter("active")} />
         <Stat label="Disabled" value={stats.disabled} color="var(--text-sub)" active={statusFilter === "disabled"} onClick={() => setStatusFilter("disabled")} />
       </div>
 
-      <div className="grid grid-cols-[200px_1fr] gap-5">
+      <div className="flex flex-col md:grid md:grid-cols-[200px_1fr] gap-5">
         <aside className="nx-card h-fit p-3">
           <div className="eyebrow px-1 pb-2">Category</div>
-          {["All", ...categories].map((c) => (
-            <button key={c} onClick={() => setCat(c)} className={"flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-[12px] " + (c === cat ? "bg-[var(--amber-low)] text-[var(--amber)]" : "text-[var(--text-sub)] hover:bg-[var(--bg-surface)]")}>
-              <span>{c}</span>
-              <span className="mono text-[10px]">{c === "All" ? plugins.length : plugins.filter((p) => p.category === c).length}</span>
-            </button>
-          ))}
+          <div className="flex overflow-x-auto md:flex-col gap-2 md:gap-0 pb-2 md:pb-0 scrollbar-hide">
+            {["All", ...categories].map((c) => (
+              <button key={c} onClick={() => setCat(c)} className={"flex shrink-0 w-auto md:w-full items-center justify-between gap-2 md:gap-0 rounded-md px-3 py-1.5 md:px-2.5 text-[12px] " + (c === cat ? "bg-[var(--amber-low)] text-[var(--amber)]" : "text-[var(--text-sub)] hover:bg-[var(--bg-surface)]")}>
+                <span>{c}</span>
+                <span className="mono text-[10px]">{c === "All" ? plugins.length : plugins.filter((p) => p.category === c).length}</span>
+              </button>
+            ))}
+          </div>
         </aside>
 
         <div>
@@ -135,9 +137,9 @@ export function HorizonPlugins() {
             <Search size={14} className="pointer-events-none absolute left-3 top-3 text-[var(--text-sub)]" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search plugins…" className="mono w-full rounded-md border border-[var(--border-c)] bg-[var(--bg-card)] py-2 pl-9 pr-3 text-[12px] focus:border-[var(--amber)] focus:outline-none" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {filtered.map((p) => <PluginCard key={p.id} p={p} onToggle={() => toggle(p)} onEdit={() => setEditingPlugin(p)} onDelete={() => deletePlugin(p.id)} />)}
-            {filtered.length === 0 && <div className="col-span-2 text-center text-[var(--text-sub)] py-10">No plugins found.</div>}
+            {filtered.length === 0 && <div className="col-span-1 lg:col-span-2 text-center text-[var(--text-sub)] py-10">No plugins found.</div>}
           </div>
         </div>
       </div>
@@ -194,8 +196,8 @@ function PluginModal({ plugin, categories, onClose, onSaved }: { plugin: PluginE
           <h2 className="font-semibold text-[var(--text)]">{plugin ? "Edit Plugin" : "Create Custom Plugin"}</h2>
           <button onClick={onClose} className="text-[var(--text-sub)] hover:text-[var(--text)]"><X size={16}/></button>
         </div>
-        <div className="p-6 space-y-4 overflow-y-auto">
-          <div className="grid grid-cols-2 gap-4">
+        <div className="p-4 md:p-6 space-y-4 overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="eyebrow block pb-1">Name</label>
               <input value={form.name} disabled={form.isBuiltIn} onChange={e => setForm({...form, name: e.target.value})} className="mono w-full rounded-md border border-[var(--border-c)] bg-[var(--bg-surface)] px-3 py-2 text-[12px] focus:border-[var(--amber)] focus:outline-none disabled:opacity-50" />
@@ -211,7 +213,7 @@ function PluginModal({ plugin, categories, onClose, onSaved }: { plugin: PluginE
             <label className="eyebrow block pb-1">Description</label>
             <input value={form.description} disabled={form.isBuiltIn} onChange={e => setForm({...form, description: e.target.value})} className="mono w-full rounded-md border border-[var(--border-c)] bg-[var(--bg-surface)] px-3 py-2 text-[12px] focus:border-[var(--amber)] focus:outline-none disabled:opacity-50" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="eyebrow block pb-1">Icon</label>
               <div className="relative" ref={iconPickerRef}>

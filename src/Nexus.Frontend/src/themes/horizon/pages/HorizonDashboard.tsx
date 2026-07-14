@@ -58,10 +58,10 @@ export function HorizonDashboard() {
   return (
     <div className="max-w-[1600px] mx-auto space-y-8 font-sans">
       {/* Hero Section */}
-      <section className="relative w-full rounded-[1.5rem] overflow-hidden shadow-sm bg-[var(--bg-surface)] border border-[var(--border-c)] min-h-[220px] flex items-center p-12">
+      <section className="relative w-full rounded-[1.5rem] overflow-hidden shadow-sm bg-[var(--bg-surface)] border border-[var(--border-c)] min-h-[220px] flex items-center p-6 md:p-12">
         <div className="absolute inset-0 bg-gradient-to-r from-[var(--amber-low)] to-transparent pointer-events-none opacity-50"></div>
         <div className="relative z-10 max-w-2xl">
-          <h2 className="text-4xl font-extrabold tracking-tight text-[var(--text)] mb-4 leading-tight">
+          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight text-[var(--text)] mb-4 leading-tight">
             {greeting}, {userName}.<br />
             <span className="text-[var(--amber)]">{online} servers online</span>
           </h2>
@@ -75,7 +75,7 @@ export function HorizonDashboard() {
       </section>
 
       {/* KPI Row */}
-      <section className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6">
         {/* Total Servers */}
         <div className="bg-[var(--bg-surface)] rounded-[1.2rem] p-6 shadow-sm border border-[var(--border-c)] relative overflow-hidden group hover:-translate-y-1 transition-transform">
           <div className="absolute top-0 left-0 w-full h-1 bg-[var(--teal)]"></div>
@@ -134,12 +134,12 @@ export function HorizonDashboard() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-[var(--bg-void)] text-[var(--text-sub)] text-[11px] uppercase tracking-widest font-bold border-b border-[var(--border-c)]">
-                  <th className="p-4 pl-6 w-16"></th>
-                  <th className="p-4">Name</th>
-                  <th className="p-4">IP Address</th>
-                  <th className="p-4 w-48">CPU Usage</th>
-                  <th className="p-4">RAM</th>
-                  <th className="p-4 pr-6 text-right">Status</th>
+                  <th className="p-2 md:p-4 md:pl-6 w-12 md:w-16"></th>
+                  <th className="p-2 md:p-4">Name</th>
+                  <th className="p-2 md:p-4">IP Address</th>
+                  <th className="p-2 md:p-4 w-32 md:w-48">CPU Usage</th>
+                  <th className="p-2 md:p-4 hidden sm:table-cell">RAM</th>
+                  <th className="p-2 md:p-4 md:pr-6 text-right">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-c)]">
@@ -149,15 +149,15 @@ export function HorizonDashboard() {
                   const isWarn = srv.status === "warning";
                   return (
                     <tr key={srv.ip} className="hover:bg-[var(--amber-low)]/30 transition-colors">
-                      <td className="p-4 pl-6 text-center">
-                        <div className="w-8 h-8 rounded-full bg-[var(--amber-low)] text-[var(--amber)] flex items-center justify-center font-bold text-xs mx-auto border border-[var(--amber)]/20">
+                      <td className="p-2 md:p-4 md:pl-6 text-center">
+                        <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-[var(--amber-low)] text-[var(--amber)] flex items-center justify-center font-bold text-[10px] md:text-xs mx-auto border border-[var(--amber)]/20">
                           {init}
                         </div>
                       </td>
-                      <td className="p-4 font-bold text-[var(--text)]">{srv.name}</td>
-                      <td className="p-4 font-mono text-xs text-[var(--text-sub)]">{srv.ip}</td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
+                      <td className="p-2 md:p-4 font-bold text-[var(--text)] whitespace-nowrap">{srv.name}</td>
+                      <td className="p-2 md:p-4 font-mono text-[10px] md:text-xs text-[var(--text-sub)]">{srv.ip}</td>
+                      <td className="p-2 md:p-4">
+                        <div className="flex items-center gap-2 md:gap-3">
                           <div className="w-full h-1.5 bg-[var(--border-dim)] rounded-full overflow-hidden">
                             <div 
                               className="h-full rounded-full" 
@@ -167,12 +167,12 @@ export function HorizonDashboard() {
                               }}
                             ></div>
                           </div>
-                          <span className="text-xs font-semibold text-[var(--text-sub)] w-8">{srv.cpu}%</span>
+                          <span className="text-[10px] md:text-xs font-semibold text-[var(--text-sub)] w-6 md:w-8">{srv.cpu}%</span>
                         </div>
                       </td>
-                      <td className="p-4 text-xs text-[var(--text-sub)]">{srv.mem}% (Used)</td>
-                      <td className="p-4 pr-6 text-right">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                      <td className="p-2 md:p-4 text-[10px] md:text-xs text-[var(--text-sub)] hidden sm:table-cell">{srv.mem}% <span className="hidden md:inline">(Used)</span></td>
+                      <td className="p-2 md:p-4 md:pr-6 text-right">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-full text-[10px] md:text-xs font-semibold ${
                           isOnline ? "bg-[var(--ok)]/10 text-[var(--ok)] border border-[var(--ok)]/20" :
                           isWarn ? "bg-[var(--warn)]/10 text-[var(--warn)] border border-[var(--warn)]/20" :
                           "bg-[var(--crit)]/10 text-[var(--crit)] border border-[var(--crit)]/20"

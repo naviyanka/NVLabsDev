@@ -161,7 +161,7 @@ export function HorizonServers() {
       </div>
 
       {/* Search Bar */}
-      <div className="relative max-w-md">
+      <div className="relative w-full md:max-w-md">
         <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-sub)]" />
         <input
           value={searchQuery}
@@ -177,12 +177,12 @@ export function HorizonServers() {
       </div>
 
       {/* Segmented Control Filters with Counts */}
-      <div className="inline-flex bg-[var(--bg-surface)] border border-[var(--border-c)] p-1.5 rounded-full w-max shadow-sm gap-1">
+      <div className="flex flex-wrap md:inline-flex bg-[var(--bg-surface)] border border-[var(--border-c)] p-1.5 rounded-2xl md:rounded-full w-full md:w-max shadow-sm gap-1">
         {(["all", "online", "warning", "critical"] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-5 py-2 rounded-full text-xs font-bold capitalize transition-all flex items-center gap-2 ${
+            className={`flex-1 md:flex-none justify-center px-3 md:px-5 py-2 rounded-full text-[10px] md:text-xs font-bold capitalize transition-all flex items-center gap-1 md:gap-2 ${
               filter === f
                 ? "bg-[var(--amber)] text-white shadow-md"
                 : "text-[var(--text-sub)] hover:text-[var(--text)]"
@@ -205,17 +205,17 @@ export function HorizonServers() {
         <div className="h-1 w-full bg-[var(--amber)] absolute top-0 left-0"></div>
         <div className="overflow-x-auto w-full">
           <table className="w-full text-left whitespace-nowrap">
-            <thead className="bg-[var(--bg-void)] border-b border-[var(--border-c)] text-[11px] font-extrabold text-[var(--text-sub)] uppercase tracking-wider">
+            <thead className="bg-[var(--bg-void)] border-b border-[var(--border-c)] text-[10px] md:text-[11px] font-extrabold text-[var(--text-sub)] uppercase tracking-wider">
               <tr>
-                <th className="px-6 py-4">Name</th>
-                <th className="px-6 py-4">IP Address</th>
-                <th className="px-6 py-4">OS</th>
-                <th className="px-6 py-4">Role</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4">CPU%</th>
-                <th className="px-6 py-4">RAM%</th>
-                <th className="px-6 py-4">Disk%</th>
-                <th className="px-6 py-4">Actions</th>
+                <th className="px-3 md:px-6 py-3 md:py-4">Name</th>
+                <th className="px-3 md:px-6 py-3 md:py-4">IP Address</th>
+                <th className="px-3 md:px-6 py-3 md:py-4">OS</th>
+                <th className="px-3 md:px-6 py-3 md:py-4">Role</th>
+                <th className="px-3 md:px-6 py-3 md:py-4">Status</th>
+                <th className="px-3 md:px-6 py-3 md:py-4">CPU%</th>
+                <th className="px-3 md:px-6 py-3 md:py-4">RAM%</th>
+                <th className="px-3 md:px-6 py-3 md:py-4">Disk%</th>
+                <th className="px-3 md:px-6 py-3 md:py-4">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-c)] font-sans text-sm text-[var(--text)]">
@@ -229,26 +229,26 @@ export function HorizonServers() {
                     onClick={() => setSelectedIp(srv.ip)}
                     className={`cursor-pointer transition-colors ${isSelected ? "bg-[var(--amber-low)]" : "hover:bg-[var(--bg-void)]/50"}`}
                   >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
+                    <td className="px-3 md:px-6 py-3 md:py-4">
+                      <div className="flex items-center gap-2 md:gap-3">
                         <input type="radio" checked={isSelected} readOnly className="accent-[var(--amber)]" />
-                        <span className="font-bold text-[var(--text)]">{srv.name}</span>
+                        <span className="font-bold text-[var(--text)] whitespace-nowrap">{srv.name}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 font-mono text-xs text-[var(--text-sub)]">{srv.ip}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 text-xs text-[var(--text-sub)]">
-                        <Terminal size={14} className="text-[var(--teal)]" />
+                    <td className="px-3 md:px-6 py-3 md:py-4 font-mono text-[10px] md:text-xs text-[var(--text-sub)]">{srv.ip}</td>
+                    <td className="px-3 md:px-6 py-3 md:py-4">
+                      <div className="flex items-center gap-2 text-[10px] md:text-xs text-[var(--text-sub)]">
+                        <Terminal size={14} className="text-[var(--teal)] hidden md:block" />
                         {srv.os}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-[var(--bg-void)] border border-[var(--border-c)] text-[var(--text)]">
+                    <td className="px-3 md:px-6 py-3 md:py-4">
+                      <span className="inline-flex items-center px-1.5 md:px-2.5 py-0.5 md:py-1 rounded-md text-[10px] md:text-xs font-semibold bg-[var(--bg-void)] border border-[var(--border-c)] text-[var(--text)] whitespace-nowrap">
                         {srv.role}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                    <td className="px-3 md:px-6 py-3 md:py-4">
+                      <span className={`inline-flex items-center gap-1.5 px-2 md:px-3 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold ${
                         isOnline ? "bg-[var(--ok)]/10 text-[var(--ok)] border border-[var(--ok)]/20" :
                         isWarn ? "bg-[var(--warn)]/10 text-[var(--warn)] border border-[var(--warn)]/20" :
                         "bg-[var(--crit)]/10 text-[var(--crit)] border border-[var(--crit)]/20"
@@ -257,31 +257,31 @@ export function HorizonServers() {
                         {srv.status.toUpperCase()}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 w-28">
-                        <span className="w-8 text-right font-mono text-xs font-semibold">{srv.cpu}%</span>
+                    <td className="px-3 md:px-6 py-3 md:py-4">
+                      <div className="flex items-center gap-2 w-20 md:w-28">
+                        <span className="w-6 md:w-8 text-right font-mono text-[10px] md:text-xs font-semibold">{srv.cpu}%</span>
                         <div className="h-1.5 flex-1 bg-[var(--border-dim)] rounded-full overflow-hidden">
                           <div className="h-full rounded-full transition-all duration-500" style={{ width: `${srv.cpu}%`, backgroundColor: srv.cpu > 80 ? "var(--crit)" : srv.cpu > 50 ? "var(--warn)" : "var(--amber)" }}></div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 w-28">
-                        <span className="w-8 text-right font-mono text-xs font-semibold">{srv.mem}%</span>
+                    <td className="px-3 md:px-6 py-3 md:py-4">
+                      <div className="flex items-center gap-2 w-20 md:w-28">
+                        <span className="w-6 md:w-8 text-right font-mono text-[10px] md:text-xs font-semibold">{srv.mem}%</span>
                         <div className="h-1.5 flex-1 bg-[var(--border-dim)] rounded-full overflow-hidden">
                           <div className="h-full rounded-full transition-all duration-500" style={{ width: `${srv.mem}%`, backgroundColor: srv.mem > 80 ? "var(--crit)" : srv.mem > 50 ? "var(--warn)" : "var(--teal)" }}></div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 w-28">
-                        <span className="w-8 text-right font-mono text-xs font-semibold">{srv.disk}%</span>
+                    <td className="px-3 md:px-6 py-3 md:py-4">
+                      <div className="flex items-center gap-2 w-20 md:w-28">
+                        <span className="w-6 md:w-8 text-right font-mono text-[10px] md:text-xs font-semibold">{srv.disk}%</span>
                         <div className="h-1.5 flex-1 bg-[var(--border-dim)] rounded-full overflow-hidden">
                           <div className="h-full rounded-full transition-all duration-500" style={{ width: `${srv.disk}%`, backgroundColor: srv.disk > 80 ? "var(--crit)" : srv.disk > 50 ? "var(--warn)" : "var(--amber)" }}></div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 md:px-6 py-3 md:py-4">
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={(e) => { e.stopPropagation(); navigate({ to: `/server/$serverId`, params: { serverId: srv.ip } }); }}

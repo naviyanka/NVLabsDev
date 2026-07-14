@@ -325,7 +325,7 @@ export function HorizonSettings() {
                       const ping = pingResults[host.id];
                       const pinging = isPinging[host.id];
                       return (
-                        <div key={host.id} className={`flex items-center justify-between p-3 rounded-lg border ${host.isActive ? "border-[var(--amber)] bg-[var(--amber-low)]" : "border-[var(--border-c)] bg-[var(--bg-surface)]"}`}>
+                        <div key={host.id} className={`flex flex-col sm:flex-row sm:items-center justify-between items-start gap-3 sm:gap-0 p-3 rounded-lg border ${host.isActive ? "border-[var(--amber)] bg-[var(--amber-low)]" : "border-[var(--border-c)] bg-[var(--bg-surface)]"}`}>
                           <div className="flex items-center gap-3">
                             <input 
                               type="radio" 
@@ -575,7 +575,7 @@ export function HorizonSettings() {
                   <div className="space-y-2">
                     {s.apiKeys?.length === 0 && <div className="text-xs text-[var(--text-sub)] italic">No API keys generated.</div>}
                     {s.apiKeys?.map(k => (
-                      <div key={k.id} className="flex items-center justify-between bg-[var(--bg-void)] border border-[var(--border-c)] p-3 rounded-lg">
+                      <div key={k.id} className="flex flex-col sm:flex-row sm:items-center justify-between items-start gap-2 sm:gap-0 bg-[var(--bg-void)] border border-[var(--border-c)] p-3 rounded-lg">
                         <div>
                           <div className="text-[12px] font-bold text-[var(--text)]">{k.name}</div>
                           <div className="text-[10px] text-[var(--text-sub)] font-mono mt-1">Created: {new Date(k.createdAt).toLocaleString()}</div>

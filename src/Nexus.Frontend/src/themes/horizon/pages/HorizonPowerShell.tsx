@@ -79,7 +79,7 @@ export function HorizonPowerShell() {
   return (
     <div className="max-w-[1600px] mx-auto space-y-8 font-sans">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4"><div><h2 className="text-3xl font-extrabold text-[var(--text)]">PowerShell PTY</h2><p className="text-sm text-[var(--text-sub)] mt-1">True Interactive WebSocket Sessions</p></div></div>
-      <div className="nx-card flex h-[76vh] flex-col overflow-hidden">
+      <div className="nx-card flex h-[65vh] md:h-[76vh] flex-col overflow-hidden">
         {/* Tab bar */}
         <div className="flex items-center gap-1 border-b border-[var(--border-c)] bg-[var(--bg-surface)] px-2 py-1.5 overflow-x-auto">
           {sessions.map((s) => {

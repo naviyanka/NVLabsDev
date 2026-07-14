@@ -154,12 +154,12 @@ export function HorizonPlugin() {  const id = useRouterState({ select: (s) => s.
     <div className="max-w-[1600px] mx-auto space-y-8 font-sans">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4"><div><h2 className="text-3xl font-extrabold text-[var(--text)]">{plugin.name}</h2><p className="text-sm text-[var(--text-sub)] mt-1">{plugin.description}</p></div></div>
 
-      <div className="nx-card p-6 mb-6">
-        <div className="flex flex-wrap gap-4 items-end justify-between">
-          <div className="flex-1 min-w-[300px]">
+      <div className="nx-card p-4 md:p-6 mb-6">
+        <div className="flex flex-col md:flex-row flex-wrap gap-4 md:items-end justify-between">
+          <div className="flex-1 min-w-[300px] w-full">
             <MultiServerSelector value={serverIps} onChange={setServerIps} />
           </div>
-          <div className="pb-5 flex items-center gap-3">
+          <div className="pb-0 md:pb-5 flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto">
             <button 
               onClick={runPlugin} 
               disabled={serverIps.length === 0}
@@ -181,8 +181,8 @@ export function HorizonPlugin() {  const id = useRouterState({ select: (s) => s.
         </div>
       </div>
 
-      <div className="grid grid-cols-[220px_1fr] gap-5 h-[550px]">
-        <aside className="nx-card p-3 flex flex-col gap-2 overflow-y-auto">
+      <div className="flex flex-col md:grid md:grid-cols-[220px_1fr] gap-4 md:gap-5 h-auto md:h-[550px]">
+        <aside className="nx-card p-3 flex flex-col gap-2 max-h-60 md:max-h-none overflow-y-auto">
           <div className="eyebrow px-1 pb-2">Active &amp; Recent Jobs</div>
           {jobs.length === 0 && (
             <div className="text-[11px] text-[var(--text-sub)] px-1 py-4 text-center">No jobs active. Select targets above and click Run Plugin.</div>
@@ -214,8 +214,8 @@ export function HorizonPlugin() {  const id = useRouterState({ select: (s) => s.
           })}
         </aside>
 
-        <div className="nx-card flex flex-col h-full overflow-hidden">
-          <div className="border-b border-[var(--border-c)] bg-[var(--bg-surface)] px-4 py-2.5 flex items-center justify-between gap-2">
+        <div className="nx-card flex flex-col h-[400px] md:h-full overflow-hidden">
+          <div className="border-b border-[var(--border-c)] bg-[var(--bg-surface)] px-3 md:px-4 py-2 md:py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <TerminalIcon size={14} className="text-[var(--text-sub)]" />
               <span className="mono text-[11px] uppercase tracking-wider text-[var(--text-sub)]">

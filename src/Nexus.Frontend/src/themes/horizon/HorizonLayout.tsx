@@ -251,7 +251,7 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
           <span className="hidden sm:inline">/</span>
           <span>{pathname === "/" ? "Dashboard" : pathname.slice(1).toUpperCase()}</span>
         </div>
-        <div className="flex-1 max-w-md mx-8">
+        <div className="flex-1 max-w-md mx-2 sm:mx-4 md:mx-8">
           <div className="relative focus-within:ring-2 focus-within:ring-[var(--amber)]/30 rounded-full transition-all">
             <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-sub)] z-10 pointer-events-none" />
             <input 
