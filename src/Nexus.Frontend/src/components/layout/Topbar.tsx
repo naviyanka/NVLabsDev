@@ -103,22 +103,21 @@ export function Topbar() {
     });
 
     connection.onreconnecting(() => {
-      if (typeof window !== "undefined") (window as any).__nexus_set_backend_offline();
+      // Intentionally left blank: rely on fetch interceptor for global state
     });
     connection.onreconnected(() => {
-      if (typeof window !== "undefined") (window as any).__nexus_set_backend_online();
+      // Intentionally left blank: rely on fetch interceptor for global state
     });
     connection.onclose(() => {
-      if (typeof window !== "undefined") (window as any).__nexus_set_backend_offline();
+      // Intentionally left blank: rely on fetch interceptor for global state
     });
 
     connection.start()
       .then(() => {
-        if (typeof window !== "undefined") (window as any).__nexus_set_backend_online();
+        // Intentionally left blank: rely on fetch interceptor
       })
       .catch(err => {
         console.error("SignalR Topbar Error: ", err);
-        if (typeof window !== "undefined") (window as any).__nexus_set_backend_offline();
       });
 
     const handleStatusChange = (e: any) => {

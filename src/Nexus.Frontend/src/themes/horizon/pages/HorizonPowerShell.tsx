@@ -46,7 +46,7 @@ export function HorizonPowerShell() {
 
   useEffect(() => {
     getServersClient().then(data => {
-      const svrs = data && data.length > 0 ? data : MOCK_SERVERS as unknown as Server[];
+      const svrs = data && data.length > 0 ? data : [];
       setServers(svrs);
       const targetName = search.serverName || svrs[0]?.name || "nexus01";
       setSessions([{ id: "s1", serverId: targetName }]);

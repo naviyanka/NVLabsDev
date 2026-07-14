@@ -116,9 +116,10 @@ export function isBackendConfigured(): boolean {
  * If not configured, returns a dummy offline URL that fetch interceptor will block.
  */
 export function getApiUrl(path: string): string {
-  const base = getBackendUrl();
-  if (!base) return `http://offline.local/api${path}`;
-  return `${base}/api${path}`;
+  if (!isBackendEnabledGlobally()) return `http://offline.local/api${path}`;
+  const active = getBackendHosts().find(h => h.isActive);
+  const base = active ? active.url.replace(/\/+$/, "") : "";
+  return base ? `${base}/api${path}` : `/api${path}`;
 }
 
 /**
@@ -126,9 +127,10 @@ export function getApiUrl(path: string): string {
  * Use for SignalR hubs: getFullUrl("/hub/notifications")
  */
 export function getFullUrl(path: string): string {
-  const base = getBackendUrl();
-  if (!base) return `http://offline.local${path}`;
-  return `${base}${path}`;
+  if (!isBackendEnabledGlobally()) return `http://offline.local${path}`;
+  const active = getBackendHosts().find(h => h.isActive);
+  const base = active ? active.url.replace(/\/+$/, "") : "";
+  return base ? `${base}${path}` : path;
 }
 
 /**
@@ -136,9 +138,11 @@ export function getFullUrl(path: string): string {
  * Converts http(s) base to ws(s).
  */
 export function getWsUrl(path: string): string {
-  const base = getBackendUrl();
-  if (!base) return `ws://offline.local${path}`;
-  const wsBase = base.replace(/^http/, "ws");
+  if (!isBackendEnabledGlobally()) return `ws://offline.local${path}`;
+  const active = getBackendHosts().find(h => h.isActive);
+  const base = active ? active.url.replace(/\/+$/, "") : "";
+  const target = base || window.location.origin;
+  const wsBase = target.replace(/^http/, "ws");
   return `${wsBase}${path}`;
 }
 

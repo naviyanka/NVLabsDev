@@ -42,11 +42,17 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
   const [brand, setBrand] = useState({ name: fs.appName || "NEXUS", subtitle: fs.appSubtitle || "Horizon UI Shell" });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
-  const [isBackendOnline, setIsBackendOnline] = useState(() => typeof window !== "undefined" ? (window as any).__nexus_backend_online !== false : true);
+  const [backendStatus, setBackendStatus] = useState({
+    enabled: isBackendEnabledGlobally(),
+    online: typeof window !== "undefined" ? ((window as any).__nexus_backend_online !== false) : true,
+    url: getBackendUrl()
+  });
   const [showBackendModal, setShowBackendModal] = useState(false);
 
   useEffect(() => {
-    const handleBackendStatus = (e: any) => setIsBackendOnline(e.detail?.online);
+    const handleBackendStatus = (e: any) => {
+      setBackendStatus(prev => ({ ...prev, online: e.detail?.online }));
+    };
     window.addEventListener('nexus-backend-status', handleBackendStatus);
     return () => window.removeEventListener('nexus-backend-status', handleBackendStatus);
   }, []);
@@ -99,10 +105,10 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
     // @ts-ignore
     toast.success = (msg: string, data?: any) => {
       setNotifications(prev => [{ id: Math.random().toString(), msg, time: new Date() }, ...prev]);
-      if ((window as any).__nexus_backend_online !== false) {
+      const id = data?.id || Math.random().toString();
+      if ((window as any).__nexus_backend_online !== false && id !== "backend-offline" && id !== "backend-action-failed" && !msg.includes("Backend connection restored")) {
         fetch(getApiUrl('/notifications/custom'), { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ type: 'Success', message: msg }) }).catch(()=>{});
       }
-      const id = data?.id || Math.random().toString();
       originalSuccess(msg, { 
         id,
         ...data, 
@@ -114,10 +120,10 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
     // @ts-ignore
     toast.error = (msg: string, data?: any) => {
       setNotifications(prev => [{ id: Math.random().toString(), msg, time: new Date() }, ...prev]);
-      if ((window as any).__nexus_backend_online !== false) {
+      const id = data?.id || Math.random().toString();
+      if ((window as any).__nexus_backend_online !== false && id !== "backend-offline" && id !== "backend-action-failed" && !msg.includes("Connection to backend lost")) {
         fetch(getApiUrl('/notifications/custom'), { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ type: 'Error', message: msg }) }).catch(()=>{});
       }
-      const id = data?.id || Math.random().toString();
       originalError(msg, { 
         id,
         ...data, 
@@ -301,9 +307,9 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
           <button 
             onClick={() => setShowBackendModal(true)}
             className="text-[var(--text-sub)] hover:bg-[var(--amber-low)] hover:text-[var(--amber)] rounded-full p-2 transition-all relative"
-            title={isBackendOnline ? "Backend Online" : "Backend Offline"}
+            title={backendStatus.online ? "Backend Online" : "Backend Offline"}
           >
-            <Activity size={18} className={isBackendOnline ? "text-[var(--ok)]" : "text-[var(--crit)] animate-pulse"} />
+            <Activity size={18} className={backendStatus.online ? "text-[var(--ok)]" : "text-[var(--crit)] animate-pulse"} />
           </button>
           <button 
             onClick={() => document.documentElement.classList.toggle('dark')} 
@@ -362,7 +368,7 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
       <BackendStatusModal 
         isOpen={showBackendModal} 
         onClose={() => setShowBackendModal(false)} 
-        isOnline={isBackendOnline} 
+        isOnline={backendStatus.online} 
       />
     </div>
   );

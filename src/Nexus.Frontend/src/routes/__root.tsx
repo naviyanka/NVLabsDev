@@ -22,7 +22,7 @@ import horizonCssUrl from "../themes/horizon/horizon.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
-import { getApiUrl, getBackendUrl } from "@/lib/backend";
+import { getApiUrl, getBackendUrl, isBackendEnabledGlobally } from "@/lib/backend";
 
 if (typeof window !== "undefined") {
   if ((window as any).__nexus_backend_online === undefined) {
@@ -54,8 +54,12 @@ if (typeof window !== "undefined") {
   };
 }
 
-if (typeof window !== "undefined" && !(window as any).__nexus_fetch_patched) {
-  const originalFetch = window.fetch;
+if (typeof window !== "undefined") {
+  // Save the very first original fetch to prevent double-patching during HMR
+  if (!(window as any).__nexus_original_fetch) {
+    (window as any).__nexus_original_fetch = window.fetch;
+  }
+  const originalFetch = (window as any).__nexus_original_fetch;
   window.fetch = async (input, init) => {
     let requestUrl = "";
     if (typeof input === "string") {
@@ -94,12 +98,13 @@ if (typeof window !== "undefined" && !(window as any).__nexus_fetch_patched) {
     const backendUrl = getBackendUrl();
     const isApiRequest = requestUrl.includes("/api/") || requestUrl.includes("/hub/");
     
-    // STRICT MODE: If no backend URL is configured, block all API requests
-    if (!backendUrl && isApiRequest) {
+    // STRICT MODE: If globally disabled, block all API requests
+    const isEnabled = isBackendEnabledGlobally();
+    if (!isEnabled && isApiRequest) {
       if ((window as any).__nexus_backend_online !== false) {
         (window as any).__nexus_set_backend_offline(method);
       }
-      throw new TypeError("Backend disconnected (no URL configured in settings)");
+      throw new TypeError("Backend disconnected (globally disabled in settings)");
     }
 
     const isHealthCheck = requestUrl.includes("/api/health");
@@ -111,14 +116,10 @@ if (typeof window !== "undefined" && !(window as any).__nexus_fetch_patched) {
     try {
       const response = await originalFetch(input, init);
       
-      if (response.status >= 500) {
-        (window as any).__nexus_set_backend_offline(method);
-      } else {
-        (window as any).__nexus_set_backend_online();
-      }
-
+      const isApiRequest = requestUrl.includes("/api/") || requestUrl.includes("/hub/");
+      
       if (response.status === 401 && window.location.pathname !== "/login") {
-        if (requestUrl.includes("/api/") || requestUrl.includes("/hub/")) {
+        if (isApiRequest) {
           localStorage.removeItem("nexus_token");
           window.location.href = "/login";
         }
@@ -126,7 +127,6 @@ if (typeof window !== "undefined" && !(window as any).__nexus_fetch_patched) {
       
       return response;
     } catch (error) {
-      (window as any).__nexus_set_backend_offline(method);
       throw error;
     }
   };
@@ -299,16 +299,18 @@ function RootComponent() {
 
   useEffect(() => {
     const pollHealth = () => {
-      const backendUrl = getBackendUrl();
+      const isEnabled = isBackendEnabledGlobally();
       
-      if (!backendUrl) {
+      if (!isEnabled) {
         if ((window as any).__nexus_backend_online !== false) {
           (window as any).__nexus_set_backend_offline("GET");
         }
         return;
       }
-      
-      const healthUrl = `${backendUrl}/api/health`;
+
+      const backendUrl = getBackendUrl();
+      const healthUrl = backendUrl ? `${backendUrl}/api/health` : `/api/health`;
+
       fetch(healthUrl)
         .then(res => {
           if (res.status < 500) {

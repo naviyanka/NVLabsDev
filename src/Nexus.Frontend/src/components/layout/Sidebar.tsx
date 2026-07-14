@@ -28,7 +28,6 @@ const CORE_ITEMS: Item[] = [
 
 const SYSTEM_ITEMS: Item[] = [
   { to: "/plugins", label: "Plugins", icon: Puzzle },
-  { to: "/sharepoint-setup", label: "SharePoint Setup", icon: Hexagon },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 

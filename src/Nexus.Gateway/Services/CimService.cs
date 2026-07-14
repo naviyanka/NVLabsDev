@@ -94,7 +94,7 @@ public class CimService : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning("Failed to reach CIM on {Ip}: {Message}", server.Ip, ex.Message);
+            _logger.LogDebug("Failed to reach CIM on {Ip}: {Message}", server.Ip, ex.Message);
             // Only fabricate mock data in Development; mark server offline in production
             if (IsDevEnvironment)
             {
