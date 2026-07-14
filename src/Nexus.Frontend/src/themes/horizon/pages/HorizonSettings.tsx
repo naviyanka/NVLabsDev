@@ -176,119 +176,63 @@ export function HorizonSettings() {
 
       {/* Settings Layout: CSS Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Mobile Navigation (Scrollable horizontal pills) */}
+        <div className="lg:hidden flex overflow-x-auto gap-2 pb-4 snap-x no-scrollbar">
+          {[
+            { id: "appearance", label: "Appearance", icon: Palette },
+            { id: "general", label: "General", icon: SlidersHorizontal },
+            { id: "developer", label: "Developer", icon: Terminal },
+            { id: "plugins", label: "Plugins", icon: FileCode },
+            { id: "infrastructure", label: "Infrastructure", icon: Terminal },
+            { id: "alerting", label: "Alerting", icon: RefreshCw },
+            { id: "security", label: "Security", icon: KeyRound },
+            { id: "deployment", label: "Deployment", icon: DownloadCloud },
+            { id: "ad", label: "AD", icon: Database },
+            { id: "automation", label: "Automation", icon: Zap },
+          ].map((sec) => (
+            <button 
+              key={sec.id}
+              onClick={() => setActiveSection(sec.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition-colors whitespace-nowrap snap-start text-sm border ${
+                activeSection === sec.id 
+                  ? "bg-[var(--amber-low)] text-[var(--amber)] border-[var(--amber)]/20 shadow-sm" 
+                  : "bg-[var(--bg-surface)] text-[var(--text-sub)] border-[var(--border-c)] hover:bg-[var(--border-c)]"
+              }`}
+            >
+              <sec.icon size={16} />
+              {sec.label}
+            </button>
+          ))}
+        </div>
+
         {/* Left Column (Nav/Quick Links) */}
         <div className="hidden lg:block lg:col-span-3">
           <div className="sticky top-[100px] flex flex-col gap-2">
-            <button 
-              onClick={() => setActiveSection("appearance")}
-              className={`flex items-center gap-3 p-3 rounded-xl font-medium transition-colors w-full text-left text-sm ${
-                activeSection === "appearance" 
-                  ? "bg-[var(--amber-low)] text-[var(--amber)] font-bold border border-[var(--amber)]/20" 
-                  : "text-[var(--text-sub)] hover:bg-[var(--bg-surface)] hover:text-[var(--text)]"
-              }`}
-            >
-              <Palette size={20} />
-              Appearance
-            </button>
-            <button 
-              onClick={() => setActiveSection("general")}
-              className={`flex items-center gap-3 p-3 rounded-xl font-medium transition-colors w-full text-left text-sm ${
-                activeSection === "general" 
-                  ? "bg-[var(--amber-low)] text-[var(--amber)] font-bold border border-[var(--amber)]/20" 
-                  : "text-[var(--text-sub)] hover:bg-[var(--bg-surface)] hover:text-[var(--text)]"
-              }`}
-            >
-              <SlidersHorizontal size={20} />
-              General
-            </button>
-            <button 
-              onClick={() => setActiveSection("developer")}
-              className={`flex items-center gap-3 p-3 rounded-xl font-medium transition-colors w-full text-left text-sm ${
-                activeSection === "developer" 
-                  ? "bg-[var(--amber-low)] text-[var(--amber)] font-bold border border-[var(--amber)]/20" 
-                  : "text-[var(--text-sub)] hover:bg-[var(--bg-surface)] hover:text-[var(--text)]"
-              }`}
-            >
-              <Terminal size={20} />
-              Developer
-            </button>
-            <button 
-              onClick={() => setActiveSection("plugins")}
-              className={`flex items-center gap-3 p-3 rounded-xl font-medium transition-colors w-full text-left text-sm ${
-                activeSection === "plugins" 
-                  ? "bg-[var(--amber-low)] text-[var(--amber)] font-bold border border-[var(--amber)]/20" 
-                  : "text-[var(--text-sub)] hover:bg-[var(--bg-surface)] hover:text-[var(--text)]"
-              }`}
-            >
-              <FileCode size={20} />
-              Plugins
-            </button>
-            <button 
-              onClick={() => setActiveSection("infrastructure")}
-              className={`flex items-center gap-3 p-3 rounded-xl font-medium transition-colors w-full text-left text-sm ${
-                activeSection === "infrastructure" 
-                  ? "bg-[var(--amber-low)] text-[var(--amber)] font-bold border border-[var(--amber)]/20" 
-                  : "text-[var(--text-sub)] hover:bg-[var(--bg-surface)] hover:text-[var(--text)]"
-              }`}
-            >
-              <Terminal size={20} />
-              Infrastructure
-            </button>
-            <button 
-              onClick={() => setActiveSection("alerting")}
-              className={`flex items-center gap-3 p-3 rounded-xl font-medium transition-colors w-full text-left text-sm ${
-                activeSection === "alerting" 
-                  ? "bg-[var(--amber-low)] text-[var(--amber)] font-bold border border-[var(--amber)]/20" 
-                  : "text-[var(--text-sub)] hover:bg-[var(--bg-surface)] hover:text-[var(--text)]"
-              }`}
-            >
-              <RefreshCw size={20} />
-              Alerting
-            </button>
-            <button 
-              onClick={() => setActiveSection("security")}
-              className={`flex items-center gap-3 p-3 rounded-xl font-medium transition-colors w-full text-left text-sm ${
-                activeSection === "security" 
-                  ? "bg-[var(--amber-low)] text-[var(--amber)] font-bold border border-[var(--amber)]/20" 
-                  : "text-[var(--text-sub)] hover:bg-[var(--bg-surface)] hover:text-[var(--text)]"
-              }`}
-            >
-              <KeyRound size={20} />
-              Admin & Security
-            </button>
-            <button 
-              onClick={() => setActiveSection("deployment")}
-              className={`flex items-center gap-3 p-3 rounded-xl font-medium transition-colors w-full text-left text-sm ${
-                activeSection === "deployment" 
-                  ? "bg-[var(--amber-low)] text-[var(--amber)] font-bold border border-[var(--amber)]/20" 
-                  : "text-[var(--text-sub)] hover:bg-[var(--bg-surface)] hover:text-[var(--text)]"
-              }`}
-            >
-              <DownloadCloud size={20} />
-              Deployment
-            </button>
-            <button 
-              onClick={() => setActiveSection("ad")}
-              className={`flex items-center gap-3 p-3 rounded-xl font-medium transition-colors w-full text-left text-sm ${
-                activeSection === "ad" 
-                  ? "bg-[var(--amber-low)] text-[var(--amber)] font-bold border border-[var(--amber)]/20" 
-                  : "text-[var(--text-sub)] hover:bg-[var(--bg-surface)] hover:text-[var(--text)]"
-              }`}
-            >
-              <Database size={20} />
-              Active Directory
-            </button>
-            <button 
-              onClick={() => setActiveSection("automation")}
-              className={`flex items-center gap-3 p-3 rounded-xl font-medium transition-colors w-full text-left text-sm ${
-                activeSection === "automation" 
-                  ? "bg-[var(--amber-low)] text-[var(--amber)] font-bold border border-[var(--amber)]/20" 
-                  : "text-[var(--text-sub)] hover:bg-[var(--bg-surface)] hover:text-[var(--text)]"
-              }`}
-            >
-              <Zap size={20} />
-              Automation
-            </button>
+            {[
+              { id: "appearance", label: "Appearance", icon: Palette },
+              { id: "general", label: "General", icon: SlidersHorizontal },
+              { id: "developer", label: "Developer", icon: Terminal },
+              { id: "plugins", label: "Plugins", icon: FileCode },
+              { id: "infrastructure", label: "Infrastructure", icon: Terminal },
+              { id: "alerting", label: "Alerting", icon: RefreshCw },
+              { id: "security", label: "Admin & Security", icon: KeyRound },
+              { id: "deployment", label: "Deployment", icon: DownloadCloud },
+              { id: "ad", label: "Active Directory", icon: Database },
+              { id: "automation", label: "Automation", icon: Zap },
+            ].map((sec) => (
+              <button 
+                key={sec.id}
+                onClick={() => setActiveSection(sec.id)}
+                className={`flex items-center gap-3 p-3 rounded-xl font-medium transition-colors w-full text-left text-sm ${
+                  activeSection === sec.id 
+                    ? "bg-[var(--amber-low)] text-[var(--amber)] font-bold border border-[var(--amber)]/20" 
+                    : "text-[var(--text-sub)] hover:bg-[var(--bg-surface)] hover:text-[var(--text)]"
+                }`}
+              >
+                <sec.icon size={20} />
+                {sec.label}
+              </button>
+            ))}
           </div>
         </div>
 
