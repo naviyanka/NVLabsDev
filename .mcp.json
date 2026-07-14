@@ -8,6 +8,12 @@
       ],
       "cwd": "C:\\Users\\nv\\Documents\\NVLabsDev",
       "type": "stdio"
+    },
+    "render": {
+      "url": "https://mcp.render.com/mcp",
+      "headers": {
+        "Authorization": "Bearer rnd_XvIRe2uqyBUZF1BpUIq5ExnANAgU"
+      }
     }
   }
 }
