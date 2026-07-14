@@ -156,29 +156,35 @@ export function Topbar() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-[var(--border-c)] bg-[var(--bg-surface)] px-5">
-      <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-[var(--border-c)] bg-[var(--bg-surface)] px-4 md:px-5">
+      <div className="flex items-center gap-2 md:gap-3">
+        <button 
+          className="md:hidden p-1.5 -ml-2 text-[var(--text-sub)] hover:text-[var(--text)]"
+          onClick={() => window.dispatchEvent(new CustomEvent('toggle-sidebar'))}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+        </button>
         <div className="relative">
           <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-sub)]" />
           <input
-            placeholder="Search servers, services, events…"
-            className="mono h-9 w-[340px] rounded-md border border-[var(--border-c)] bg-[var(--bg-card)] pl-8 pr-14 text-[12px] text-[var(--text)] placeholder:text-[var(--text-ghost)] focus:border-[var(--amber)] focus:outline-none"
+            placeholder="Search..."
+            className="mono h-9 w-[180px] md:w-[340px] rounded-md border border-[var(--border-c)] bg-[var(--bg-card)] pl-8 pr-14 text-[12px] text-[var(--text)] placeholder:text-[var(--text-ghost)] focus:border-[var(--amber)] focus:outline-none"
           />
-          <kbd className="mono absolute right-2 top-1/2 -translate-y-1/2 rounded border border-[var(--border-c)] bg-[var(--bg-void)] px-1.5 py-0.5 text-[9px] text-[var(--text-sub)]">
+          <kbd className="mono absolute right-2 top-1/2 -translate-y-1/2 hidden md:block rounded border border-[var(--border-c)] bg-[var(--bg-void)] px-1.5 py-0.5 text-[9px] text-[var(--text-sub)]">
             ⌘K
           </kbd>
         </div>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 md:gap-3">
         {isLive ? (
-          <div className="mono flex items-center gap-1.5 rounded-full border border-[var(--teal)]/30 bg-[var(--teal-low)] px-2.5 py-1 text-[10px] tracking-[0.2em] text-[var(--teal)] transition-colors">
+          <div className="mono flex items-center gap-1.5 rounded-full border border-[var(--teal)]/30 bg-[var(--teal-low)] px-2 md:px-2.5 py-1 text-[10px] tracking-[0.2em] text-[var(--teal)] transition-colors">
             <span className="nx-blink h-1.5 w-1.5 rounded-full bg-[var(--teal)]" />
-            LIVE
+            <span className="hidden md:inline">LIVE</span>
           </div>
         ) : (
-          <div className="mono flex items-center gap-1.5 rounded-full border border-[var(--crit)]/30 bg-[var(--crit)]/10 px-2.5 py-1 text-[10px] tracking-[0.2em] text-[var(--crit)] transition-colors">
+          <div className="mono flex items-center gap-1.5 rounded-full border border-[var(--crit)]/30 bg-[var(--crit)]/10 px-2 md:px-2.5 py-1 text-[10px] tracking-[0.2em] text-[var(--crit)] transition-colors">
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--crit)]" />
-            DEAD
+            <span className="hidden md:inline">DEAD</span>
           </div>
         )}
         

@@ -1,6 +1,7 @@
 [build]
   base = "src/Nexus.Frontend"
   command = "npm install && npm run build"
+  publish = ".netlify/public"
 
 [build.environment]
   CI = "false"

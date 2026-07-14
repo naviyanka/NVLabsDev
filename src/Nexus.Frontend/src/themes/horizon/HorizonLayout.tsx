@@ -37,6 +37,7 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [userContext, setUserContext] = useState({ username: "Admin User", role: "Luminous Command", initials: "NX" });
   const [brand, setBrand] = useState({ name: "NEXUS", subtitle: "Horizon UI Shell" });
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     fetch(getApiUrl("/settings")).then(r => r.json()).then(s => {
@@ -132,8 +133,16 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen w-full bg-[var(--bg-void)] text-[var(--text)] flex overflow-hidden font-sans">
+      {/* Mobile Backdrop */}
+      {mobileMenuOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-black/50 md:hidden" 
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+      
       {/* SideNavBar */}
-      <nav className="fixed left-0 top-0 h-screen w-[240px] bg-[var(--bg-surface)] border-r border-[var(--border-c)] shadow-sm flex flex-col py-8 px-4 space-y-2 z-50">
+      <nav className={`fixed left-0 top-0 h-screen w-[240px] bg-[var(--bg-surface)] border-r border-[var(--border-c)] shadow-sm flex flex-col py-8 px-4 space-y-2 z-50 transition-transform duration-300 md:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="mb-8 px-4 shrink-0">
           <div className="text-2xl font-extrabold tracking-tight text-[var(--amber)] flex items-center gap-2">
             <span className="inline-block w-3 h-3 rounded-full bg-[var(--amber)] animate-pulse shrink-0"></span>
@@ -207,10 +216,16 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
       </nav>
 
       {/* TopNavBar */}
-      <header className="fixed top-0 right-0 h-16 w-[calc(100%-240px)] z-40 bg-[var(--bg-surface)]/90 backdrop-blur-xl border-b border-[var(--border-c)] flex items-center justify-between px-8">
+      <header className="fixed top-0 right-0 h-16 w-full md:w-[calc(100%-240px)] z-30 bg-[var(--bg-surface)]/90 backdrop-blur-xl border-b border-[var(--border-c)] flex items-center justify-between px-4 md:px-8">
         <div className="flex items-center gap-2 text-[var(--text-sub)] text-xs font-semibold uppercase tracking-widest">
-          <span className="text-[var(--amber)] font-bold">{brand.name}</span>
-          <span>/</span>
+          <button 
+            className="md:hidden p-2 -ml-2 text-[var(--text)] hover:text-[var(--amber)]"
+            onClick={() => setMobileMenuOpen(true)}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+          </button>
+          <span className="text-[var(--amber)] font-bold hidden sm:inline">{brand.name}</span>
+          <span className="hidden sm:inline">/</span>
           <span>{pathname === "/" ? "Dashboard" : pathname.slice(1).toUpperCase()}</span>
         </div>
         <div className="flex-1 max-w-md mx-8">
@@ -274,7 +289,7 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
       </header>
 
       {/* Main Content Area */}
-      <main className="ml-[240px] mt-16 p-8 w-[calc(100%-240px)] h-[calc(100vh-64px)] overflow-y-auto bg-[var(--bg-void)] text-[var(--text)]">
+      <main className="mt-16 p-4 md:p-8 w-full md:w-[calc(100%-240px)] md:ml-[240px] h-[calc(100vh-64px)] overflow-y-auto bg-[var(--bg-void)] text-[var(--text)]">
         {children}
       </main>
     </div>

@@ -341,7 +341,7 @@ function RootComponent() {
       <ThemeContext.Provider value={{ theme, setTheme }}>
         <div className="min-h-screen w-full bg-[var(--bg-void)] text-[var(--text)] transition-colors duration-300">
           <Sidebar />
-          <div className="ml-14 flex min-h-screen flex-col">
+          <div className="md:ml-14 flex min-h-screen flex-col">
             <Topbar />
             <main className="flex-1">
               <Outlet />

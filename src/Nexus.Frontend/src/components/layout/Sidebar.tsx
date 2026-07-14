@@ -33,6 +33,7 @@ const SYSTEM_ITEMS: Item[] = [
 
 export function Sidebar() {
   const [expanded, setExpanded] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [plugins, setPlugins] = useState<any[]>([]);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const online = MOCK_SERVERS.filter((s) => s.status === "online").length;
@@ -47,7 +48,14 @@ export function Sidebar() {
   useEffect(() => {
     fetchPlugins();
     window.addEventListener("plugins-updated", fetchPlugins);
-    return () => window.removeEventListener("plugins-updated", fetchPlugins);
+    
+    const handleMobileToggle = () => setMobileOpen(prev => !prev);
+    window.addEventListener("toggle-sidebar", handleMobileToggle);
+    
+    return () => {
+      window.removeEventListener("plugins-updated", fetchPlugins);
+      window.removeEventListener("toggle-sidebar", handleMobileToggle);
+    };
   }, []);
 
   // Group plugins by Category — restrict plugin targetRoute to safe in-app routes
@@ -87,12 +95,19 @@ export function Sidebar() {
   ];
 
   return (
-    <aside
-      onMouseEnter={() => setExpanded(true)}
-      onMouseLeave={() => setExpanded(false)}
-      className="fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-[var(--border-c)] bg-[var(--bg-surface)] transition-[width] duration-200 ease-out"
-      style={{ width: expanded ? 220 : 56 }}
-    >
+    <>
+      {mobileOpen && (
+        <div 
+          className="fixed inset-0 z-30 bg-black/50 md:hidden" 
+          onClick={() => setMobileOpen(false)} 
+        />
+      )}
+      <aside
+        onMouseEnter={() => setExpanded(true)}
+        onMouseLeave={() => setExpanded(false)}
+        className={`fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-[var(--border-c)] bg-[var(--bg-surface)] transition-all duration-300 ease-out md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        style={{ width: mobileOpen ? 220 : (expanded ? 220 : 56) }}
+      >
       {/* Logo */}
       <div className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border-c)] px-3">
         <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-[var(--amber-low)] text-[var(--amber)]">
@@ -150,7 +165,8 @@ export function Sidebar() {
             <span className="text-[var(--text-sub)]"> / {MOCK_SERVERS.length} online</span>
           </div>
         </div>
-      )}
-    </aside>
+        )}
+      </aside>
+    </>
   );
 }
