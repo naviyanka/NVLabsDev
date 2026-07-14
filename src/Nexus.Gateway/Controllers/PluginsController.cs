@@ -148,4 +148,11 @@ public class PluginsController : ControllerBase
         }
         return Ok(new { stopped = true });
     }
+
+    [HttpPost("{id}/jobs/{serverIp}/retry")]
+    public IActionResult RetryJob(string id, string serverIp)
+    {
+        _jobManager.RetryJob(id, serverIp);
+        return Ok(new { retried = true });
+    }
 }

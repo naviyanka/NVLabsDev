@@ -12,6 +12,8 @@ public class PluginJobState
     public CancellationTokenSource? Cts { get; set; }
     public DateTime? StartTime { get; set; }
     public DateTime? EndTime { get; set; }
+    public string ScriptType { get; set; } = string.Empty;
+    public string ScriptContent { get; set; } = string.Empty;
 }
 
 public class PluginBackgroundJobManager
@@ -47,6 +49,8 @@ public class PluginBackgroundJobManager
             return;
         }
 
+        job.ScriptType = scriptType;
+        job.ScriptContent = scriptContent;
         job.Status = "Running";
         job.Output.Clear();
         job.Output.AppendLine($"[{DateTime.UtcNow:HH:mm:ss}] Starting native PowerShell runspace session on {serverIp}...");
@@ -168,6 +172,18 @@ Remove-Item $tempFile -ErrorAction SilentlyContinue
                 job.Cts.Cancel();
                 job.Status = "Stopped";
                 job.Output.AppendLine($"[{DateTime.UtcNow:HH:mm:ss}] Stop command issued.");
+            }
+        }
+    }
+
+    public void RetryJob(string pluginId, string serverIp)
+    {
+        var key = $"{pluginId}_{serverIp}";
+        if (_jobs.TryGetValue(key, out var job))
+        {
+            if (job.Status != "Running" && !string.IsNullOrEmpty(job.ScriptContent))
+            {
+                StartJob(pluginId, serverIp, job.ScriptType, job.ScriptContent);
             }
         }
     }

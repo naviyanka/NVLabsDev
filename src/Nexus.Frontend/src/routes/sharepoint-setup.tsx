@@ -192,6 +192,12 @@ function SharePointSetupPage() {
     fetch(getApiUrl(`/plugins/sharepointsetup/stop`), { method: "POST", headers: { "Authorization": `Bearer ${token}` }});
   };
 
+  const retryJob = async (serverIp: string) => {
+    const token = localStorage.getItem("nexus_token");
+    fetch(getApiUrl(`/plugins/sharepointsetup/jobs/${serverIp}/retry`), { method: "POST", headers: { "Authorization": `Bearer ${token}` }})
+      .then(() => toast.success("Job restarted"));
+  };
+
   // Compute active editions
   const activeEditions = Object.keys(editions).filter(ed => (editions as any)[ed]);
   const hasSelections = activeEditions.length > 0;
@@ -452,9 +458,17 @@ function SharePointSetupPage() {
                   <div key={idx} className="border border-border/20 rounded bg-black p-2">
                     <div className="flex justify-between items-center mb-2 border-b border-border/20 pb-1">
                       <span className="font-bold text-primary">{job.serverIp}</span>
-                      <span className={`px-2 py-0.5 rounded text-[10px] ${job.status==='Running' ? 'bg-blue-900 text-blue-200' : job.status==='Completed' ? 'bg-green-900 text-green-200' : job.status==='Failed' ? 'bg-red-900 text-red-200' : 'bg-gray-800'}`}>
-                        {job.status}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {job.status === 'Running' && (
+                          <button onClick={() => stopJob(job.serverIp)} className="text-red-400 hover:text-red-300 px-2 py-0.5 border border-red-900 rounded text-[10px]">Stop</button>
+                        )}
+                        {job.status === 'Failed' && (
+                          <button onClick={() => retryJob(job.serverIp)} className="text-blue-400 hover:text-blue-300 px-2 py-0.5 border border-blue-900 rounded text-[10px]">Retry</button>
+                        )}
+                        <span className={`px-2 py-0.5 rounded text-[10px] ${job.status==='Running' ? 'bg-blue-900 text-blue-200' : job.status==='Completed' ? 'bg-green-900 text-green-200' : job.status==='Failed' ? 'bg-red-900 text-red-200' : 'bg-gray-800'}`}>
+                          {job.status}
+                        </span>
+                      </div>
                     </div>
                     {lastLines.map((l: string, i: number) => (
                       <div key={i} className={`${l.includes('[ERROR]') ? 'text-red-400' : ''}`}>{l}</div>
