@@ -219,7 +219,7 @@ function RootShell({ children }: { children: ReactNode }) {
             try {
               var t = localStorage.getItem('nexus-theme');
               if (t) document.documentElement.setAttribute('data-theme', t);
-              else document.documentElement.setAttribute('data-theme', 'dark');
+              else document.documentElement.setAttribute('data-theme', 'horizon');
               
               var tt = localStorage.getItem('nexus-terminal-theme');
               if (tt) document.documentElement.setAttribute('data-terminal-theme', tt);
@@ -240,9 +240,9 @@ function RootComponent() {
   const isLoginPage = useRouterState({ select: (s) => s.location.pathname === "/login" });
   const [theme, setTheme] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem('nexus-theme') || 'dark';
+      return localStorage.getItem('nexus-theme') || 'horizon';
     }
-    return 'dark';
+    return 'horizon';
   });
 
   useEffect(() => {
@@ -323,32 +323,13 @@ function RootComponent() {
     );
   }
 
-  if (theme === 'horizon') {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <ThemeContext.Provider value={{ theme, setTheme }}>
-          <HorizonLayout>
-            <Outlet />
-          </HorizonLayout>
-          <Toaster theme="light" position="top-right" richColors />
-        </ThemeContext.Provider>
-      </QueryClientProvider>
-    );
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeContext.Provider value={{ theme, setTheme }}>
-        <div className="min-h-screen w-full bg-[var(--bg-void)] text-[var(--text)] transition-colors duration-300">
-          <Sidebar />
-          <div className="md:ml-14 flex min-h-screen flex-col">
-            <Topbar />
-            <main className="flex-1">
-              <Outlet />
-            </main>
-          </div>
-          <Toaster theme="dark" position="top-right" richColors />
-        </div>
+        <HorizonLayout>
+          <Outlet />
+        </HorizonLayout>
+        <Toaster theme="light" position="top-right" richColors />
       </ThemeContext.Provider>
     </QueryClientProvider>
   );
