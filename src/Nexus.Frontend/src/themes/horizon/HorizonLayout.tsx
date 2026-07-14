@@ -89,12 +89,13 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
       if ((window as any).__nexus_backend_online !== false) {
         fetch(getApiUrl('/notifications/custom'), { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ type: 'Success', message: msg }) }).catch(()=>{});
       }
-      let toastId: string | number;
-      toastId = originalSuccess(msg, { 
+      const id = data?.id || Math.random().toString();
+      originalSuccess(msg, { 
+        id,
         ...data, 
-        onClick: () => toast.dismiss(toastId)
+        onClick: () => toast.dismiss(id)
       });
-      return toastId;
+      return id;
     };
     
     // @ts-ignore
@@ -103,12 +104,13 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
       if ((window as any).__nexus_backend_online !== false) {
         fetch(getApiUrl('/notifications/custom'), { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ type: 'Error', message: msg }) }).catch(()=>{});
       }
-      let toastId: string | number;
-      toastId = originalError(msg, { 
+      const id = data?.id || Math.random().toString();
+      originalError(msg, { 
+        id,
         ...data, 
-        onClick: () => toast.dismiss(toastId)
+        onClick: () => toast.dismiss(id)
       });
-      return toastId;
+      return id;
     };
 
     return () => {
