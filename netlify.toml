@@ -4,4 +4,3 @@
 
 [build.environment]
   CI = "false"
-  NODE_ENV = "development"
