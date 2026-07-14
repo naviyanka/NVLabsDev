@@ -2,3 +2,7 @@
   base = "src/Nexus.Frontend"
   command = "npm install && npm run build"
   publish = ".output/public"
+
+[build.environment]
+  CI = "false"
+  NODE_ENV = "development"
