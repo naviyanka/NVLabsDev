@@ -113,23 +113,21 @@ export function isBackendConfigured(): boolean {
 
 /**
  * Build full API URL from a path like "/servers/localhost/services".
- * - Configured: "https://tunnel.example.com/api/servers/localhost/services"
- * - Not configured: "/api/servers/localhost/services" (Vite proxy handles it)
+ * If not configured, returns a dummy offline URL that fetch interceptor will block.
  */
 export function getApiUrl(path: string): string {
   const base = getBackendUrl();
-  if (!base) return `/api${path}`;
+  if (!base) return `http://offline.local/api${path}`;
   return `${base}/api${path}`;
 }
 
 /**
  * Build full URL for any /api or /hub path.
  * Use for SignalR hubs: getFullUrl("/hub/notifications")
- * Use for raw API: getFullUrl("/api/health")
  */
 export function getFullUrl(path: string): string {
   const base = getBackendUrl();
-  if (!base) return path; // relative — Vite proxy handles it
+  if (!base) return `http://offline.local${path}`;
   return `${base}${path}`;
 }
 
@@ -139,10 +137,7 @@ export function getFullUrl(path: string): string {
  */
 export function getWsUrl(path: string): string {
   const base = getBackendUrl();
-  if (!base) {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    return `${protocol}//${window.location.host}${path}`;
-  }
+  if (!base) return `ws://offline.local${path}`;
   const wsBase = base.replace(/^http/, "ws");
   return `${wsBase}${path}`;
 }

@@ -91,6 +91,17 @@ if (typeof window !== "undefined" && !(window as any).__nexus_fetch_patched) {
       method = input.method;
     }
 
+    const backendUrl = getBackendUrl();
+    const isApiRequest = requestUrl.includes("/api/") || requestUrl.includes("/hub/");
+    
+    // STRICT MODE: If no backend URL is configured, block all API requests
+    if (!backendUrl && isApiRequest) {
+      if ((window as any).__nexus_backend_online !== false) {
+        (window as any).__nexus_set_backend_offline(method);
+      }
+      throw new TypeError("Backend disconnected (no URL configured in settings)");
+    }
+
     const isHealthCheck = requestUrl.includes("/api/health");
     if (!(window as any).__nexus_backend_online && !isHealthCheck) {
       (window as any).__nexus_set_backend_offline(method);
@@ -289,11 +300,15 @@ function RootComponent() {
   useEffect(() => {
     const pollHealth = () => {
       const backendUrl = getBackendUrl();
-      const healthUrl = backendUrl ? `${backendUrl}/api/health` : "/api/health";
-      // Skip polling if no backend configured AND we're on a remote host (not localhost dev)
-      if (!backendUrl && typeof window !== "undefined" && !window.location.hostname.match(/^(localhost|127\.0\.0\.1)$/)) {
+      
+      if (!backendUrl) {
+        if ((window as any).__nexus_backend_online !== false) {
+          (window as any).__nexus_set_backend_offline("GET");
+        }
         return;
       }
+      
+      const healthUrl = `${backendUrl}/api/health`;
       fetch(healthUrl)
         .then(res => {
           if (res.status < 500) {
