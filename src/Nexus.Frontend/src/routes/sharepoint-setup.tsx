@@ -74,8 +74,11 @@ function SharePointSetupPage() {
   // Poll jobs
   useEffect(() => {
     const interval = setInterval(() => {
-      fetch(getApiUrl("/plugins/sharepointsetup/jobs"))
-        .then(r => r.json())
+      const token = localStorage.getItem("nexus_token");
+      fetch(getApiUrl("/plugins/sharepointsetup/jobs"), {
+        headers: { "Authorization": `Bearer ${token}` }
+      })
+        .then(r => r.ok ? r.json() : [])
         .then(d => {
           if (Array.isArray(d)) setJobs(d);
         })
