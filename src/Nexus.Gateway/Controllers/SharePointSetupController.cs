@@ -32,6 +32,7 @@ public class SharePointSetupController : ControllerBase
             if (p == null || p.Configurations == null) return BadRequest("Invalid payload");
 
             var dcScript = new StringBuilder();
+            var basePath = string.IsNullOrWhiteSpace(p.FileSharePath) ? p.FileShareUrl : p.FileSharePath;
             
             // PS Downloader function
             dcScript.AppendLine(@"
@@ -76,6 +77,7 @@ $path = '{p.FileSharePath}'
 if (-not (Test-Path $path)) {{ New-Item -ItemType Directory -Force -Path $path }}
 $shareName = 'SPSetup'
 if (-not (Get-SmbShare -Name $shareName -ErrorAction SilentlyContinue)) {{
+    Write-Output ""[INFO] Creating SMB Share '$shareName' at $path with FullAccess to Everyone...""
     New-SmbShare -Name $shareName -Path $path -FullAccess 'Everyone'
 }}
 ");
@@ -93,11 +95,13 @@ if (-not (Get-SmbShare -Name $shareName -ErrorAction SilentlyContinue)) {{
                     else
                     {
                         dcScript.AppendLine($@"
-$sqlDir = Join-Path '{p.FileSharePath}' 'SQL_{conf.SpEdition}'
+$sqlDir = Join-Path '{basePath}' 'SQL_{conf.SpEdition}'
 if (-not (Test-Path $sqlDir)) {{ New-Item -ItemType Directory -Force -Path $sqlDir }}
 $outFile = Join-Path $sqlDir 'sql.iso'
 if (-not (Test-Path $outFile)) {{
+    Write-Output ""[INFO] Downloading SQL ISO to $outFile...""
     Invoke-DownloadWithProgress -url '{conf.SqlDownloadUrl}' -outFile $outFile -tag '{tag}'
+    Write-Output ""[INFO] Download completed.""
 }} else {{
     Write-Output ""[PROGRESS|{tag}|100]""
 }}
@@ -114,11 +118,13 @@ if (-not (Test-Path $outFile)) {{
                     else
                     {
                         dcScript.AppendLine($@"
-$spDir = Join-Path '{p.FileSharePath}' 'SP_{conf.SpEdition}'
+$spDir = Join-Path '{basePath}' 'SP_{conf.SpEdition}'
 if (-not (Test-Path $spDir)) {{ New-Item -ItemType Directory -Force -Path $spDir }}
 $outFile = Join-Path $spDir 'sp.iso'
 if (-not (Test-Path $outFile)) {{
+    Write-Output ""[INFO] Downloading SP ISO to $outFile...""
     Invoke-DownloadWithProgress -url '{conf.SpDownloadUrl}' -outFile $outFile -tag '{tag}'
+    Write-Output ""[INFO] Download completed.""
 }} else {{
     Write-Output ""[PROGRESS|{tag}|100]""
 }}
@@ -128,9 +134,9 @@ if (-not (Test-Path $outFile)) {{
             }
 
             var dcIp = "127.0.0.1"; 
-            if (dcScript.Length > 0 && (p.DownloadSp || p.DownloadSql || !string.IsNullOrWhiteSpace(p.FileSharePath)))
+            if (dcScript.Length > 0 && (p.DownloadSp || p.DownloadSql || !string.IsNullOrWhiteSpace(basePath)))
             {
-                _jobManager.StartJob("sharepointsetup", $"DC_Download_{dcIp}", "ps1", dcScript.ToString());
+                _jobManager.StartJob("sharepoint_DC_Download", dcIp, "ps1", dcScript.ToString());
             }
 
             foreach (var conf in p.Configurations)
@@ -141,23 +147,28 @@ if (-not (Test-Path $outFile)) {{
                     var sqlScript = $@"
 $share = '{p.FileShareUrl}'
 if (-not (Get-PSDrive -Name Z -ErrorAction SilentlyContinue)) {{
+    Write-Output ""[INFO] Mapping network drive Z: to $share...""
     New-PSDrive -Name Z -PSProvider FileSystem -Root $share -Persist
     $shell = New-Object -ComObject shell.application
+    Write-Output ""[INFO] Pinning $share to Quick Access...""
     $shell.Namespace($share).Self.InvokeVerb('pintohome')
 }}
 
 $isoPath = Join-Path $share 'SQL_{conf.SpEdition}\sql.iso'
 if (Test-Path $isoPath) {{
     Write-Output ""[PROGRESS|SQL_INSTALL_{conf.SpEdition}|10]""
+    Write-Output ""[INFO] Mounting ISO image $isoPath...""
     $mount = Mount-DiskImage -ImagePath $isoPath -PassThru
     $driveLetter = ($mount | Get-Volume).DriveLetter
     $setup = ""${{driveLetter}}:\setup.exe""
     Write-Output ""[PROGRESS|SQL_INSTALL_{conf.SpEdition}|50]""
+    Write-Output ""[INFO] Installing SQL Server...""
     Start-Process -FilePath $setup -ArgumentList '/Q /IACCEPTSQLSERVERLICENSETERMS /ACTION=install /FEATURES=SQLEngine /INSTANCENAME=""{conf.SqlInstanceName}"" /INSTANCEDIR=""{conf.SqlDisk}:\"" /SQLSYSADMINACCOUNTS={sqlAdmins}' -Wait
+    Write-Output ""[INFO] SQL Server installation finished.""
     Write-Output ""[PROGRESS|SQL_INSTALL_{conf.SpEdition}|100]""
 }}
 ";
-                    _jobManager.StartJob("sharepointsetup", $"SQL_{conf.SpEdition}_{conf.SqlTargetServer}", "ps1", sqlScript);
+                    _jobManager.StartJob($"sharepoint_SQL_{conf.SpEdition}", conf.SqlTargetServer, "ps1", sqlScript);
                 }
 
                 if (p.InstallSp && conf.SpServers != null && conf.SpServers.Any())
@@ -167,26 +178,33 @@ if (Test-Path $isoPath) {{
                         var spScript = $@"
 $share = '{p.FileShareUrl}'
 if (-not (Get-PSDrive -Name Z -ErrorAction SilentlyContinue)) {{
+    Write-Output ""[INFO] Mapping network drive Z: to $share...""
     New-PSDrive -Name Z -PSProvider FileSystem -Root $share -Persist
     $shell = New-Object -ComObject shell.application
+    Write-Output ""[INFO] Pinning $share to Quick Access...""
     $shell.Namespace($share).Self.InvokeVerb('pintohome')
 }}
 
 $isoPath = Join-Path $share 'SP_{conf.SpEdition}\sp.iso'
 if (Test-Path $isoPath) {{
     Write-Output ""[PROGRESS|SP_PREREQ_{server}|10]""
+    Write-Output ""[INFO] Mounting ISO image $isoPath...""
     $mount = Mount-DiskImage -ImagePath $isoPath -PassThru
     $driveLetter = ($mount | Get-Volume).DriveLetter
     $prereq = ""${{driveLetter}}:\prerequisiteinstaller.exe""
+    Write-Output ""[INFO] Installing SharePoint Prerequisites...""
     Start-Process -FilePath $prereq -ArgumentList '/unattended' -Wait
+    Write-Output ""[INFO] Prerequisites installation finished.""
     
     Write-Output ""[PROGRESS|SP_INSTALL_{server}|50]""
     $setup = ""${{driveLetter}}:\setup.exe""
+    Write-Output ""[INFO] Installing SharePoint...""
     Start-Process -FilePath $setup -ArgumentList '/config config.xml' -Wait
+    Write-Output ""[INFO] SharePoint installation finished.""
     Write-Output ""[PROGRESS|SP_INSTALL_{server}|100]""
 }}
 ";
-                        _jobManager.StartJob("sharepointsetup", $"SP_{conf.SpEdition}_{server}", "ps1", spScript);
+                        _jobManager.StartJob($"sharepoint_SP_{conf.SpEdition}", server, "ps1", spScript);
                     }
                 }
             }

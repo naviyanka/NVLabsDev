@@ -1,5 +1,8 @@
 using System.Collections.Concurrent;
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
+using Nexus.Gateway.Data;
+using Nexus.Gateway.Models;
 
 namespace Nexus.Gateway.Services;
 
@@ -14,25 +17,57 @@ public class PluginJobState
     public DateTime? EndTime { get; set; }
     public string ScriptType { get; set; } = string.Empty;
     public string ScriptContent { get; set; } = string.Empty;
+    public int JobId { get; set; }
+    public string LogFilePath { get; set; } = string.Empty;
 }
 
 public class PluginBackgroundJobManager
 {
     private readonly PowerShellSessionManager _sessionManager;
     private readonly ILogger<PluginBackgroundJobManager> _logger;
+    private readonly IServiceScopeFactory _scopeFactory;
     // Key: $"{pluginId}_{serverIp}"
     private readonly ConcurrentDictionary<string, PluginJobState> _jobs = new();
 
-    public PluginBackgroundJobManager(PowerShellSessionManager sessionManager, ILogger<PluginBackgroundJobManager> logger)
+    public PluginBackgroundJobManager(PowerShellSessionManager sessionManager, ILogger<PluginBackgroundJobManager> logger, IServiceScopeFactory scopeFactory)
     {
         _sessionManager = sessionManager;
         _logger = logger;
+        _scopeFactory = scopeFactory;
+        
+        var logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "App_Data", "JobLogs");
+        if (!Directory.Exists(logDir)) Directory.CreateDirectory(logDir);
+    }
+
+    private void LogToFileAndOutput(PluginJobState job, string line)
+    {
+        job.Output.AppendLine(line);
+        try { File.AppendAllText(job.LogFilePath, line + Environment.NewLine); } catch { }
+    }
+    
+    private void UpdateDbStatus(int jobId, string status, DateTime? endTime = null)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<NexusContext>();
+        var dbJob = db.BackgroundJobs.Find(jobId);
+        if (dbJob != null) {
+            dbJob.Status = status;
+            if (endTime.HasValue) dbJob.EndTime = endTime.Value;
+            db.SaveChanges();
+        }
     }
 
     public PluginJobState GetOrCreateJobState(string pluginId, string serverIp)
     {
         var key = $"{pluginId}_{serverIp}";
         return _jobs.GetOrAdd(key, _ => new PluginJobState { PluginId = pluginId, ServerIp = serverIp });
+    }
+
+    public List<BackgroundJob> GetAllJobs()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<NexusContext>();
+        return db.BackgroundJobs.OrderByDescending(j => j.StartTime).ToList();
     }
 
     public List<PluginJobState> GetJobsForPlugin(string pluginId)
@@ -45,7 +80,6 @@ public class PluginBackgroundJobManager
         var job = GetOrCreateJobState(pluginId, serverIp);
         if (job.Status == "Running" && job.Cts != null && !job.Cts.IsCancellationRequested)
         {
-            // Already running
             return;
         }
 
@@ -53,10 +87,31 @@ public class PluginBackgroundJobManager
         job.ScriptContent = scriptContent;
         job.Status = "Running";
         job.Output.Clear();
-        job.Output.AppendLine($"[{DateTime.UtcNow:HH:mm:ss}] Starting native PowerShell runspace session on {serverIp}...");
+        
+        var logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "App_Data", "JobLogs");
+        job.LogFilePath = Path.Combine(logDir, $"{pluginId}_{serverIp.Replace(":", "_").Replace(".", "_")}_{DateTime.UtcNow.Ticks}.log");
+
+        using (var scope = _scopeFactory.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<NexusContext>();
+            var dbJob = new BackgroundJob
+            {
+                PluginId = pluginId,
+                ServerIp = serverIp,
+                Status = "Running",
+                StartTime = DateTime.UtcNow,
+                ScriptType = scriptType,
+                ScriptContent = scriptContent,
+                LogFilePath = job.LogFilePath
+            };
+            db.BackgroundJobs.Add(dbJob);
+            db.SaveChanges();
+            job.JobId = dbJob.Id;
+        }
+
+        LogToFileAndOutput(job, $"[{DateTime.UtcNow:HH:mm:ss}] Starting native PowerShell runspace session on {serverIp}...");
         job.StartTime = DateTime.UtcNow;
         job.EndTime = null;
-        // Dispose prior CTS to prevent unmanaged timer handle leak on repeated StartJob calls
         job.Cts?.Dispose();
         job.Cts = new CancellationTokenSource();
 
@@ -94,7 +149,7 @@ Remove-Item $tempFile -ErrorAction SilentlyContinue
                 }
 
                 sessionId = _sessionManager.CreateSession(serverIp);
-                job.Output.AppendLine($"[{DateTime.UtcNow:HH:mm:ss}] Native session {sessionId} established. Executing script...");
+                LogToFileAndOutput(job, $"[{DateTime.UtcNow:HH:mm:ss}] Native session {sessionId} established. Executing script...");
 
                 await foreach (var chunk in _sessionManager.ExecuteStreamAsync(sessionId, commandToRun, token))
                 {
@@ -102,38 +157,38 @@ Remove-Item $tempFile -ErrorAction SilentlyContinue
 
                     if (chunk.StartsWith("OUT:"))
                     {
-                        job.Output.AppendLine(chunk.Substring(4));
+                        LogToFileAndOutput(job, chunk.Substring(4));
                     }
                     else if (chunk.StartsWith("ERR:"))
                     {
-                        job.Output.AppendLine($"[ERROR] {chunk.Substring(4)}");
+                        LogToFileAndOutput(job, $"[ERROR] {chunk.Substring(4)}");
                     }
                     else
                     {
-                        job.Output.AppendLine(chunk);
+                        LogToFileAndOutput(job, chunk);
                     }
                 }
 
                 if (token.IsCancellationRequested)
                 {
                     job.Status = "Stopped";
-                    job.Output.AppendLine($"[{DateTime.UtcNow:HH:mm:ss}] Plugin execution stopped by user.");
+                    LogToFileAndOutput(job, $"[{DateTime.UtcNow:HH:mm:ss}] Plugin execution stopped by user.");
                 }
                 else
                 {
                     job.Status = "Completed";
-                    job.Output.AppendLine($"[{DateTime.UtcNow:HH:mm:ss}] Plugin execution completed successfully.");
+                    LogToFileAndOutput(job, $"[{DateTime.UtcNow:HH:mm:ss}] Plugin execution completed successfully.");
                 }
             }
             catch (OperationCanceledException)
             {
                 job.Status = "Stopped";
-                job.Output.AppendLine($"[{DateTime.UtcNow:HH:mm:ss}] Plugin execution stopped by user.");
+                LogToFileAndOutput(job, $"[{DateTime.UtcNow:HH:mm:ss}] Plugin execution stopped by user.");
             }
             catch (Exception ex)
             {
                 job.Status = "Failed";
-                job.Output.AppendLine($"[{DateTime.UtcNow:HH:mm:ss}] [FAILED] {ex.Message}");
+                LogToFileAndOutput(job, $"[{DateTime.UtcNow:HH:mm:ss}] [FAILED] {ex.Message}");
             }
             finally
             {
@@ -142,9 +197,9 @@ Remove-Item $tempFile -ErrorAction SilentlyContinue
                 {
                     _sessionManager.DestroySession(sessionId);
                 }
-                // Dispose CTS after job ends to release unmanaged timer handle
                 job.Cts?.Dispose();
                 job.Cts = null;
+                UpdateDbStatus(job.JobId, job.Status, job.EndTime);
             }
         });
     }
@@ -158,7 +213,8 @@ Remove-Item $tempFile -ErrorAction SilentlyContinue
             {
                 job.Cts.Cancel();
                 job.Status = "Stopped";
-                job.Output.AppendLine($"[{DateTime.UtcNow:HH:mm:ss}] Stop command issued.");
+                LogToFileAndOutput(job, $"[{DateTime.UtcNow:HH:mm:ss}] Stop command issued.");
+                UpdateDbStatus(job.JobId, job.Status, DateTime.UtcNow);
             }
         }
     }
@@ -171,7 +227,8 @@ Remove-Item $tempFile -ErrorAction SilentlyContinue
             {
                 job.Cts.Cancel();
                 job.Status = "Stopped";
-                job.Output.AppendLine($"[{DateTime.UtcNow:HH:mm:ss}] Stop command issued.");
+                LogToFileAndOutput(job, $"[{DateTime.UtcNow:HH:mm:ss}] Stop command issued.");
+                UpdateDbStatus(job.JobId, job.Status, DateTime.UtcNow);
             }
         }
     }

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Palette, SlidersHorizontal, Terminal, FileCode, RefreshCw, Download, KeyRound, Plus, Trash2, Server, Database, Zap, DownloadCloud } from "lucide-react";
+import { Palette, SlidersHorizontal, Terminal, FileCode, RefreshCw, Download, KeyRound, Plus, Trash2, Server, Database, Zap, DownloadCloud, Activity } from "lucide-react";
 import { getApiUrl, getFullUrl, BackendHost, getBackendHosts, setBackendHosts, isBackendEnabledGlobally, setBackendEnabledGlobally, testBackendConnection, BackendPingResult } from "@/lib/backend";
 import { getFrontendSettings, saveFrontendSettings, type FrontendSettings } from "@/lib/frontendSettings";
+import { BackgroundJobsView } from "./BackgroundJobsView";
 
 interface AppSettings {
   language: string;
@@ -197,6 +198,7 @@ export function HorizonSettings() {
             { id: "deployment", label: "Deployment", icon: DownloadCloud },
             { id: "ad", label: "AD", icon: Database },
             { id: "automation", label: "Automation", icon: Zap },
+            { id: "jobs", label: "Background Jobs", icon: Activity },
           ].map((sec) => (
             <button 
               key={sec.id}
@@ -227,6 +229,7 @@ export function HorizonSettings() {
               { id: "deployment", label: "Deployment", icon: DownloadCloud },
               { id: "ad", label: "Active Directory", icon: Database },
               { id: "automation", label: "Automation", icon: Zap },
+            { id: "jobs", label: "Background Jobs", icon: Activity },
             ].map((sec) => (
               <button 
                 key={sec.id}
@@ -838,6 +841,7 @@ export function HorizonSettings() {
             </section>
           )}
 
+          {activeSection === "jobs" && <BackgroundJobsView />}
           {activeSection === "automation" && (
             <section className="bg-[var(--bg-surface)] rounded-[1.5rem] border border-[var(--border-c)] shadow-sm overflow-hidden relative">
               <div className="absolute top-0 left-0 right-0 h-1 bg-[var(--text)]"></div>

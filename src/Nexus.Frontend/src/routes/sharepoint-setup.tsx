@@ -75,12 +75,12 @@ function SharePointSetupPage() {
   useEffect(() => {
     const interval = setInterval(() => {
       const token = localStorage.getItem("nexus_token");
-      fetch(getApiUrl("/plugins/sharepointsetup/jobs"), {
+      fetch(getApiUrl("/jobs?includeLogs=true"), {
         headers: { "Authorization": `Bearer ${token}` }
       })
         .then(r => r.ok ? r.json() : [])
         .then(d => {
-          if (Array.isArray(d)) setJobs(d);
+          if (Array.isArray(d)) setJobs(d.filter((j: any) => j.pluginId?.startsWith('sharepoint_')));
         })
         .catch(() => {});
     }, 2000);
@@ -188,7 +188,7 @@ function SharePointSetupPage() {
 
   const stopJob = async (serverIp: string) => {
     const token = localStorage.getItem("nexus_token");
-    fetch(getApiUrl(`/plugins/sharepointsetup/stop?serverIp=${serverIp}`), { method: "POST", headers: { "Authorization": `Bearer ${token}` }});
+    fetch(getApiUrl(`/jobs/${jobs.find(j => j.serverIp === serverIp)?.id}/stop`), { method: "POST", headers: { "Authorization": `Bearer ${token}` }});
   };
   const stopAllJobs = async () => {
     const token = localStorage.getItem("nexus_token");
@@ -197,7 +197,7 @@ function SharePointSetupPage() {
 
   const retryJob = async (serverIp: string) => {
     const token = localStorage.getItem("nexus_token");
-    fetch(getApiUrl(`/plugins/sharepointsetup/jobs/${serverIp}/retry`), { method: "POST", headers: { "Authorization": `Bearer ${token}` }})
+    fetch(getApiUrl(`/jobs/${jobs.find(j => j.serverIp === serverIp)?.id}/retry`), { method: "POST", headers: { "Authorization": `Bearer ${token}` }})
       .then(() => toast.success("Job restarted"));
   };
 

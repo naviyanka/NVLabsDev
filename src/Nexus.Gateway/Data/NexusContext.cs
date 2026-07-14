@@ -20,6 +20,7 @@ public class NexusContext : DbContext
     public DbSet<SecurityEventLog> SecurityEventLogs { get; set; } = null!;
     public DbSet<SecuritySnapshot> SecuritySnapshots { get; set; } = null!;
     public DbSet<PluginEntity> Plugins { get; set; } = null!;
+    public DbSet<BackgroundJob> BackgroundJobs { get; set; } = null!;
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<PerfSample>().HasIndex(p => new { p.ServerIp, p.T });

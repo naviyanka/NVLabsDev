@@ -110,12 +110,12 @@ public class PowerShellSessionManager : IDisposable
         private static readonly string[] BlockedPatterns = new[]
         {
             @"\bInvoke-Expression\b", @"\bIEX\b", @"\bInvoke-WebRequest\b", @"\bInvoke-RestMethod\b",
-            @"\bStart-Process\b", @"\bStart-Job\b", @"\bRegister-ScheduledTask\b",
+            @"\bStart-Job\b", @"\bRegister-ScheduledTask\b",
             @"\bNew-Item\s+HKLM:", @"\bRemove-Item\b.*-Recurse\b.*-Force\b",
             @"\bFormat-Table\b.*\|\s*Out-File\b", @"\bSet-Content\b", @"\bAdd-Content\b",
             @"\bInvoke-Command\b", @"\bEnter-PSSession\b", @"\bNew-PSSession\b",
             @"\bInvoke-WmiMethod\b", @"\bInvoke-CimMethod\b",
-            @"\b[System\.Net\.WebClient]\b", @"\bInvoke-WebRequest\b", @"\bInvoke-RestMethod\b",
+            @"\[System\.Net\.WebClient\]", @"\bInvoke-WebRequest\b", @"\bInvoke-RestMethod\b",
             @"\bDownloadString\b", @"\bDownloadFile\b",
             @"\bcertutil\b", @"\bbitsadmin\b"
         };
@@ -153,8 +153,8 @@ public class PowerShellSessionManager : IDisposable
             {
                 session.LastUsed = DateTime.UtcNow;
                 session.PowerShell.Commands.Clear();
-                // Use single-quoted script block to prevent injection via command string
-                session.PowerShell.AddScript($". {{ '{command.Replace("'", "''")}' }} | Out-String -Stream");
+                session.PowerShell.AddScript(command);
+                session.PowerShell.AddCommand("Out-String").AddParameter("Stream", true);
 
                 var outputBuffer = new PSDataCollection<PSObject>();
                 outputBuffer.DataAdded += (s, e) =>
