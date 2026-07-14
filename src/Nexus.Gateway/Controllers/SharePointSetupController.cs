@@ -27,7 +27,8 @@ public class SharePointSetupController : ControllerBase
         
         try
         {
-            var p = payload.Deserialize<SharePointSetupPayload>();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var p = payload.Deserialize<SharePointSetupPayload>(options);
             if (p == null || p.Configurations == null) return BadRequest("Invalid payload");
 
             var dcScript = new StringBuilder();
