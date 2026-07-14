@@ -252,24 +252,26 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
         <div className="flex items-center gap-4">
           
           {/* Backend Status Indicator */}
-          {backendStatus.enabled && backendStatus.url && (
-            <div 
-              className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${
-                backendStatus.online 
+          <div 
+            className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${
+              (!backendStatus.enabled || !backendStatus.url)
+                ? "border-[var(--border-c)] bg-[var(--bg-void)] text-[var(--text-sub)]"
+                : backendStatus.online 
                   ? "border-[var(--ok)]/30 bg-[var(--ok)]/10 text-[var(--ok)]" 
                   : "border-[var(--crit)]/30 bg-[var(--crit)]/10 text-[var(--crit)]"
-              }`}
-              title={`Remote Backend: ${backendStatus.url}`}
-            >
-              <div className="relative flex h-2 w-2">
-                {backendStatus.online && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--ok)] opacity-75"></span>}
-                <span className={`relative inline-flex rounded-full h-2 w-2 ${backendStatus.online ? "bg-[var(--ok)]" : "bg-[var(--crit)]"}`}></span>
-              </div>
-              <span className="truncate max-w-[100px]">
-                {backendStatus.online ? "API Online" : "API Dead"}
-              </span>
+            }`}
+            title={(!backendStatus.enabled || !backendStatus.url) ? "No backend configured. Running in offline/resilient mode." : `Remote Backend: ${backendStatus.url}`}
+          >
+            <div className="relative flex h-2 w-2">
+              {backendStatus.enabled && backendStatus.url && backendStatus.online && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--ok)] opacity-75"></span>}
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                (!backendStatus.enabled || !backendStatus.url) ? "bg-[var(--text-sub)]" : backendStatus.online ? "bg-[var(--ok)]" : "bg-[var(--crit)]"
+              }`}></span>
             </div>
-          )}
+            <span className="truncate max-w-[100px]">
+              {(!backendStatus.enabled || !backendStatus.url) ? "Offline Mode" : backendStatus.online ? "API Online" : "API Dead"}
+            </span>
+          </div>
 
           <button 
             onClick={() => document.documentElement.classList.toggle('dark')} 
