@@ -82,10 +82,16 @@ if (-not (Get-SmbShare -Name $shareName -ErrorAction SilentlyContinue)) {{
 
             foreach (var conf in p.Configurations)
             {
-                if (p.DownloadSql && !string.IsNullOrWhiteSpace(conf.SqlDownloadUrl) && !conf.SqlDownloaded)
+                if (p.DownloadSql && !string.IsNullOrWhiteSpace(conf.SqlDownloadUrl))
                 {
                     var tag = "SQL_" + conf.SpEdition;
-                    dcScript.AppendLine($@"
+                    if (conf.SqlDownloaded)
+                    {
+                        dcScript.AppendLine($@"Write-Output ""[PROGRESS|{tag}|100]""");
+                    }
+                    else
+                    {
+                        dcScript.AppendLine($@"
 $sqlDir = Join-Path '{p.FileSharePath}' 'SQL_{conf.SpEdition}'
 if (-not (Test-Path $sqlDir)) {{ New-Item -ItemType Directory -Force -Path $sqlDir }}
 $outFile = Join-Path $sqlDir 'sql.iso'
@@ -95,11 +101,18 @@ if (-not (Test-Path $outFile)) {{
     Write-Output ""[PROGRESS|{tag}|100]""
 }}
 ");
+                    }
                 }
-                if (p.DownloadSp && !string.IsNullOrWhiteSpace(conf.SpDownloadUrl) && !conf.SpDownloaded)
+                if (p.DownloadSp && !string.IsNullOrWhiteSpace(conf.SpDownloadUrl))
                 {
                     var tag = "SP_" + conf.SpEdition;
-                    dcScript.AppendLine($@"
+                    if (conf.SpDownloaded)
+                    {
+                        dcScript.AppendLine($@"Write-Output ""[PROGRESS|{tag}|100]""");
+                    }
+                    else
+                    {
+                        dcScript.AppendLine($@"
 $spDir = Join-Path '{p.FileSharePath}' 'SP_{conf.SpEdition}'
 if (-not (Test-Path $spDir)) {{ New-Item -ItemType Directory -Force -Path $spDir }}
 $outFile = Join-Path $spDir 'sp.iso'
@@ -109,6 +122,7 @@ if (-not (Test-Path $outFile)) {{
     Write-Output ""[PROGRESS|{tag}|100]""
 }}
 ");
+                    }
                 }
             }
 
