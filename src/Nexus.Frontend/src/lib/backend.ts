@@ -1,34 +1,111 @@
-const STORAGE_KEY = "nexus_backend_url";
+export interface BackendHost {
+  id: string;
+  name: string;
+  url: string;
+  isActive: boolean;
+}
+
+export interface BackendPingResult {
+  reachable: boolean;
+  pingMs: number | null;
+  statusCode: number | null;
+  error?: string;
+}
+
+const STORAGE_KEY = "nexus_backend_hosts";
+const GLOBAL_TOGGLE_KEY = "nexus_backend_enabled";
 
 /**
- * Get the configured backend base URL.
- * Returns empty string if not configured (local dev mode uses Vite proxy).
+ * Get all configured backend hosts.
  */
-export function getBackendUrl(): string {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem(STORAGE_KEY) || "";
+export function getBackendHosts(): BackendHost[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  
+  // Legacy migration
+  if (typeof window !== "undefined") {
+    const legacyUrl = localStorage.getItem("nexus_backend_url");
+    if (legacyUrl) {
+      const legacyHost: BackendHost = {
+        id: "legacy",
+        name: "Legacy Backend",
+        url: legacyUrl,
+        isActive: true
+      };
+      localStorage.removeItem("nexus_backend_url");
+      setBackendHosts([legacyHost]);
+      return [legacyHost];
+    }
+  }
+  
+  return [];
+}
+
+/**
+ * Save the entire list of backend hosts.
+ */
+export function setBackendHosts(hosts: BackendHost[]): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(hosts));
+  window.dispatchEvent(new CustomEvent("nexus-backend-url-changed"));
+}
+
+/**
+ * Check if the global "Use Remote Backend" toggle is enabled.
+ */
+export function isBackendEnabledGlobally(): boolean {
+  if (typeof window === "undefined") return false;
+  const val = localStorage.getItem(GLOBAL_TOGGLE_KEY);
+  return val === null ? true : val === "true"; // Default to true if not set
+}
+
+/**
+ * Set the global "Use Remote Backend" toggle.
+ */
+export function setBackendEnabledGlobally(enabled: boolean): void {
+  localStorage.setItem(GLOBAL_TOGGLE_KEY, enabled.toString());
+  window.dispatchEvent(new CustomEvent("nexus-backend-url-changed"));
 }
 
 /**
  * Set the backend base URL (e.g. "https://abc123.ngrok-free.app").
- * Strips trailing slashes for consistency.
+ * Legacy wrapper: adds it as the active host.
  */
 export function setBackendUrl(url: string): void {
   const clean = url.replace(/\/+$/, "");
-  localStorage.setItem(STORAGE_KEY, clean);
-  window.dispatchEvent(new CustomEvent("nexus-backend-url-changed"));
+  setBackendEnabledGlobally(true);
+  const current = getBackendHosts().map(h => ({ ...h, isActive: false }));
+  current.push({
+    id: Date.now().toString(),
+    name: "Custom URL",
+    url: clean,
+    isActive: true
+  });
+  setBackendHosts(current);
 }
 
 /**
  * Clear backend URL — reverts to local dev proxy mode.
+ * Legacy wrapper: disables remote backends.
  */
 export function clearBackendUrl(): void {
-  localStorage.removeItem(STORAGE_KEY);
-  window.dispatchEvent(new CustomEvent("nexus-backend-url-changed"));
+  setBackendEnabledGlobally(false);
 }
 
 /**
- * Check if a backend URL has been explicitly configured.
+ * Get the currently active backend URL.
+ * Returns empty string if globally disabled or no active host.
+ */
+export function getBackendUrl(): string {
+  if (!isBackendEnabledGlobally()) return "";
+  const active = getBackendHosts().find(h => h.isActive);
+  return active ? active.url.replace(/\/+$/, "") : "";
+}
+
+/**
+ * Check if a backend URL has been explicitly configured AND is active.
  */
 export function isBackendConfigured(): boolean {
   return !!getBackendUrl();
@@ -71,20 +148,34 @@ export function getWsUrl(path: string): string {
 }
 
 /**
- * Test if a backend URL is reachable by hitting /api/health.
- * Returns true if healthy, false otherwise.
+ * Test if a backend URL is reachable by hitting /api/health and measure ping.
  */
-export async function testBackendConnection(url?: string): Promise<boolean> {
+export async function testBackendConnection(url?: string): Promise<BackendPingResult> {
   const target = url || getBackendUrl();
-  if (!target) return false;
+  if (!target) return { reachable: false, pingMs: null, statusCode: null, error: "No URL provided" };
+  
+  const cleanUrl = target.replace(/\/+$/, "");
+  const startTime = performance.now();
+  
   try {
-    const cleanUrl = target.replace(/\/+$/, "");
     const res = await fetch(`${cleanUrl}/api/health`, {
       method: "GET",
       signal: AbortSignal.timeout(5000),
     });
-    return res.ok;
-  } catch {
-    return false;
+    
+    const endTime = performance.now();
+    
+    return {
+      reachable: res.ok,
+      pingMs: Math.round(endTime - startTime),
+      statusCode: res.status,
+    };
+  } catch (err: any) {
+    return {
+      reachable: false,
+      pingMs: null,
+      statusCode: null,
+      error: err.message || "Connection failed"
+    };
   }
 }

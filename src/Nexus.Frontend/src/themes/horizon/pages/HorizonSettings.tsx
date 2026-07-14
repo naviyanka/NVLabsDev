@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Palette, SlidersHorizontal, Terminal, FileCode, RefreshCw, Download, KeyRound, Plus, Trash2, Server, Database, Zap, DownloadCloud } from "lucide-react";
-import { getApiUrl, getFullUrl, getBackendUrl, setBackendUrl, clearBackendUrl, testBackendConnection } from "@/lib/backend";
+import { getApiUrl, getFullUrl, BackendHost, getBackendHosts, setBackendHosts, isBackendEnabledGlobally, setBackendEnabledGlobally, testBackendConnection, BackendPingResult } from "@/lib/backend";
 
 interface AppSettings {
   language: string;
@@ -71,8 +71,22 @@ export function HorizonSettings() {
   const [exportTimeFilter, setExportTimeFilter] = useState("all");
 
   // Backend Connection State
-  const [backendInput, setBackendInput] = useState(getBackendUrl());
-  const [backendStatus, setBackendStatus] = useState<"unknown" | "testing" | "success" | "error">("unknown");
+  const [backendHostsState, setBackendHostsState] = useState<BackendHost[]>([]);
+  const [globalBackendEnabled, setGlobalBackendEnabled] = useState(true);
+  const [newBackendName, setNewBackendName] = useState("");
+  const [newBackendUrl, setNewBackendUrl] = useState("");
+  const [pingResults, setPingResults] = useState<Record<string, BackendPingResult>>({});
+  const [isPinging, setIsPinging] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setBackendHostsState(getBackendHosts());
+    setGlobalBackendEnabled(isBackendEnabledGlobally());
+  }, []);
+
+  const saveHosts = (newHosts: BackendHost[]) => {
+    setBackendHostsState(newHosts);
+    setBackendHosts(newHosts);
+  };
 
   const fetchLogs = () => {
     setLoadingLogs(true);
@@ -334,57 +348,130 @@ export function HorizonSettings() {
                 <p className="text-xs text-[var(--text-sub)] mt-1">Configure global platform behavior and refresh intervals.</p>
               </div>
               <div className="p-6 space-y-6">
-                {/* Backend Connection */}
+                {/* Backend Infrastructure Manager */}
                 <div className="mb-6 rounded-2xl border border-[var(--border-c)] bg-[var(--bg-void)] p-5 shadow-sm">
-                  <div className="flex items-center justify-between pb-3">
-                    <h3 className="font-semibold text-sm text-[var(--text)] uppercase tracking-widest">Backend Connection</h3>
-                    {backendStatus === "testing" && <span className="text-xs text-[var(--amber)] animate-pulse">Testing...</span>}
-                    {backendStatus === "success" && <span className="text-xs text-[var(--ok)] font-medium">Connected</span>}
-                    {backendStatus === "error" && <span className="text-xs text-rose-400 font-medium">Connection Failed</span>}
+                  <div className="flex items-center justify-between pb-3 border-b border-[var(--border-c)]">
+                    <div>
+                      <h3 className="font-semibold text-sm text-[var(--text)] uppercase tracking-widest flex items-center gap-2">
+                        <Server size={14} className="text-[var(--amber)]" />
+                        Backend Infrastructure Manager
+                      </h3>
+                      <p className="text-[11px] text-[var(--text-sub)] mt-1">
+                        Configure local, ngrok, or Cloudflare Tunnel backend endpoints.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-[var(--text-sub)] uppercase">Enable Remote Backends</span>
+                      <input 
+                        type="checkbox" 
+                        checked={globalBackendEnabled} 
+                        onChange={(e) => {
+                          setGlobalBackendEnabled(e.target.checked);
+                          setBackendEnabledGlobally(e.target.checked);
+                          toast.success("Backend settings updated. Reloading...");
+                          setTimeout(() => window.location.reload(), 1000);
+                        }} 
+                        className="accent-[var(--amber)] h-4 w-4" 
+                      />
+                    </div>
                   </div>
-                  <p className="text-xs text-[var(--text-sub)] pb-4">
-                    Set a custom backend URL (e.g., ngrok, Cloudflare Tunnel) if hosting the frontend remotely. Leave blank for local development.
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="text"
-                      value={backendInput}
-                      onChange={(e) => setBackendInput(e.target.value)}
-                      placeholder="https://abc1234.ngrok-free.app"
-                      className="flex-1 w-full bg-[var(--bg-surface)] border border-[var(--border-c)] rounded-lg px-3 py-2 text-sm font-mono text-[var(--text)] focus:outline-none focus:border-[var(--amber)] transition-colors"
-                    />
-                    <button 
-                      onClick={async () => {
-                        setBackendStatus("testing");
-                        const ok = await testBackendConnection(backendInput);
-                        setBackendStatus(ok ? "success" : "error");
-                      }}
-                      className="px-4 py-2 text-sm font-medium rounded-lg border border-[var(--border-c)] hover:bg-[var(--bg-surface)] text-[var(--text)] transition-colors"
-                    >
-                      Test
-                    </button>
-                    <button 
-                      onClick={() => {
-                        if (!backendInput.trim()) clearBackendUrl();
-                        else setBackendUrl(backendInput);
-                        toast.success("Backend URL saved. Reloading app...");
-                        setTimeout(() => window.location.reload(), 1000);
-                      }}
-                      className="px-4 py-2 text-sm font-bold rounded-lg bg-[var(--amber)] text-black hover:bg-[var(--amber-low)] hover:text-[var(--amber)] border border-[var(--amber)] transition-colors shadow-sm"
-                    >
-                      Save
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setBackendInput("");
-                        clearBackendUrl();
-                        toast.success("Reverted to local backend. Reloading...");
-                        setTimeout(() => window.location.reload(), 1000);
-                      }}
-                      className="px-4 py-2 text-sm font-medium rounded-lg border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 transition-colors"
-                    >
-                      Clear
-                    </button>
+
+                  <div className={`mt-4 space-y-3 ${!globalBackendEnabled ? "opacity-50 pointer-events-none" : ""}`}>
+                    {backendHostsState.map(host => {
+                      const ping = pingResults[host.id];
+                      const pinging = isPinging[host.id];
+                      return (
+                        <div key={host.id} className={`flex items-center justify-between p-3 rounded-lg border ${host.isActive ? "border-[var(--amber)] bg-[var(--amber-low)]" : "border-[var(--border-c)] bg-[var(--bg-surface)]"}`}>
+                          <div className="flex items-center gap-3">
+                            <input 
+                              type="radio" 
+                              name="activeBackend" 
+                              checked={host.isActive}
+                              onChange={() => {
+                                const next = backendHostsState.map(h => ({ ...h, isActive: h.id === host.id }));
+                                saveHosts(next);
+                                toast.success("Active backend changed. Reloading...");
+                                setTimeout(() => window.location.reload(), 1000);
+                              }}
+                              className="accent-[var(--amber)] h-4 w-4"
+                            />
+                            <div>
+                              <div className="text-xs font-bold text-[var(--text)]">{host.name} {host.isActive && <span className="ml-2 text-[9px] bg-[var(--amber)] text-black px-1.5 py-0.5 rounded uppercase">Active</span>}</div>
+                              <div className="text-[11px] text-[var(--text-sub)] font-mono">{host.url}</div>
+                              {ping && (
+                                <div className="mt-1 flex items-center gap-2 text-[10px] font-mono">
+                                  {ping.reachable ? (
+                                    <>
+                                      <span className="text-[var(--ok)] flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-[var(--ok)]"></div> Reachable</span>
+                                      <span className="text-[var(--text-sub)]">Ping: {ping.pingMs}ms</span>
+                                    </>
+                                  ) : (
+                                    <span className="text-rose-400 flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-rose-400"></div> Offline ({ping.error})</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button 
+                              onClick={async () => {
+                                setIsPinging(p => ({ ...p, [host.id]: true }));
+                                const res = await testBackendConnection(host.url);
+                                setPingResults(p => ({ ...p, [host.id]: res }));
+                                setIsPinging(p => ({ ...p, [host.id]: false }));
+                              }}
+                              disabled={pinging}
+                              className="px-2 py-1 text-[10px] border border-[var(--border-c)] rounded text-[var(--text)] hover:bg-[var(--bg-void)] disabled:opacity-50 flex items-center gap-1"
+                            >
+                              {pinging ? <RefreshCw size={10} className="animate-spin" /> : <Zap size={10} />}
+                              {pinging ? "Testing..." : "Test"}
+                            </button>
+                            <button 
+                              onClick={() => {
+                                if (confirm("Delete this backend?")) saveHosts(backendHostsState.filter(h => h.id !== host.id));
+                              }}
+                              className="px-2 py-1 text-[10px] border border-[var(--border-c)] rounded text-rose-400 hover:bg-rose-500/10"
+                            >
+                              <Trash2 size={10} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    <div className="flex flex-col sm:flex-row items-center gap-2 mt-4 pt-4 border-t border-[var(--border-c)]">
+                      <input 
+                        type="text" 
+                        placeholder="Name (e.g. CF Tunnel)" 
+                        value={newBackendName}
+                        onChange={e => setNewBackendName(e.target.value)}
+                        className="flex-1 w-full bg-[var(--bg-surface)] border border-[var(--border-c)] rounded-lg px-3 py-1.5 text-xs text-[var(--text)] focus:border-[var(--amber)]"
+                      />
+                      <input 
+                        type="text" 
+                        placeholder="URL (e.g. https://abc.trycloudflare.com)" 
+                        value={newBackendUrl}
+                        onChange={e => setNewBackendUrl(e.target.value)}
+                        className="flex-2 w-full bg-[var(--bg-surface)] border border-[var(--border-c)] rounded-lg px-3 py-1.5 text-xs text-[var(--text)] focus:border-[var(--amber)]"
+                      />
+                      <button 
+                        onClick={() => {
+                          if (!newBackendName.trim() || !newBackendUrl.trim()) return;
+                          const newHost: BackendHost = {
+                            id: Date.now().toString(),
+                            name: newBackendName,
+                            url: newBackendUrl,
+                            isActive: backendHostsState.length === 0 // Make active if it's the first one
+                          };
+                          saveHosts([...backendHostsState, newHost]);
+                          setNewBackendName("");
+                          setNewBackendUrl("");
+                        }}
+                        className="whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-lg bg-[var(--amber-low)] text-[var(--amber)] border border-[var(--amber)]/30 hover:bg-[var(--amber)] hover:text-black flex items-center gap-1"
+                      >
+                        <Plus size={12} /> Add
+                      </button>
+                    </div>
                   </div>
                 </div>
 
