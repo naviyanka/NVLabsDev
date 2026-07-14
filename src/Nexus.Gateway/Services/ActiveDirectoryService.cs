@@ -71,11 +71,11 @@ public class ActiveDirectoryService
         }
         catch (PrincipalServerDownException)
         {
-            _logger.LogWarning("Failed to query AD domain {Domain}. Machine is likely not domain joined.", domainName);
+            _logger.LogDebug("Failed to query AD domain {Domain}. Machine is likely not domain joined.", domainName);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to query AD domain {Domain}. Machine might not be domain joined.", domainName);
+            _logger.LogDebug(ex, "Failed to query AD domain {Domain}. Machine might not be domain joined.", domainName);
         }
         return servers;
     }

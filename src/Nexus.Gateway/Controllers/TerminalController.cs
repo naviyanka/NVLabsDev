@@ -81,9 +81,10 @@ public class TerminalController : ControllerBase
                     }
                 }
             }
+            catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                Console.WriteLine($"PTY read error: {ex.Message}");
+                // Console.WriteLine($"PTY read error: {ex.Message}");
             }
             cts.Cancel();
         });
@@ -115,7 +116,7 @@ public class TerminalController : ControllerBase
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"WebSocket read error: {ex.Message}");
+            // Console.WriteLine($"WebSocket read error: {ex.Message}");
         }
 
         cts.Cancel();
