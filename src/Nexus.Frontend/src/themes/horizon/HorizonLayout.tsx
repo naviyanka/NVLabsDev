@@ -1,5 +1,5 @@
 import React, { ReactNode, useState, useEffect } from "react";
-import { getApiUrl, getFullUrl } from "@/lib/backend";
+import { getApiUrl, getFullUrl, isBackendEnabledGlobally, getBackendUrl } from "@/lib/backend";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { 
   LayoutDashboard, Server, Bell, Settings as SettingsIcon, Search, HelpCircle, Terminal, Cpu, Shield, FileCode, Activity, Moon, Sun, AppWindow, Cog, HardDrive, FolderOpen, Calendar, Package, Layers, RefreshCw, Monitor, BadgeCheck, Users, KeyRound, Network, DatabaseZap, GitBranch, CopySlash, ScrollText, Puzzle, Hexagon, X, LogOut, User
@@ -38,6 +38,11 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
   const [userContext, setUserContext] = useState({ username: "Admin User", role: "Luminous Command", initials: "NX" });
   const [brand, setBrand] = useState({ name: "NEXUS", subtitle: "Horizon UI Shell" });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [backendStatus, setBackendStatus] = useState({
+    enabled: isBackendEnabledGlobally(),
+    online: typeof window !== "undefined" ? ((window as any).__nexus_backend_online !== false) : true,
+    url: getBackendUrl()
+  });
 
   useEffect(() => {
     fetch(getApiUrl("/settings")).then(r => r.json()).then(s => {
@@ -57,6 +62,11 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
       setBrand({ name: e.detail.appName || "NEXUS", subtitle: e.detail.appSubtitle || "Horizon UI Shell" });
     };
     window.addEventListener("nexus-branding-change", handler);
+
+    const backendStatusHandler = (e: any) => {
+      setBackendStatus(prev => ({ ...prev, online: e.detail.online }));
+    };
+    window.addEventListener("nexus-backend-status", backendStatusHandler);
 
     try {
       const userStr = localStorage.getItem("nexus-user");
@@ -95,6 +105,7 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
       toast.success = originalSuccess;
       toast.error = originalError;
       window.removeEventListener("nexus-branding-change", handler);
+      window.removeEventListener("nexus-backend-status", backendStatusHandler);
     };
   }, []);
 
@@ -239,6 +250,27 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
           </div>
         </div>
         <div className="flex items-center gap-4">
+          
+          {/* Backend Status Indicator */}
+          {backendStatus.enabled && backendStatus.url && (
+            <div 
+              className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${
+                backendStatus.online 
+                  ? "border-[var(--ok)]/30 bg-[var(--ok)]/10 text-[var(--ok)]" 
+                  : "border-[var(--crit)]/30 bg-[var(--crit)]/10 text-[var(--crit)]"
+              }`}
+              title={`Remote Backend: ${backendStatus.url}`}
+            >
+              <div className="relative flex h-2 w-2">
+                {backendStatus.online && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--ok)] opacity-75"></span>}
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${backendStatus.online ? "bg-[var(--ok)]" : "bg-[var(--crit)]"}`}></span>
+              </div>
+              <span className="truncate max-w-[100px]">
+                {backendStatus.online ? "API Online" : "API Dead"}
+              </span>
+            </div>
+          )}
+
           <button 
             onClick={() => document.documentElement.classList.toggle('dark')} 
             className="text-[var(--text-sub)] hover:bg-[var(--amber-low)] hover:text-[var(--amber)] rounded-full p-2 transition-all relative"
