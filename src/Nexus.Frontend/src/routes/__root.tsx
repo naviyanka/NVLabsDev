@@ -34,9 +34,9 @@ if (typeof window !== "undefined") {
     (window as any).__nexus_backend_online = false;
     
     if (wasOnline) {
-      toast.error("Connection to backend lost. Running in offline mode.");
+      toast.error("Connection to backend lost. Running in offline mode.", { id: "backend-offline" });
     } else if (method && method.toUpperCase() !== "GET") {
-      toast.error("Backend is dead/unreachable. Action failed.");
+      toast.error("Backend is dead/unreachable. Action failed.", { id: "backend-action-failed" });
     }
     
     window.dispatchEvent(new CustomEvent("nexus-backend-status", { detail: { online: false } }));

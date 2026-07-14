@@ -86,18 +86,28 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
     // @ts-ignore
     toast.success = (msg: string, data?: any) => {
       setNotifications(prev => [{ id: Math.random().toString(), msg, time: new Date() }, ...prev]);
-      fetch(getApiUrl('/notifications/custom'), { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ type: 'Success', message: msg }) }).catch(()=>{});
+      if ((window as any).__nexus_backend_online !== false) {
+        fetch(getApiUrl('/notifications/custom'), { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ type: 'Success', message: msg }) }).catch(()=>{});
+      }
       let toastId: string | number;
-      toastId = originalSuccess(msg, { ...data, onClick: () => toast.dismiss(toastId) });
+      toastId = originalSuccess(msg, { 
+        ...data, 
+        onClick: () => toast.dismiss(toastId)
+      });
       return toastId;
     };
     
     // @ts-ignore
     toast.error = (msg: string, data?: any) => {
       setNotifications(prev => [{ id: Math.random().toString(), msg, time: new Date() }, ...prev]);
-      fetch(getApiUrl('/notifications/custom'), { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ type: 'Error', message: msg }) }).catch(()=>{});
+      if ((window as any).__nexus_backend_online !== false) {
+        fetch(getApiUrl('/notifications/custom'), { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ type: 'Error', message: msg }) }).catch(()=>{});
+      }
       let toastId: string | number;
-      toastId = originalError(msg, { ...data, onClick: () => toast.dismiss(toastId) });
+      toastId = originalError(msg, { 
+        ...data, 
+        onClick: () => toast.dismiss(toastId)
+      });
       return toastId;
     };
 
