@@ -42,8 +42,28 @@ interface AppSettings {
   logFilePath?: string;
 }
 
+const DEFAULT_SETTINGS: AppSettings = {
+  language: "en-US",
+  defaultLandingPage: "dashboard",
+  autoRefreshInterval: 30,
+  theme: "horizon",
+  terminalTheme: "stealth",
+  pluginCategories: "Management,Security,Infrastructure,Advanced,Custom",
+  apiKeys: [],
+  appName: "NEXUS",
+  appSubtitle: "Horizon UI Shell"
+};
+
 export function HorizonSettings() {
-  const [s, setS] = useState<AppSettings | null>(null);
+  const [s, setS] = useState<AppSettings | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("nexus-frontend-db-settings");
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+    }
+    return DEFAULT_SETTINGS;
+  });
   const [activeSection, setActiveSection] = useState("appearance");
   const [logs, setLogs] = useState<string[]>([]);
   const [logsEnabled, setLogsEnabled] = useState(false);
@@ -78,14 +98,21 @@ export function HorizonSettings() {
   useEffect(() => {
     fetch(getApiUrl("/settings"))
       .then(res => res.json())
-      .then(data => setS(data))
-      .catch(err => toast.error("Failed to load settings"));
+      .then(data => {
+        setS(data);
+        localStorage.setItem("nexus-frontend-db-settings", JSON.stringify(data));
+      })
+      .catch(err => {
+        // Silent fallback since we have localStorage
+        console.warn("Using offline settings cache.");
+      });
   }, []);
 
   function patch(updates: Partial<AppSettings>) {
     if (!s) return;
     const next = { ...s, ...updates };
     setS(next);
+    localStorage.setItem("nexus-frontend-db-settings", JSON.stringify(next));
     if (updates.theme) {
       document.documentElement.setAttribute("data-theme", updates.theme);
       try { localStorage.setItem("nexus-theme", updates.theme); } catch(e) {}
@@ -107,7 +134,9 @@ export function HorizonSettings() {
       body: JSON.stringify(next)
     }).then(res => {
       if(res.ok) toast.success("Settings saved successfully");
-      else toast.error("Failed to save settings");
+      else toast.warning("Saved locally. Backend sync failed.");
+    }).catch(() => {
+      toast.warning("Saved locally (Offline Mode).");
     });
   }
 
