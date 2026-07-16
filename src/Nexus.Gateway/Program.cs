@@ -25,6 +25,11 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        var jwtKey = builder.Configuration["Jwt:Key"] ?? Environment.GetEnvironmentVariable("JWT_KEY");
+        if (string.IsNullOrEmpty(jwtKey) || jwtKey.Length < 32)
+        {
+            throw new InvalidOperationException("JWT_KEY must be configured with at least 32 characters in production.");
+        }
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -33,7 +38,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "Nexus",
             ValidAudience = builder.Configuration["Jwt:Audience"] ?? "NexusUsers",
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? "nexus-super-secret-key-1234567890-very-secure"))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
         };
         options.Events = new JwtBearerEvents
         {
@@ -58,8 +63,9 @@ builder.Services.AddAuthorization(options =>
 });
 
 // Custom services
-builder.Services.AddDbContext<NexusContext>(options => options.UseSqlite("Data Source=nexus.db"));
-builder.Services.AddDbContext<NexusLogContext>(options => options.UseSqlite("Data Source=nexus_logs.db"));
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? @"Server=(localdb)\MSSQLLocalDB;Database=nexus;Trusted_Connection=True;";
+builder.Services.AddDbContext<NexusContext>(options => options.UseSqlServer(connectionString));
+builder.Services.AddDbContext<NexusLogContext>(options => options.UseSqlServer(connectionString));
 builder.Services.AddTransient<ActiveDirectoryService>();
 builder.Services.AddSingleton<CimService>();
 builder.Services.AddSingleton<PowerShellSessionManager>();
@@ -83,7 +89,7 @@ int webBindingPort = 5011; // Default prod port
 try
 {
     var optionsBuilder = new DbContextOptionsBuilder<NexusContext>();
-    optionsBuilder.UseSqlite("Data Source=nexus.db");
+    optionsBuilder.UseSqlServer(connectionString);
     using var context = new NexusContext(optionsBuilder.Options);
     var setting = context.AppSettings.FirstOrDefault(s => s.Id == "global");
     if (setting != null && setting.WebBindingPort > 0)
@@ -133,10 +139,10 @@ builder.Services.AddReverseProxy()
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("AllowRestricted", policy =>
     {
-        // Allow any origin for remote frontend (Render.com) connecting via tunnel
-        policy.SetIsOriginAllowed(_ => true)
+        var allowedOrigins = Environment.GetEnvironmentVariable("ALLOWED_ORIGINS")?.Split(',') ?? new[] { "http://localhost:5173", "https://localhost:5173" };
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials(); // Required for SignalR WebSocket transport
@@ -180,8 +186,14 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+if (app.Environment.IsProduction() || isProd)
+{
+    app.UseHsts();
+    app.UseHttpsRedirection();
+}
+
 app.UseForwardedHeaders();
-app.UseCors("AllowAll");
+app.UseCors("AllowRestricted");
 app.UseWebSockets();
 app.UseAuthentication();
 app.UseAuthorization();

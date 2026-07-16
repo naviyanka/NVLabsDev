@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
-    <NoWarn>$(NoWarn);CS1998;CS0168;NU1608</NoWarn>
+    <NoWarn>$(NoWarn);CS0168;NU1608</NoWarn>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>f0c45f8c-2142-44b8-befd-71ca8c8213c9</UserSecretsId>
   </PropertyGroup>
@@ -16,7 +16,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.2" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.9" />
     <PackageReference Include="Microsoft.Management.Infrastructure" Version="3.0.0" />
     <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.4.2" />

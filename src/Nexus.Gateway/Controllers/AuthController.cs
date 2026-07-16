@@ -68,9 +68,9 @@ namespace Nexus.Gateway.Controllers
 
         private string GenerateJwtToken(string username, string role)
         {
-            var jwtKey = _config["Jwt:Key"];
+            var jwtKey = _config["Jwt:Key"] ?? Environment.GetEnvironmentVariable("JWT_KEY");
             if (string.IsNullOrEmpty(jwtKey) || jwtKey.Length < 32)
-                throw new InvalidOperationException("Jwt:Key must be configured in appsettings with at least 32 characters. Refusing to use hardcoded fallback.");
+                throw new InvalidOperationException("JWT_KEY must be configured with at least 32 characters.");
 
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);

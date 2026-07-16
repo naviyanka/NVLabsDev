@@ -5,6 +5,7 @@ using Nexus.Gateway.Models;
 
 namespace Nexus.Gateway.Services;
 
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public class ActiveDirectoryService
 {
     private readonly NexusContext _db;
@@ -116,3 +117,4 @@ public class ActiveDirectoryService
         return users;
     }
 }
+

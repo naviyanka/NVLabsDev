@@ -25,7 +25,7 @@ public class WindowsFilesController : ControllerBase
         try
         {
             var sources = new List<FileSourceModel>();
-            var session = _cimService.GetSession(serverIp);
+            using var session = _cimService.CreateSession(serverIp);
 
             var logicalDisks = session.QueryInstances(@"root\cimv2", "WQL", "SELECT Name, VolumeName FROM Win32_LogicalDisk WHERE DriveType = 3").ToList();
             foreach (var ld in logicalDisks)
@@ -363,3 +363,4 @@ public class FileContentDto
 {
     public string Content { get; set; } = string.Empty;
 }
+
