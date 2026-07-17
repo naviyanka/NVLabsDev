@@ -7,6 +7,9 @@ using Microsoft.EntityFrameworkCore;
 using Nexus.Gateway.BackgroundServices;
 using Nexus.Gateway.Services;
 using Nexus.Gateway.Hubs;
+using Nexus.ControlPlane.Credentials;
+using Nexus.ControlPlane.Data;
+using Nexus.ControlPlane.Controllers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,7 +21,7 @@ builder.Host.UseWindowsService(options =>
 builder.Logging.AddProvider(new MemoryLoggerProvider(MemoryLogSink.Instance));
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddApplicationPart(typeof(CredentialsController).Assembly);
 builder.Services.AddEndpointsApiExplorer();
 
 // Authentication & Authorization
@@ -60,12 +63,22 @@ builder.Services.AddAuthorization(options =>
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
         .Build();
+    options.AddPolicy("CredentialAdministrators", policy =>
+        policy.RequireRole("Administrators", "Domain Admins"));
 });
 
 // Custom services
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? @"Server=(localdb)\MSSQLLocalDB;Database=nexus;Trusted_Connection=True;";
 builder.Services.AddDbContext<NexusContext>(options => options.UseSqlServer(connectionString));
 builder.Services.AddDbContext<NexusLogContext>(options => options.UseSqlServer(connectionString));
+var controlPlaneDirectory = Path.Combine(builder.Environment.ContentRootPath, "App_Data");
+Directory.CreateDirectory(controlPlaneDirectory);
+var controlPlaneConnection = builder.Configuration.GetConnectionString("ControlPlane")
+    ?? $"Data Source={Path.Combine(controlPlaneDirectory, "nexus-control-plane.db")};Cache=Shared";
+builder.Services.AddDbContext<ControlPlaneDbContext>(options => options.UseSqlite(controlPlaneConnection));
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<ICredentialProtector, DpapiCredentialProtector>();
+builder.Services.AddScoped<ICredentialVault, CredentialVault>();
 builder.Services.AddTransient<ActiveDirectoryService>();
 builder.Services.AddSingleton<CimService>();
 builder.Services.AddSingleton<PowerShellSessionManager>();
@@ -167,6 +180,9 @@ using (var scope = app.Services.CreateScope())
     
     var db = scope.ServiceProvider.GetRequiredService<NexusContext>();
     db.Database.Migrate();
+
+    var controlPlaneDb = scope.ServiceProvider.GetRequiredService<ControlPlaneDbContext>();
+    controlPlaneDb.Database.Migrate();
 
     var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
     var setting = db.AppSettings.FirstOrDefault(s => s.Id == "global");
