@@ -22,6 +22,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -79,6 +80,13 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
     setSelectedIndex(0);
   }, [query]);
 
+  // Auto-scroll selected item into view
+  useEffect(() => {
+    if (!listRef.current) return;
+    const el = listRef.current.querySelector(`[data-cmd-index="${selectedIndex}"]`) as HTMLElement;
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }, [selectedIndex]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -107,7 +115,6 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
       <div 
         className="w-full max-w-xl bg-[var(--bg-surface)] border border-[var(--border-c)] rounded-2xl shadow-2xl overflow-hidden flex flex-col mx-4 animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={handleKeyDown}
       >
         {/* Input Bar */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border-c)] bg-[var(--bg-card)]">
@@ -116,6 +123,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Type a command, route, or search server..."
             className="w-full bg-transparent text-sm text-[var(--text)] placeholder-[var(--text-sub)] focus:outline-none"
           />
@@ -125,7 +133,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
         </div>
 
         {/* Results List */}
-        <div className="max-h-[380px] overflow-y-auto p-2 divide-y divide-[var(--border-c)]/30">
+        <div ref={listRef} className="max-h-[380px] overflow-y-auto p-2 divide-y divide-[var(--border-c)]/30">
           {filtered.length === 0 ? (
             <div className="py-12 text-center text-xs text-[var(--text-sub)]">
               No matching commands or routes found for "<span className="text-[var(--amber)]">{query}</span>"
@@ -137,6 +145,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
               return (
                 <div
                   key={item.id}
+                  data-cmd-index={idx}
                   onClick={() => {
                     item.action();
                     onClose();
