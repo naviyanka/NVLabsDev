@@ -5,7 +5,7 @@ import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useNavigate } from "@tanstack/react-router";
-import { getVMsClient as getVMs, controlVMClient as controlVM, createVMClient, checkpointVMClient, type HyperVVM } from "@/api/client";
+import { getVMsClient as getVMs, controlVMClient as controlVM, createVMClient, type HyperVVM } from "@/api/client";
 import { Plus, X, Server } from "lucide-react";
 import { toast } from "sonner";
 

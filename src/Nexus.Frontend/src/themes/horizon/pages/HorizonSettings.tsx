@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
-import { Palette, SlidersHorizontal, Terminal, FileCode, RefreshCw, Download, KeyRound, Plus, Trash2, Server, Database, Zap, DownloadCloud, Activity, Search, ShieldCheck, Cpu, Check, AlertCircle, Rocket, HardDrive, Bot, Globe, Lock, Shield, Sparkles } from "lucide-react";
-import { getApiUrl, getFullUrl, BackendHost, getBackendHosts, setBackendHosts, isBackendEnabledGlobally, setBackendEnabledGlobally, testBackendConnection, BackendPingResult } from "@/lib/backend";
-import { getFrontendSettings, saveFrontendSettings, type FrontendSettings } from "@/lib/frontendSettings";
+import { Palette, Terminal, FileCode, Download, KeyRound, Plus, Trash2, Server, Database, Zap, Activity, Search, ShieldCheck, Check, Rocket, HardDrive, Bot, Globe, Shield, Sparkles } from "lucide-react";
+import { getApiUrl, getFullUrl, BackendHost, getBackendHosts, setBackendHosts, isBackendEnabledGlobally, BackendPingResult } from "@/lib/backend";
+import { getFrontendSettings, saveFrontendSettings } from "@/lib/frontendSettings";
 import { BackgroundJobsView } from "./BackgroundJobsView";
 import { TerminalThemePreview } from "@/components/settings/TerminalThemePreview";
 import { SettingsImportExport } from "@/components/settings/SettingsImportExport";
@@ -99,17 +99,12 @@ export function HorizonSettings() {
   });
   const [activeSection, setActiveSection] = useState("appearance");
   const [searchQuery, setSearchQuery] = useState("");
-  const [logs, setLogs] = useState<string[]>([]);
-  const [logsEnabled, setLogsEnabled] = useState(false);
-  const [loadingLogs, setLoadingLogs] = useState(false);
 
   // Backend Connection State
   const [backendHostsState, setBackendHostsState] = useState<BackendHost[]>([]);
   const [globalBackendEnabled, setGlobalBackendEnabled] = useState(true);
-  const [newBackendName, setNewBackendName] = useState("");
-  const [newBackendUrl, setNewBackendUrl] = useState("");
-  const [pingResults, setPingResults] = useState<Record<string, BackendPingResult>>({});
-  const [isPinging, setIsPinging] = useState<Record<string, boolean>>({});
+  const [pingResults] = useState<Record<string, BackendPingResult>>({});
+  const [isPinging] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setBackendHostsState(getBackendHosts());
@@ -216,7 +211,7 @@ export function HorizonSettings() {
     });
   }
 
-  const activeHost = backendHostsState.find(h => h.isActive) || backendHostsState[0];
+
 
   const themes = [
     { id: "horizon", name: "🌅 Horizon Luminous Day", desc: "Warm coral primary, pure Luminous UI redesign", accent: "#ff5e3a" },

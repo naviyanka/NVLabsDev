@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
-import { ShieldAlert, RefreshCw, Download, CheckSquare, ChevronUp, ChevronDown, X } from "lucide-react";
+import { RefreshCw, Download, CheckSquare, ChevronUp, ChevronDown, X } from "lucide-react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
 import { getUpdatesClient, checkUpdatesClient, installUpdatesClient, type WindowsUpdate } from "@/api/client";

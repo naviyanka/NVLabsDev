@@ -1,6 +1,6 @@
-import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useMemo } from "react";
-import { Terminal as TermIcon, Trash2, Plus, X, Download, Sliders, Shield, FileText, Play, ZoomIn, ZoomOut, TerminalIcon } from "lucide-react";
+import { Terminal as TermIcon, Trash2, Plus, X, Download, ZoomIn, ZoomOut } from "lucide-react";
 
 import { getServersClient, type Server } from "@/api/client";
 import { getFrontendSettings } from "@/lib/frontendSettings";

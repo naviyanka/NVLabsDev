@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+
 import { useEffect, useMemo, useState, useRef } from "react";
 import { 
-  Search, Plus, X, Trash2, Edit2, LayoutDashboard, Server, Activity, AppWindow, Cog, HardDrive, FolderOpen,
+  Search, Plus, X, Trash2, Edit2, Server, Activity, AppWindow, Cog, HardDrive, FolderOpen,
   Calendar, Package, Layers, RefreshCw, Monitor, Shield, BadgeCheck, Users,
   KeyRound, Network, Cpu, DatabaseZap, GitBranch, CopySlash, Terminal,
   ScrollText, Puzzle, Settings as SettingsIcon 
@@ -17,11 +17,11 @@ const ICONS: Record<string, React.ComponentType<any>> = {
 };
 
 import { toast } from "sonner";
-import { getApiUrl, getFullUrl } from "@/lib/backend";
+import { getApiUrl } from "@/lib/backend";
 
 
 
-const CATS = ["All","Security","Storage","Monitoring","Network","Management","Custom"] as const;
+
 
 export interface PluginEntity {
   id: string;

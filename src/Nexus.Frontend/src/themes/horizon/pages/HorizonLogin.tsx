@@ -1,8 +1,8 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Shield, Server, KeyRound, User, Lock, Building, Settings2 } from "lucide-react";
-import { getApiUrl, getFullUrl, getBackendUrl, setBackendUrl, clearBackendUrl, testBackendConnection } from "@/lib/backend";
+import { getApiUrl, getBackendUrl, setBackendUrl, clearBackendUrl, testBackendConnection } from "@/lib/backend";
 
 
 

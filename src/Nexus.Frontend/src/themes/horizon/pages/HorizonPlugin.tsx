@@ -1,6 +1,6 @@
 import { getApiUrl } from "@/lib/backend";
-import { createFileRoute, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState, useContext } from "react";
+import { useRouterState } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Play, Terminal as TerminalIcon, CheckSquare, Square, StopCircle, Server as ServerIcon } from "lucide-react";
 
 import { getServersClient as getServers, type Server } from "@/api/client";

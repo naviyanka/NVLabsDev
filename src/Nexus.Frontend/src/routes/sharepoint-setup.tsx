@@ -8,8 +8,8 @@ import {
   Save, Search, Play, CheckCircle2, Circle, ChevronDown, ChevronRight,
   RefreshCw, XCircle, Shield, Server as ServerIcon, Database, HardDrive,
   Download, FileText, Activity, Terminal, AlertTriangle, Layers, ArrowRight,
-  FileUp, FileDown, Check, Zap, Cpu, Key, Lock, Network, Sliders, Globe,
-  Copy, Eye, EyeOff, Wrench, Sparkles, CheckSquare, PackageCheck, KeyRound,
+  FileUp, FileDown, Zap, Cpu, Key, Network,
+  Wrench, PackageCheck, KeyRound,
   FileCode2, SlidersHorizontal, Award
 } from "lucide-react";
 import {
@@ -84,7 +84,7 @@ function SharePointSetupPage() {
   // Active Directory Dialog Search State
   const [adSearchQuery, setAdSearchQuery] = useState("");
   const [adSearchResults, setAdSearchResults] = useState<string[]>([]);
-  const [isAdSearching, setIsAdSearching] = useState(false);
+  const [, /* isAdSearching */ setIsAdSearching] = useState(false);
   const [adOpenForEdition, setAdOpenForEdition] = useState<string | null>(null);
 
   // AutoSPInstaller Service Apps State
@@ -114,8 +114,7 @@ function SharePointSetupPage() {
   });
 
   // Farm Passphrase State
-  const [farmPassphrase, setFarmPassphrase] = useState("NexusPassphrase2026!");
-  const [showPassphrase, setShowPassphrase] = useState(false);
+  const [farmPassphrase] = useState("NexusPassphrase2026!");
 
   // Service Accounts State
   const [serviceAccounts, setServiceAccounts] = useState<ServiceAccount[]>([
@@ -127,7 +126,7 @@ function SharePointSetupPage() {
   ]);
 
   // Automator & SQL Optimization Switches
-  const [automations, setAutomations] = useState({
+  const [automations] = useState({
     createSmbShare: true,
     configureFirewallPorts: true,
     setSqlMaxdop: true,
@@ -145,8 +144,8 @@ function SharePointSetupPage() {
   // Terminal & Log Filters
   const [jobs, setJobs] = useState<any[]>([]);
   const [isTerminalExpanded, setIsTerminalExpanded] = useState(true);
-  const [logFilter, setLogFilter] = useState<"ALL" | "INFO" | "SUCCESS" | "ERROR">("ALL");
-  const [logSearch, setLogSearch] = useState("");
+  const [logFilter] = useState<"ALL" | "INFO" | "SUCCESS" | "ERROR">("ALL");
+  const [logSearch] = useState("");
 
   useEffect(() => {
     getServers().then(svrs => {
@@ -421,16 +420,7 @@ function SharePointSetupPage() {
   if (totalTasks > 0) overallProgress = Math.round((completedTasks / totalTasks) * 100);
 
   // Filter terminal logs
-  const filteredJobs = useMemo(() => {
-    return jobs.map(j => {
-      let lines = (j.output || "").split("\n").filter((l: string) => l.trim().length > 0 && !l.includes("[PROGRESS|"));
-      if (logFilter === "ERROR") lines = lines.filter((l: string) => l.toLowerCase().includes("error") || l.toLowerCase().includes("fail"));
-      if (logFilter === "SUCCESS") lines = lines.filter((l: string) => l.toLowerCase().includes("success") || l.toLowerCase().includes("completed"));
-      if (logFilter === "INFO") lines = lines.filter((l: string) => !l.toLowerCase().includes("error"));
-      if (logSearch) lines = lines.filter((l: string) => l.toLowerCase().includes(logSearch.toLowerCase()));
-      return { ...j, filteredLines: lines };
-    });
-  }, [jobs, logFilter, logSearch]);
+
 
   const activeEditions = Object.keys(editions).filter(ed => (editions as any)[ed]);
   const hasSelections = activeEditions.length > 0;

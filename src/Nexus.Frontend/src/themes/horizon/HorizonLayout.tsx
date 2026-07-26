@@ -1,8 +1,8 @@
 import React, { ReactNode, useState, useEffect } from "react";
-import { getApiUrl, getFullUrl, isBackendEnabledGlobally, getBackendUrl } from "@/lib/backend";
+import { getApiUrl, isBackendEnabledGlobally, getBackendUrl } from "@/lib/backend";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { 
-  LayoutDashboard, Server, Bell, Settings as SettingsIcon, Search, HelpCircle, Terminal, Cpu, Shield, FileCode, Activity, Moon, Sun, AppWindow, Cog, HardDrive, FolderOpen, Calendar, Package, Layers, RefreshCw, Monitor, BadgeCheck, Users, KeyRound, Network, DatabaseZap, GitBranch, CopySlash, ScrollText, Puzzle, Hexagon, X, LogOut, User
+  LayoutDashboard, Server, Bell, Settings as SettingsIcon, Search, HelpCircle, Terminal, Cpu, Shield, FileCode, Activity, Moon, Sun, AppWindow, Cog, HardDrive, FolderOpen, Calendar, Package, Layers, RefreshCw, Monitor, BadgeCheck, Users, KeyRound, Network, DatabaseZap, GitBranch, CopySlash, ScrollText, Puzzle, X, LogOut, User
 } from "lucide-react";
 import { toast } from "sonner";
 import { BackendStatusModal } from "@/components/ui/BackendStatusModal";

@@ -3,7 +3,7 @@ import { Fragment, useEffect, useState, useMemo } from "react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
 import { getUsersClient, getGroupsClient, createUserClient, deleteUserClient, type LocalUser, type LocalGroup } from "@/api/client";
-import { Loader2, Search, ArrowDownAZ, ArrowUpZA, UserCheck, UserX, Users, Shield, Plus, Trash2, UserPlus, X } from "lucide-react";
+import { Loader2, Search, ArrowDownAZ, ArrowUpZA, UserCheck, UserX, Users, Shield, Trash2, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/users")({

@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { getServersClient, getNotificationsClient, type Server, type Notification } from "@/api/client";
 import { Server as ServerIcon, CheckCircle, XCircle, AlertTriangle, ChevronRight, Zap, RefreshCw, Activity, Terminal, Sparkles, Layers, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { getApiUrl } from "@/lib/backend";
 import { getFrontendSettings } from "@/lib/frontendSettings";
 
 export function HorizonDashboard() {
