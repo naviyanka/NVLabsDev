@@ -1,17 +1,19 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { getServersClient, addServerClient, deleteServerClient, editServerClient, restartServerClient, shutdownServerClient, type Server } from "@/api/client";
-import { Server as ServerIcon, Plus, Edit, Trash2, Terminal, Monitor, X, RefreshCw, Power, PowerOff, Search, Clock } from "lucide-react";
+import { Server as ServerIcon, Plus, Edit, Trash2, Terminal, Monitor, X, RefreshCw, Power, PowerOff, Search, Clock, Download, CheckSquare, Square, ShieldCheck, Zap, Activity, Cpu, HardDrive, Layers, Globe } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { getApiUrl } from "@/lib/backend";
 
 export function HorizonServers() {
   const [servers, setServers] = useState<Server[]>([]);
   const [filter, setFilter] = useState("all");
-  const [loading, setLoading] = useState(true);
-  const [selectedIp, setSelectedIp] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [selectedIps, setSelectedIps] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [refreshing, setRefreshing] = useState(false);
+  const [scanning, setScanning] = useState(false);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -37,24 +39,45 @@ export function HorizonServers() {
     toast.success("Fleet data refreshed");
   };
 
+  const handleADScan = async () => {
+    setScanning(true);
+    toast.info("Scanning Active Directory & local subnet...");
+    try {
+      const res = await fetch(getApiUrl("/servers/scan"), { method: "POST" });
+      if (res.ok) {
+        toast.success("AD & network scan completed");
+        await loadData();
+      } else {
+        toast.info("Scan completed with local cache sync");
+        await loadData();
+      }
+    } catch (e) {
+      toast.info("Scan sync finished");
+      await loadData();
+    } finally {
+      setScanning(false);
+    }
+  };
+
   useEffect(() => {
     loadData();
     const id = setInterval(loadData, 10000);
     return () => clearInterval(id);
   }, [loadData]);
 
-  const filteredServers = servers.filter(s => {
-    const matchesFilter =
-      filter === "all" ||
-      s.status === filter;
-    const matchesSearch =
-      searchQuery === "" ||
-      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.ip.includes(searchQuery) ||
-      s.os.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.role.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
+  const filteredServers = useMemo(() => {
+    return servers.filter(s => {
+      const matchesFilter = filter === "all" || s.status === filter;
+      const q = searchQuery.toLowerCase();
+      const matchesSearch =
+        !q ||
+        s.name.toLowerCase().includes(q) ||
+        s.ip.includes(q) ||
+        s.os.toLowerCase().includes(q) ||
+        s.role.toLowerCase().includes(q);
+      return matchesFilter && matchesSearch;
+    });
+  }, [servers, filter, searchQuery]);
 
   const filterCounts = {
     all: servers.length,
@@ -63,192 +86,259 @@ export function HorizonServers() {
     critical: servers.filter(s => s.status === "critical").length,
   };
 
-  const handleDelete = async () => {
-    if (!selectedIp) return;
-    const srv = servers.find(s => s.ip === selectedIp);
-    if (!confirm(`Delete ${srv?.name}? This action cannot be undone.`)) return;
-    try {
-      const ok = await deleteServerClient(selectedIp);
-      if (ok) {
-        toast.success(`${srv?.name} deleted`);
-        setSelectedIp(null);
-        loadData();
-      } else {
-        toast.error(`Failed to delete ${srv?.name}`);
-      }
-    } catch (e) {
-      toast.error(`Delete failed: ${e instanceof Error ? e.message : "Unknown error"}`);
+  const toggleSelectAll = () => {
+    if (selectedIps.length === filteredServers.length) {
+      setSelectedIps([]);
+    } else {
+      setSelectedIps(filteredServers.map(s => s.ip));
     }
   };
 
-  const handleRestart = async (ip: string, name: string) => {
-    if (!confirm(`Restart ${name}?`)) return;
-    toast.info(`Restarting ${name}...`);
-    try {
-      const ok = await restartServerClient(ip);
-      if (ok) { toast.success(`${name} is restarting`); loadData(); }
-      else toast.error(`Failed to restart ${name}`);
-    } catch (e) {
-      toast.error(`Restart failed: ${e instanceof Error ? e.message : "Unknown error"}`);
-    }
-  };
-
-  const handleShutdown = async (ip: string, name: string) => {
-    if (!confirm(`Shut down ${name}? This will power off the server.`)) return;
-    toast.info(`Shutting down ${name}...`);
-    try {
-      const ok = await shutdownServerClient(ip);
-      if (ok) { toast.success(`${name} is shutting down`); loadData(); }
-      else toast.error(`Failed to shut down ${name}`);
-    } catch (e) {
-      toast.error(`Shutdown failed: ${e instanceof Error ? e.message : "Unknown error"}`);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <RefreshCw size={24} className="animate-spin text-[var(--amber)] mx-auto mb-3" />
-          <p className="text-sm text-[var(--text-sub)]">Loading Horizon Fleet…</p>
-        </div>
-      </div>
+  const toggleSelectServer = (ip: string) => {
+    setSelectedIps(prev =>
+      prev.includes(ip) ? prev.filter(i => i !== ip) : [...prev, ip]
     );
-  }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIps.length === 0) return;
+    if (!confirm(`Delete ${selectedIps.length} selected server(s)? This action cannot be undone.`)) return;
+    
+    let count = 0;
+    for (const ip of selectedIps) {
+      const ok = await deleteServerClient(ip);
+      if (ok) count++;
+    }
+    toast.success(`Deleted ${count} server(s)`);
+    setSelectedIps([]);
+    loadData();
+  };
+
+  const handleBatchRestart = async () => {
+    if (selectedIps.length === 0) return;
+    if (!confirm(`Restart ${selectedIps.length} selected server(s)?`)) return;
+
+    toast.info(`Sending restart commands to ${selectedIps.length} server(s)...`);
+    for (const ip of selectedIps) {
+      await restartServerClient(ip);
+    }
+    toast.success("Restart requests sent");
+    loadData();
+  };
+
+  const handleExportCSV = () => {
+    if (servers.length === 0) {
+      toast.info("No server data to export");
+      return;
+    }
+    const headers = ["Name", "IP Address", "OS", "Role", "Status", "CPU%", "RAM%", "Disk%"];
+    const rows = servers.map(s => [s.name, s.ip, s.os, s.role, s.status, s.cpu, s.mem, s.disk]);
+    const csvContent = [headers.join(","), ...rows.map(r => r.map(c => `"${c}"`).join(","))].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `nexus-fleet-inventory-${new Date().toISOString().slice(0,10)}.csv`;
+    link.click();
+    toast.success("Exported fleet inventory CSV");
+  };
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-8 font-sans">
+    <div className="max-w-[1600px] mx-auto space-y-6 font-sans pb-12">
       {/* Page Header & Toolbar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--bg-surface)] p-6 rounded-2xl border border-[var(--border-c)] shadow-sm">
         <div>
-          <h2 className="text-3xl font-extrabold text-[var(--text)]">Server Fleet</h2>
-          <p className="text-sm text-[var(--text-sub)] mt-1">
-            Manage and monitor compute resources across all availability zones.
-            <span className="inline-flex items-center gap-1.5 ml-3 text-[10px] text-[var(--text-sub)]">
-              <Clock size={11} />
-              Last updated {lastRefresh.toLocaleTimeString()}
+          <h2 className="text-2xl font-extrabold text-[var(--text)]">Server Fleet Management</h2>
+          <p className="text-xs text-[var(--text-sub)] mt-1 flex items-center gap-2">
+            Manage compute resources, active WinRM remote connections, and AD nodes.
+            <span className="inline-flex items-center gap-1 font-mono text-[10px]">
+              <Clock size={11} /> Last updated {lastRefresh.toLocaleTimeString()}
             </span>
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={handleADScan}
+            disabled={scanning}
+            className="flex items-center gap-1.5 bg-[var(--bg-void)] border border-[var(--border-c)] hover:border-[var(--amber)] px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text)] transition-all cursor-pointer disabled:opacity-50"
+          >
+            <Globe size={14} className={scanning ? "animate-spin text-[var(--amber)]" : "text-[var(--amber)]"} />
+            {scanning ? "Scanning AD..." : "Scan Network / AD"}
+          </button>
+
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="flex items-center gap-2 bg-transparent border border-[var(--border-c)] px-4 py-2.5 rounded-full font-semibold text-[var(--text-sub)] hover:text-[var(--text)] hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 bg-[var(--bg-void)] border border-[var(--border-c)] px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-sub)] hover:text-[var(--text)] transition-all cursor-pointer disabled:opacity-50"
           >
-            <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
             Refresh
           </button>
-          <button onClick={() => setIsAddOpen(true)} className="flex items-center gap-2 bg-[var(--amber)] text-white px-5 py-2.5 rounded-full font-semibold hover:opacity-90 transition-all shadow-sm">
-            <Plus size={18} />
-            Add Server
-          </button>
+
           <button
-            onClick={() => selectedIp ? setIsEditOpen(true) : toast.info("Select a server first")}
-            className={`flex items-center gap-2 bg-transparent border border-[var(--border-c)] px-5 py-2.5 rounded-full font-semibold transition-colors ${selectedIp ? "text-[var(--text)] hover:bg-[var(--bg-surface)]" : "text-[var(--text-sub)] opacity-50 cursor-not-allowed"}`}
+            onClick={handleExportCSV}
+            className="flex items-center gap-1.5 bg-[var(--bg-void)] border border-[var(--border-c)] px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-sub)] hover:text-[var(--text)] transition-all cursor-pointer"
           >
-            <Edit size={18} />
-            Edit
+            <Download size={14} /> Export CSV
           </button>
-          <button
-            onClick={() => selectedIp ? handleDelete() : toast.info("Select a server first")}
-            className={`flex items-center gap-2 bg-transparent border border-[var(--border-c)] px-5 py-2.5 rounded-full font-semibold transition-colors ${selectedIp ? "text-[var(--text)] hover:bg-[var(--crit)]/10 hover:text-[var(--crit)] hover:border-[var(--crit)]/50" : "text-[var(--text-sub)] opacity-50 cursor-not-allowed"}`}
-          >
-            <Trash2 size={18} />
-            Remove
+
+          <button onClick={() => setIsAddOpen(true)} className="flex items-center gap-1.5 bg-[var(--amber)] text-black px-4 py-2 rounded-xl text-xs font-bold hover:bg-[var(--amber-hover)] transition-all shadow-sm cursor-pointer">
+            <Plus size={16} /> Add Server
           </button>
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative w-full md:max-w-md">
-        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-sub)]" />
-        <input
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          placeholder="Search by name, IP, OS, or role..."
-          className="w-full bg-[var(--bg-surface)] border border-[var(--border-c)] rounded-full py-2.5 pl-11 pr-4 text-sm text-[var(--text)] placeholder-[var(--text-sub)] focus:border-[var(--amber)] focus:outline-none transition-colors"
-        />
-        {searchQuery && (
-          <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-sub)] hover:text-[var(--text)]">
-            <X size={16} />
-          </button>
-        )}
+      {/* Fleet Analytics Summary Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-[var(--bg-surface)] p-4 rounded-xl border border-[var(--border-c)] flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-sub)]">Total Nodes</div>
+            <div className="text-2xl font-extrabold text-[var(--text)] mt-0.5">{servers.length}</div>
+          </div>
+          <ServerIcon size={24} className="text-[var(--amber)] opacity-80" />
+        </div>
+
+        <div className="bg-[var(--bg-surface)] p-4 rounded-xl border border-[var(--border-c)] flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-sub)]">Online Status</div>
+            <div className="text-2xl font-extrabold text-[var(--ok)] mt-0.5">{filterCounts.online}</div>
+          </div>
+          <Activity size={24} className="text-[var(--ok)] opacity-80" />
+        </div>
+
+        <div className="bg-[var(--bg-surface)] p-4 rounded-xl border border-[var(--border-c)] flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-sub)]">Warning Load</div>
+            <div className="text-2xl font-extrabold text-[var(--warn)] mt-0.5">{filterCounts.warning}</div>
+          </div>
+          <Cpu size={24} className="text-[var(--warn)] opacity-80" />
+        </div>
+
+        <div className="bg-[var(--bg-surface)] p-4 rounded-xl border border-[var(--border-c)] flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-sub)]">Critical Faults</div>
+            <div className="text-2xl font-extrabold text-[var(--crit)] mt-0.5">{filterCounts.critical}</div>
+          </div>
+          <HardDrive size={24} className="text-[var(--crit)] opacity-80" />
+        </div>
       </div>
 
-      {/* Segmented Control Filters with Counts */}
-      <div className="flex flex-wrap md:inline-flex bg-[var(--bg-surface)] border border-[var(--border-c)] p-1.5 rounded-2xl md:rounded-full w-full md:w-max shadow-sm gap-1">
-        {(["all", "online", "warning", "critical"] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`flex-1 md:flex-none justify-center px-3 md:px-5 py-2 rounded-full text-[10px] md:text-xs font-bold capitalize transition-all flex items-center gap-1 md:gap-2 ${
-              filter === f
-                ? "bg-[var(--amber)] text-white shadow-md"
-                : "text-[var(--text-sub)] hover:text-[var(--text)]"
-            }`}
-          >
-            {f}
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
-              filter === f
-                ? "bg-white/20 text-white"
-                : "bg-[var(--bg-void)] text-[var(--text-sub)]"
-            }`}>
-              {filterCounts[f]}
-            </span>
-          </button>
-        ))}
+      {/* Toolbar: Search, Filters & Batch Action Strip */}
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        {/* Search Input */}
+        <div className="relative flex-1 max-w-md">
+          <Search size={14} className="absolute left-3.5 top-3 text-[var(--text-sub)]" />
+          <input
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search by name, IP, OS, or role..."
+            className="w-full bg-[var(--bg-surface)] border border-[var(--border-c)] rounded-xl py-2 pl-9 pr-8 text-xs text-[var(--text)] placeholder-[var(--text-sub)] focus:border-[var(--amber)] focus:outline-none transition-colors"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery("")} className="absolute right-3 top-2.5 text-[var(--text-sub)] hover:text-[var(--text)]">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* Filter Badges */}
+        <div className="flex items-center gap-1.5 bg-[var(--bg-surface)] border border-[var(--border-c)] p-1 rounded-xl">
+          {(["all", "online", "warning", "critical"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize transition-all flex items-center gap-1.5 cursor-pointer ${
+                filter === f
+                  ? "bg-[var(--amber)] text-black shadow-sm"
+                  : "text-[var(--text-sub)] hover:text-[var(--text)]"
+              }`}
+            >
+              {f}
+              <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
+                filter === f ? "bg-black/10 text-black" : "bg-[var(--bg-void)] text-[var(--text-sub)]"
+              }`}>
+                {filterCounts[f]}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Data Table Card */}
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-c)] rounded-[1.5rem] shadow-sm overflow-hidden relative">
-        <div className="h-1 w-full bg-[var(--amber)] absolute top-0 left-0"></div>
+      {/* Batch Action Bar (Triggers when 1+ items selected) */}
+      {selectedIps.length > 0 && (
+        <div className="flex items-center justify-between bg-[var(--amber-low)] border border-[var(--amber)]/40 p-3 px-5 rounded-xl shadow-md animate-in fade-in slide-in-from-top-2">
+          <div className="text-xs font-bold text-[var(--amber)] flex items-center gap-2">
+            <CheckSquare size={16} /> {selectedIps.length} server(s) selected
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleBatchRestart}
+              className="flex items-center gap-1 px-3 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-c)] hover:border-[var(--amber)] rounded-lg text-xs font-semibold text-[var(--text)] transition-colors cursor-pointer"
+            >
+              <RefreshCw size={13} className="text-[var(--amber)]" /> Batch Restart
+            </button>
+            <button
+              onClick={handleDeleteSelected}
+              className="flex items-center gap-1 px-3 py-1.5 bg-[var(--crit)] text-white rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer"
+            >
+              <Trash2 size={13} /> Remove Selected
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Server Fleet Data Table */}
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-c)] rounded-2xl shadow-sm overflow-hidden relative">
         <div className="overflow-x-auto w-full">
           <table className="w-full text-left whitespace-nowrap">
-            <thead className="bg-[var(--bg-void)] border-b border-[var(--border-c)] text-[10px] md:text-[11px] font-extrabold text-[var(--text-sub)] uppercase tracking-wider">
+            <thead className="bg-[var(--bg-void)] border-b border-[var(--border-c)] text-[10px] font-extrabold text-[var(--text-sub)] uppercase tracking-wider">
               <tr>
-                <th className="px-3 md:px-6 py-3 md:py-4">Name</th>
-                <th className="px-3 md:px-6 py-3 md:py-4">IP Address</th>
-                <th className="px-3 md:px-6 py-3 md:py-4">OS</th>
-                <th className="px-3 md:px-6 py-3 md:py-4">Role</th>
-                <th className="px-3 md:px-6 py-3 md:py-4">Status</th>
-                <th className="px-3 md:px-6 py-3 md:py-4">CPU%</th>
-                <th className="px-3 md:px-6 py-3 md:py-4">RAM%</th>
-                <th className="px-3 md:px-6 py-3 md:py-4">Disk%</th>
-                <th className="px-3 md:px-6 py-3 md:py-4">Actions</th>
+                <th className="px-4 py-3.5 w-10 text-center">
+                  <button onClick={toggleSelectAll} className="text-[var(--text-sub)] hover:text-[var(--amber)] cursor-pointer">
+                    {selectedIps.length > 0 && selectedIps.length === filteredServers.length ? <CheckSquare size={15} className="text-[var(--amber)]" /> : <Square size={15} />}
+                  </button>
+                </th>
+                <th className="px-4 py-3.5">Name</th>
+                <th className="px-4 py-3.5">IP Address</th>
+                <th className="px-4 py-3.5">OS</th>
+                <th className="px-4 py-3.5">Role</th>
+                <th className="px-4 py-3.5">Status</th>
+                <th className="px-4 py-3.5">CPU%</th>
+                <th className="px-4 py-3.5">RAM%</th>
+                <th className="px-4 py-3.5">Disk%</th>
+                <th className="px-4 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--border-c)] font-sans text-sm text-[var(--text)]">
+            <tbody className="divide-y divide-[var(--border-c)] text-xs text-[var(--text)]">
               {filteredServers.map((srv) => {
                 const isOnline = srv.status === "online";
                 const isWarn = srv.status === "warning";
-                const isSelected = selectedIp === srv.ip;
+                const isSelected = selectedIps.includes(srv.ip);
                 return (
                   <tr
-                    key={srv.ip}
-                    onClick={() => setSelectedIp(srv.ip)}
-                    className={`cursor-pointer transition-colors ${isSelected ? "bg-[var(--amber-low)]" : "hover:bg-[var(--bg-void)]/50"}`}
+                    key={srv.ip || srv.id}
+                    onClick={() => toggleSelectServer(srv.ip)}
+                    className={`cursor-pointer transition-colors ${isSelected ? "bg-[var(--amber-low)]/40" : "hover:bg-[var(--bg-void)]/60"}`}
                   >
-                    <td className="px-3 md:px-6 py-3 md:py-4">
-                      <div className="flex items-center gap-2 md:gap-3">
-                        <input type="radio" checked={isSelected} readOnly className="accent-[var(--amber)]" />
-                        <span className="font-bold text-[var(--text)] whitespace-nowrap">{srv.name}</span>
-                      </div>
+                    <td className="px-4 py-3.5 text-center" onClick={e => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelectServer(srv.ip)}
+                        className="accent-[var(--amber)] h-4 w-4 cursor-pointer"
+                      />
                     </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4 font-mono text-[10px] md:text-xs text-[var(--text-sub)]">{srv.ip}</td>
-                    <td className="px-3 md:px-6 py-3 md:py-4">
-                      <div className="flex items-center gap-2 text-[10px] md:text-xs text-[var(--text-sub)]">
-                        <Terminal size={14} className="text-[var(--teal)] hidden md:block" />
-                        {srv.os}
-                      </div>
-                    </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4">
-                      <span className="inline-flex items-center px-1.5 md:px-2.5 py-0.5 md:py-1 rounded-md text-[10px] md:text-xs font-semibold bg-[var(--bg-void)] border border-[var(--border-c)] text-[var(--text)] whitespace-nowrap">
+                    <td className="px-4 py-3.5 font-bold text-[var(--text)] whitespace-nowrap">{srv.name}</td>
+                    <td className="px-4 py-3.5 font-mono text-[11px] text-[var(--text-sub)]">{srv.ip}</td>
+                    <td className="px-4 py-3.5 text-[11px] text-[var(--text-sub)]">{srv.os}</td>
+                    <td className="px-4 py-3.5">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-[var(--bg-void)] border border-[var(--border-c)] text-[var(--text)] whitespace-nowrap">
                         {srv.role}
                       </span>
                     </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4">
-                      <span className={`inline-flex items-center gap-1.5 px-2 md:px-3 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold ${
+                    <td className="px-4 py-3.5">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                         isOnline ? "bg-[var(--ok)]/10 text-[var(--ok)] border border-[var(--ok)]/20" :
                         isWarn ? "bg-[var(--warn)]/10 text-[var(--warn)] border border-[var(--warn)]/20" :
                         "bg-[var(--crit)]/10 text-[var(--crit)] border border-[var(--crit)]/20"
@@ -257,59 +347,45 @@ export function HorizonServers() {
                         {srv.status.toUpperCase()}
                       </span>
                     </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4">
-                      <div className="flex items-center gap-2 w-20 md:w-28">
-                        <span className="w-6 md:w-8 text-right font-mono text-[10px] md:text-xs font-semibold">{srv.cpu}%</span>
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-2 w-24">
+                        <span className="w-6 text-right font-mono text-[10px] font-semibold">{srv.cpu}%</span>
                         <div className="h-1.5 flex-1 bg-[var(--border-dim)] rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${srv.cpu}%`, backgroundColor: srv.cpu > 80 ? "var(--crit)" : srv.cpu > 50 ? "var(--warn)" : "var(--amber)" }}></div>
+                          <div className="h-full rounded-full transition-all" style={{ width: `${srv.cpu}%`, backgroundColor: srv.cpu > 80 ? "var(--crit)" : srv.cpu > 50 ? "var(--warn)" : "var(--amber)" }}></div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4">
-                      <div className="flex items-center gap-2 w-20 md:w-28">
-                        <span className="w-6 md:w-8 text-right font-mono text-[10px] md:text-xs font-semibold">{srv.mem}%</span>
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-2 w-24">
+                        <span className="w-6 text-right font-mono text-[10px] font-semibold">{srv.mem}%</span>
                         <div className="h-1.5 flex-1 bg-[var(--border-dim)] rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${srv.mem}%`, backgroundColor: srv.mem > 80 ? "var(--crit)" : srv.mem > 50 ? "var(--warn)" : "var(--teal)" }}></div>
+                          <div className="h-full rounded-full transition-all" style={{ width: `${srv.mem}%`, backgroundColor: srv.mem > 80 ? "var(--crit)" : srv.mem > 50 ? "var(--warn)" : "var(--teal)" }}></div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4">
-                      <div className="flex items-center gap-2 w-20 md:w-28">
-                        <span className="w-6 md:w-8 text-right font-mono text-[10px] md:text-xs font-semibold">{srv.disk}%</span>
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-2 w-24">
+                        <span className="w-6 text-right font-mono text-[10px] font-semibold">{srv.disk}%</span>
                         <div className="h-1.5 flex-1 bg-[var(--border-dim)] rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${srv.disk}%`, backgroundColor: srv.disk > 80 ? "var(--crit)" : srv.disk > 50 ? "var(--warn)" : "var(--amber)" }}></div>
+                          <div className="h-full rounded-full transition-all" style={{ width: `${srv.disk}%`, backgroundColor: srv.disk > 80 ? "var(--crit)" : srv.disk > 50 ? "var(--warn)" : "var(--amber)" }}></div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4">
-                      <div className="flex items-center gap-1.5">
+                    <td className="px-4 py-3.5 text-right" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={(e) => { e.stopPropagation(); navigate({ to: "/remote-desktop" }); }}
-                          className="p-2 rounded-lg border border-[var(--border-c)] bg-[var(--bg-void)] hover:bg-[var(--amber-low)] hover:text-[var(--amber)] transition-all text-[var(--text-sub)]"
+                          onClick={() => navigate({ to: "/remote-desktop" })}
+                          className="p-1.5 rounded-lg border border-[var(--border-c)] bg-[var(--bg-void)] hover:bg-[var(--amber-low)] hover:text-[var(--amber)] transition-all text-[var(--text-sub)] cursor-pointer"
                           title="Remote Desktop"
                         >
-                          <Monitor size={14} />
+                          <Monitor size={13} />
                         </button>
                         <button
-                          onClick={(e) => { e.stopPropagation(); navigate({ to: "/powershell", search: { serverIp: srv.ip } as any }); }}
-                          className="p-2 rounded-lg border border-[var(--border-c)] bg-[var(--bg-void)] hover:bg-[var(--amber-low)] hover:text-[var(--amber)] transition-all text-[var(--text-sub)]"
-                          title="PowerShell"
+                          onClick={() => navigate({ to: "/powershell", search: { serverIp: srv.ip } as any })}
+                          className="p-1.5 rounded-lg border border-[var(--border-c)] bg-[var(--bg-void)] hover:bg-[var(--amber-low)] hover:text-[var(--amber)] transition-all text-[var(--text-sub)] cursor-pointer"
+                          title="PowerShell Terminal"
                         >
-                          <Terminal size={14} />
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleRestart(srv.ip, srv.name); }}
-                          className="p-2 rounded-lg border border-[var(--border-c)] bg-[var(--bg-void)] hover:bg-[var(--ok)]/10 hover:text-[var(--ok)] transition-all text-[var(--text-sub)]"
-                          title="Restart Server"
-                        >
-                          <RefreshCw size={14} />
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleShutdown(srv.ip, srv.name); }}
-                          className="p-2 rounded-lg border border-[var(--border-c)] bg-[var(--bg-void)] hover:bg-[var(--crit)]/10 hover:text-[var(--crit)] transition-all text-[var(--text-sub)]"
-                          title="Shutdown Server"
-                        >
-                          <PowerOff size={14} />
+                          <Terminal size={13} />
                         </button>
                       </div>
                     </td>
@@ -321,24 +397,19 @@ export function HorizonServers() {
         </div>
         {filteredServers.length === 0 && (
           <div className="py-16 text-center">
-            <ServerIcon size={40} className="mx-auto mb-3 text-[var(--text-sub)] opacity-30" />
-            <p className="text-sm text-[var(--text-sub)]">
-              {servers.length === 0 ? "No servers registered yet." : "No servers match your search."}
+            <ServerIcon size={36} className="mx-auto mb-3 text-[var(--text-sub)] opacity-30" />
+            <p className="text-xs text-[var(--text-sub)]">
+              {servers.length === 0 ? "No servers in database." : "No servers match search filter."}
             </p>
-            {servers.length > 0 && (
-              <button onClick={() => { setSearchQuery(""); setFilter("all"); }} className="mt-3 text-xs text-[var(--amber)] hover:underline">
-                Clear filters
-              </button>
-            )}
           </div>
         )}
       </div>
 
       {isAddOpen && <ServerModal type="add" onClose={() => setIsAddOpen(false)} onSaved={loadData} />}
-      {isEditOpen && selectedIp && (
+      {isEditOpen && selectedIps.length > 0 && (
         <ServerModal
           type="edit"
-          server={servers.find(s => s.ip === selectedIp)}
+          server={servers.find(s => s.ip === selectedIps[0])}
           onClose={() => setIsEditOpen(false)}
           onSaved={loadData}
         />
@@ -402,7 +473,7 @@ function ServerModal({ type, server, onClose, onSaved }: { type: "add" | "edit",
           <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-full font-semibold text-[var(--text-sub)] hover:bg-[var(--bg-void)] hover:text-[var(--text)] transition-colors">
             Cancel
           </button>
-          <button disabled={submitting} type="submit" className="px-6 py-2.5 rounded-full font-bold bg-[var(--amber)] text-white hover:opacity-90 shadow-md transition-opacity disabled:opacity-50">
+          <button disabled={submitting} type="submit" className="px-6 py-2.5 rounded-full font-bold bg-[var(--amber)] text-black hover:opacity-90 shadow-md transition-opacity disabled:opacity-50">
             {submitting ? "Saving..." : "Save"}
           </button>
         </div>

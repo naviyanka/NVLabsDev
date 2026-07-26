@@ -98,7 +98,7 @@ if (typeof window !== "undefined") {
     const backendUrl = getBackendUrl();
     const isApiRequest = requestUrl.includes("/api/") || requestUrl.includes("/hub/");
     
-    // STRICT MODE: If globally disabled, block all API requests
+    // STRICT MODE: If globally disabled in settings, mark offline mode
     const isEnabled = isBackendEnabledGlobally();
     if (!isEnabled && isApiRequest) {
       if ((window as any).__nexus_backend_online !== false) {
@@ -107,26 +107,26 @@ if (typeof window !== "undefined") {
       throw new TypeError("Backend disconnected (globally disabled in settings)");
     }
 
-    const isHealthCheck = requestUrl.includes("/api/health");
-    if (!(window as any).__nexus_backend_online && !isHealthCheck) {
-      (window as any).__nexus_set_backend_offline(method);
-      throw new TypeError("Failed to fetch (backend offline)");
-    }
-
     try {
       const response = await originalFetch(input, init);
-      
-      const isApiRequest = requestUrl.includes("/api/") || requestUrl.includes("/hub/");
-      
+
+      // Any valid HTTP response from backend means API is online
+      if (isApiRequest && (window as any).__nexus_backend_online !== true) {
+        (window as any).__nexus_set_backend_online();
+      }
+
       if (response.status === 401 && window.location.pathname !== "/login") {
         if (isApiRequest) {
           localStorage.removeItem("nexus_token");
           window.location.href = "/login";
         }
       }
-      
+
       return response;
     } catch (error) {
+      if (isApiRequest) {
+        (window as any).__nexus_set_backend_offline(method);
+      }
       throw error;
     }
   };
@@ -334,7 +334,7 @@ function RootComponent() {
       <QueryClientProvider client={queryClient}>
         <ThemeContext.Provider value={{ theme, setTheme }}>
           <Outlet />
-          <Toaster theme="dark" position="top-right" richColors />
+          <Toaster theme="dark" position="top-right" richColors closeButton dismissible toastOptions={{ onClick: (_, t) => toast.dismiss(t?.id) }} />
         </ThemeContext.Provider>
       </QueryClientProvider>
     );
@@ -346,7 +346,7 @@ function RootComponent() {
         <HorizonLayout>
           <Outlet />
         </HorizonLayout>
-        <Toaster theme="light" position="top-right" richColors />
+        <Toaster theme="light" position="top-right" richColors closeButton dismissible toastOptions={{ onClick: (_, t) => toast.dismiss(t?.id) }} />
       </ThemeContext.Provider>
     </QueryClientProvider>
   );

@@ -45,7 +45,7 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
   
   const [backendStatus, setBackendStatus] = useState({
     enabled: isBackendEnabledGlobally(),
-    online: typeof window !== "undefined" ? ((window as any).__nexus_backend_online !== false) : true,
+    online: true,
     url: getBackendUrl()
   });
   const [showBackendModal, setShowBackendModal] = useState(false);
@@ -63,11 +63,48 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const handleBackendStatus = (e: any) => {
-      setBackendStatus(prev => ({ ...prev, online: e.detail?.online }));
+    const checkLiveHealth = async () => {
+      const enabled = isBackendEnabledGlobally();
+      const url = getBackendUrl();
+      let online = false;
+
+      try {
+        const targetUrl = url ? `${url.replace(/\/+$/, "")}/api/health` : `/api/health`;
+        const res = await fetch(targetUrl, { signal: AbortSignal.timeout(3000) });
+        online = res.ok;
+      } catch (err) {
+        // Fallback: try relative /api/health directly
+        try {
+          const res = await fetch("/api/health", { signal: AbortSignal.timeout(3000) });
+          online = res.ok;
+        } catch (e) {
+          online = false;
+        }
+      }
+
+      setBackendStatus({ enabled, online, url });
+      if (typeof window !== "undefined") {
+        (window as any).__nexus_backend_online = online;
+      }
     };
+
+    checkLiveHealth();
+    const interval = setInterval(checkLiveHealth, 3000);
+
+    const handleBackendStatus = (e: any) => {
+      if (e.detail?.online !== undefined) {
+        setBackendStatus(prev => ({ ...prev, online: e.detail.online }));
+      }
+    };
+
     window.addEventListener('nexus-backend-status', handleBackendStatus);
-    return () => window.removeEventListener('nexus-backend-status', handleBackendStatus);
+    window.addEventListener('nexus-backend-url-changed', checkLiveHealth);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('nexus-backend-status', handleBackendStatus);
+      window.removeEventListener('nexus-backend-url-changed', checkLiveHealth);
+    };
   }, []);
 
   useEffect(() => {
@@ -299,34 +336,42 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
         </div>
         <div className="flex items-center gap-4">
           
-          {/* Backend Status Indicator */}
-          <div 
-            className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${
-              (!backendStatus.enabled || !backendStatus.url)
-                ? "border-[var(--border-c)] bg-[var(--bg-void)] text-[var(--text-sub)]"
-                : backendStatus.online 
-                  ? "border-[var(--ok)]/30 bg-[var(--ok)]/10 text-[var(--ok)]" 
-                  : "border-[var(--crit)]/30 bg-[var(--crit)]/10 text-[var(--crit)]"
-            }`}
-            title={(!backendStatus.enabled || !backendStatus.url) ? "No backend configured. Running in offline/resilient mode." : `Remote Backend: ${backendStatus.url}`}
-          >
-            <div className="relative flex h-2 w-2">
-              {backendStatus.enabled && backendStatus.url && backendStatus.online && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--ok)] opacity-75"></span>}
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${
-                (!backendStatus.enabled || !backendStatus.url) ? "bg-[var(--text-sub)]" : backendStatus.online ? "bg-[var(--ok)]" : "bg-[var(--crit)]"
-              }`}></span>
-            </div>
-            <span className="truncate max-w-[100px]">
-              {(!backendStatus.enabled || !backendStatus.url) ? "Offline Mode" : backendStatus.online ? "API Online" : "API Dead"}
-            </span>
-          </div>
-
+          {/* Heartbeat Backend Status Icon Button */}
           <button 
             onClick={() => setShowBackendModal(true)}
-            className="text-[var(--text-sub)] hover:bg-[var(--amber-low)] hover:text-[var(--amber)] rounded-full p-2 transition-all relative"
-            title={backendStatus.online ? "Backend Online" : "Backend Offline"}
+            className={`relative p-2 rounded-full transition-all hover:scale-110 cursor-pointer flex items-center justify-center ${
+              !backendStatus.enabled
+                ? "hover:bg-[var(--amber-low)] text-[var(--amber)]"
+                : backendStatus.online 
+                  ? "hover:bg-[var(--ok)]/10 text-[var(--ok)]" 
+                  : "hover:bg-[var(--crit)]/10 text-[var(--crit)]"
+            }`}
+            title={
+              !backendStatus.enabled 
+                ? "Offline Mode (Local Cache Only)" 
+                : backendStatus.online 
+                  ? `Backend Online (${backendStatus.url || "http://localhost:5010"})` 
+                  : "Backend Dead / Unreachable"
+            }
           >
-            <Activity size={18} className={backendStatus.online ? "text-[var(--ok)]" : "text-[var(--crit)] animate-pulse"} />
+            <Activity 
+              size={19} 
+              className={`${
+                !backendStatus.enabled 
+                  ? "text-[var(--amber)]" 
+                  : backendStatus.online 
+                    ? "text-[var(--ok)] animate-pulse" 
+                    : "text-[var(--crit)] animate-bounce"
+              }`} 
+            />
+            {/* Status Heartbeat Dot */}
+            <span className={`absolute top-1 right-1 h-2 w-2 rounded-full ${
+              !backendStatus.enabled 
+                ? "bg-[var(--amber)]" 
+                : backendStatus.online 
+                  ? "bg-[var(--ok)] shadow-[0_0_8px_var(--ok)] animate-ping" 
+                  : "bg-[var(--crit)] shadow-[0_0_8px_var(--crit)] animate-ping"
+            }`} />
           </button>
           <button 
             onClick={() => document.documentElement.classList.toggle('dark')} 

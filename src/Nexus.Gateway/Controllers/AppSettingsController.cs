@@ -23,14 +23,20 @@ public class AppSettingsController : ControllerBase
         var settings = await _db.AppSettings.FirstOrDefaultAsync(s => s.Id == "global");
         if (settings == null)
         {
-            settings = new AppSetting { Id = "global" };
+            settings = new AppSetting { Id = "global", Theme = "horizon", TerminalTheme = "stealth" };
             _db.AppSettings.Add(settings);
+            await _db.SaveChangesAsync();
+        }
+        else if (string.IsNullOrEmpty(settings.Theme) || settings.Theme == "dark")
+        {
+            settings.Theme = "horizon";
             await _db.SaveChangesAsync();
         }
         return Ok(settings);
     }
 
     [HttpPatch]
+    [HttpPost]
     public async Task<ActionResult<AppSetting>> Update([FromBody] JsonObject updates)
     {
         var settings = await _db.AppSettings.FirstOrDefaultAsync(s => s.Id == "global");

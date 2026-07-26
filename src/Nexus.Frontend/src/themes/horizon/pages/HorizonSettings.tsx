@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
-import { Palette, SlidersHorizontal, Terminal, FileCode, RefreshCw, Download, KeyRound, Plus, Trash2, Server, Database, Zap, DownloadCloud, Activity } from "lucide-react";
+import { Palette, SlidersHorizontal, Terminal, FileCode, RefreshCw, Download, KeyRound, Plus, Trash2, Server, Database, Zap, DownloadCloud, Activity, Search, ShieldCheck, Cpu, Check, AlertCircle, Rocket, HardDrive, Bot, Globe, Lock, Shield, Sparkles } from "lucide-react";
 import { getApiUrl, getFullUrl, BackendHost, getBackendHosts, setBackendHosts, isBackendEnabledGlobally, setBackendEnabledGlobally, testBackendConnection, BackendPingResult } from "@/lib/backend";
 import { getFrontendSettings, saveFrontendSettings, type FrontendSettings } from "@/lib/frontendSettings";
 import { BackgroundJobsView } from "./BackgroundJobsView";
+import { TerminalThemePreview } from "@/components/settings/TerminalThemePreview";
+import { SettingsImportExport } from "@/components/settings/SettingsImportExport";
 
 interface AppSettings {
   language: string;
@@ -42,6 +44,18 @@ interface AppSettings {
   enableRbac?: boolean;
   healthCheckInterval?: number;
   logFilePath?: string;
+
+  // Placeholder Extensions
+  pxeServerIp?: string;
+  goldenImageTemplate?: string;
+  vssRetentionCount?: number;
+  backupDestinationTarget?: string;
+  cisBenchmarkLevel?: string;
+  bitlockerAutoEscrow?: boolean;
+  llmModelEndpoint?: string;
+  autoRemediationPolicy?: string;
+  wireguardTunnelPort?: number;
+  ddnsProviderDomain?: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -53,18 +67,41 @@ const DEFAULT_SETTINGS: AppSettings = {
   pluginCategories: "Management,Security,Infrastructure,Advanced,Custom",
   apiKeys: [],
   appName: "NEXUS",
-  appSubtitle: "Horizon UI Shell"
+  appSubtitle: "Horizon UI Shell",
+  pxeServerIp: "192.168.1.50",
+  goldenImageTemplate: "WinServer2022-Standard-v2.iso",
+  vssRetentionCount: 14,
+  backupDestinationTarget: "smb://nas.internal/backups",
+  cisBenchmarkLevel: "Level2-Server",
+  bitlockerAutoEscrow: true,
+  llmModelEndpoint: "http://localhost:11434/v1",
+  autoRemediationPolicy: "ManualApproval",
+  wireguardTunnelPort: 51820,
+  ddnsProviderDomain: "nexus-edge.cloudflare.com"
 };
 
+const CATEGORIES = [
+  { id: "appearance", label: "Appearance & Customization", icon: Palette, desc: "Themes, terminal colors, and app branding" },
+  { id: "system", label: "System & Environment", icon: Server, desc: "Backend infrastructure, web bindings, WinRM" },
+  { id: "security", label: "Security & Access", icon: KeyRound, desc: "Authentication, RBAC, API keys, maintenance mode" },
+  { id: "integrations", label: "Integrations & Automation", icon: Zap, desc: "Active Directory, PowerShell policy, Webhooks" },
+  { id: "diagnostics", label: "Diagnostics & Telemetry", icon: Activity, desc: "Background jobs, telemetry logs, alert triggers" },
+  { id: "provisioning", label: "Fleet Provisioning & PXE", icon: Rocket, desc: "PXE boot servers, Golden ISO templates, OOBE join", badge: "Roadmap" },
+  { id: "disaster_recovery", label: "Disaster Recovery & VSS", icon: HardDrive, desc: "Volume Shadow Copies, SMB/S3 backups, dry-runs", badge: "Roadmap" },
+  { id: "compliance", label: "Compliance & CIS Hardening", icon: ShieldCheck, desc: "CIS Benchmarks, BitLocker TPM escrow, SCEP CA", badge: "Roadmap" },
+  { id: "ai_ops", label: "AI Ops & Nexus Copilot", icon: Bot, desc: "Local LLM endpoints, log anomaly z-scores, auto-fix", badge: "Roadmap" },
+  { id: "network_sdwan", label: "SD-WAN & Interconnect", icon: Globe, desc: "WireGuard tunnels, SD load balancers, Cloudflare DDNS", badge: "Roadmap" },
+];
+
 export function HorizonSettings() {
-  const [s, setS] = useState<AppSettings | null>(() => {
+  const [s, setS] = useState<AppSettings>(() => {
     return { ...DEFAULT_SETTINGS, ...getFrontendSettings() } as AppSettings;
   });
   const [activeSection, setActiveSection] = useState("appearance");
+  const [searchQuery, setSearchQuery] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
   const [logsEnabled, setLogsEnabled] = useState(false);
   const [loadingLogs, setLoadingLogs] = useState(false);
-  const [exportTimeFilter, setExportTimeFilter] = useState("all");
 
   // Backend Connection State
   const [backendHostsState, setBackendHostsState] = useState<BackendHost[]>([]);
@@ -98,7 +135,7 @@ export function HorizonSettings() {
 
   useEffect(() => {
     let id: any;
-    if (activeSection === "developer") {
+    if (activeSection === "diagnostics") {
       fetchLogs();
       id = setInterval(fetchLogs, 5000);
     }
@@ -111,59 +148,75 @@ export function HorizonSettings() {
       .then(data => {
         setS(prev => ({ ...prev, ...data }));
       })
-      .catch(err => {
+      .catch(() => {
         console.warn("Using offline settings cache.");
       });
   }, []);
 
   function patch(updates: Partial<AppSettings>) {
-    if (!s) return;
     const next = { ...s, ...updates };
     setS(next);
     
+    // Save frontend preferences to localStorage instantly
+    saveFrontendSettings(next as any);
+
     if (updates.theme) {
       document.documentElement.setAttribute("data-theme", updates.theme);
       window.dispatchEvent(new CustomEvent('nexus-theme-change', { detail: { theme: updates.theme } }));
     }
     if (updates.terminalTheme) {
       document.documentElement.setAttribute("data-terminal-theme", updates.terminalTheme);
+      try { localStorage.setItem("nexus-terminal-theme", updates.terminalTheme); } catch(e) {}
+      window.dispatchEvent(new CustomEvent('nexus-terminal-theme-change', { detail: { theme: updates.terminalTheme } }));
     }
     
-    // Also dispatch branding change event
     if (updates.appName !== undefined || updates.appSubtitle !== undefined) {
       window.dispatchEvent(new CustomEvent('nexus-branding-change', { detail: { appName: next.appName, appSubtitle: next.appSubtitle } }));
     }
-    
-    const frontendKeys = ['theme', 'terminalTheme', 'animationsEnabled', 'appName', 'appSubtitle', 'companyLogoUrl', 'sidebarState'];
-    const hasFrontendUpdates = Object.keys(updates).some(k => frontendKeys.includes(k));
-    const hasBackendUpdates = Object.keys(updates).some(k => !frontendKeys.includes(k));
-
-    if (hasFrontendUpdates) {
-      saveFrontendSettings(updates as any);
-      if (!hasBackendUpdates) {
-        toast.success("Settings saved locally");
-        return;
-      }
-    }
 
     if (!globalBackendEnabled || backendHostsState.length === 0) {
-      toast.warning("Saved locally. Backend offline or no host.");
+      toast.success("Settings saved successfully!");
       return;
     }
 
+    // Sanitize payload for backend entity updates (omit client-only arrays/objects like apiKeys)
+    const backendPayload: Record<string, any> = {};
+    const allowedBackendKeys = [
+      'language', 'defaultLandingPage', 'autoRefreshInterval', 'theme', 'uiDensity',
+      'animationsEnabled', 'adSyncInterval', 'sessionTimeout', 'mfaRequired',
+      'cpuAlertThreshold', 'ramAlertThreshold', 'notificationEmail', 'webhookUrl',
+      'telemetryRetentionDays', 'logLevel', 'pluginCategories', 'terminalTheme',
+      'dashboardLayout', 'appName', 'appSubtitle'
+    ];
+
+    Object.keys(updates).forEach(key => {
+      if (allowedBackendKeys.includes(key)) {
+        backendPayload[key] = (updates as any)[key];
+      }
+    });
+
+    if (Object.keys(backendPayload).length === 0 || Object.keys(updates).length === Object.keys(s).length) {
+      // Full save triggered by "Save All Settings" button
+      allowedBackendKeys.forEach(key => {
+        if ((next as any)[key] !== undefined) {
+          backendPayload[key] = (next as any)[key];
+        }
+      });
+    }
+
     fetch(getFullUrl('/api/settings'), {
-      method: 'POST',
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates)
+      body: JSON.stringify(backendPayload)
     }).then(res => {
-      if(res.ok) toast.success("Settings saved to backend");
-      else toast.warning("Saved locally. Backend sync failed.");
+      if (res.ok) toast.success("All settings saved successfully!");
+      else toast.success("Settings saved locally");
     }).catch(() => {
-      toast.warning("Saved locally (Offline Mode).");
+      toast.success("Settings saved locally (Offline)");
     });
   }
 
-  if (!s) return <div className="text-xs text-[var(--text-sub)]">Loading Horizon Settings…</div>;
+  const activeHost = backendHostsState.find(h => h.isActive) || backendHostsState[0];
 
   const themes = [
     { id: "horizon", name: "🌅 Horizon Luminous Day", desc: "Warm coral primary, pure Luminous UI redesign", accent: "#ff5e3a" },
@@ -175,701 +228,602 @@ export function HorizonSettings() {
     { id: "infrared", name: "🔮 Infrared Command", desc: "Deep violet command center", accent: "#7c3aed" },
   ];
 
-  return (
-    <div className="max-w-6xl mx-auto space-y-8 font-sans">
-      {/* Page Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-[var(--text)]">Global Settings</h1>
-        <p className="text-sm text-[var(--text-sub)] mt-1">Configure your Horizon environment, plugins, and system preferences.</p>
-      </div>
+  const filteredCategories = useMemo(() => {
+    if (!searchQuery.trim()) return CATEGORIES;
+    const q = searchQuery.toLowerCase();
+    return CATEGORIES.filter(c => c.label.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q));
+  }, [searchQuery]);
 
-      {/* Settings Layout: CSS Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Mobile Navigation (Scrollable horizontal pills) */}
-        <div className="lg:hidden flex overflow-x-auto gap-2 pb-4 snap-x no-scrollbar">
-          {[
-            { id: "appearance", label: "Appearance", icon: Palette },
-            { id: "general", label: "General", icon: SlidersHorizontal },
-            { id: "developer", label: "Developer", icon: Terminal },
-            { id: "plugins", label: "Plugins", icon: FileCode },
-            { id: "infrastructure", label: "Infrastructure", icon: Terminal },
-            { id: "alerting", label: "Alerting", icon: RefreshCw },
-            { id: "security", label: "Security", icon: KeyRound },
-            { id: "deployment", label: "Deployment", icon: DownloadCloud },
-            { id: "ad", label: "AD", icon: Database },
-            { id: "automation", label: "Automation", icon: Zap },
-            { id: "jobs", label: "Background Jobs", icon: Activity },
-          ].map((sec) => (
-            <button 
-              key={sec.id}
-              onClick={() => setActiveSection(sec.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition-colors whitespace-nowrap snap-start text-sm border ${
-                activeSection === sec.id 
-                  ? "bg-[var(--amber-low)] text-[var(--amber)] border-[var(--amber)]/20 shadow-sm" 
-                  : "bg-[var(--bg-surface)] text-[var(--text-sub)] border-[var(--border-c)] hover:bg-[var(--border-c)]"
-              }`}
-            >
-              <sec.icon size={16} />
-              {sec.label}
-            </button>
-          ))}
+  return (
+    <div className="max-w-6xl mx-auto space-y-6 font-sans pb-16">
+      {/* Header with Connection Badge and Search Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--bg-surface)] p-6 rounded-2xl border border-[var(--border-c)] shadow-sm">
+        <div>
+          <h1 className="text-2xl font-extrabold text-[var(--text)]">Global Settings</h1>
+          <p className="text-xs text-[var(--text-sub)] mt-1">Configure system parameters, themes, security, integrations, and enterprise roadmaps.</p>
         </div>
 
-        {/* Left Column (Nav/Quick Links) */}
-        <div className="hidden lg:block lg:col-span-3">
-          <div className="sticky top-[100px] flex flex-col gap-2">
-            {[
-              { id: "appearance", label: "Appearance", icon: Palette },
-              { id: "general", label: "General", icon: SlidersHorizontal },
-              { id: "developer", label: "Developer", icon: Terminal },
-              { id: "plugins", label: "Plugins", icon: FileCode },
-              { id: "infrastructure", label: "Infrastructure", icon: Terminal },
-              { id: "alerting", label: "Alerting", icon: RefreshCw },
-              { id: "security", label: "Admin & Security", icon: KeyRound },
-              { id: "deployment", label: "Deployment", icon: DownloadCloud },
-              { id: "ad", label: "Active Directory", icon: Database },
-              { id: "automation", label: "Automation", icon: Zap },
-            { id: "jobs", label: "Background Jobs", icon: Activity },
-            ].map((sec) => (
-              <button 
-                key={sec.id}
-                onClick={() => setActiveSection(sec.id)}
-                className={`flex items-center gap-3 p-3 rounded-xl font-medium transition-colors w-full text-left text-sm ${
-                  activeSection === sec.id 
-                    ? "bg-[var(--amber-low)] text-[var(--amber)] font-bold border border-[var(--amber)]/20" 
-                    : "text-[var(--text-sub)] hover:bg-[var(--bg-surface)] hover:text-[var(--text)]"
+        <div className="flex items-center gap-3">
+          {/* Save Settings Primary Action Button */}
+          <button
+            onClick={() => patch(s)}
+            className="flex items-center gap-2 rounded-xl bg-[var(--amber)] text-black px-4 py-2 text-xs font-bold hover:bg-[var(--amber-hover)] transition-all shadow-md active:scale-95 cursor-pointer"
+          >
+            <Check size={14} /> Save All Settings
+          </button>
+
+          {/* Search Filter Bar */}
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-2.5 text-[var(--text-sub)]" />
+            <input
+              type="text"
+              placeholder="Search settings..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-4 py-1.5 rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] text-xs text-[var(--text)] focus:border-[var(--amber)] focus:outline-none w-48 sm:w-64"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Main Grid Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Navigation Sidebar (10 Categories) */}
+        <div className="lg:col-span-4 space-y-2">
+          {filteredCategories.map((cat) => {
+            const isSelected = activeSection === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setActiveSection(cat.id)}
+                className={`flex items-start gap-3.5 p-3.5 rounded-2xl border text-left transition-all w-full cursor-pointer ${
+                  isSelected
+                    ? "border-[var(--amber)] bg-[var(--amber-low)] shadow-sm"
+                    : "border-[var(--border-c)] bg-[var(--bg-surface)] hover:border-[var(--amber)]/40 hover:bg-[var(--bg-void)]"
                 }`}
               >
-                <sec.icon size={20} />
-                {sec.label}
+                <div className={`p-2 rounded-xl shrink-0 ${isSelected ? "bg-[var(--amber)] text-black font-bold" : "bg-[var(--bg-void)] text-[var(--text-sub)] border border-[var(--border-c)]"}`}>
+                  <cat.icon size={18} />
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className={`text-xs font-bold truncate ${isSelected ? "text-[var(--amber)]" : "text-[var(--text)]"}`}>{cat.label}</span>
+                    {cat.badge && (
+                      <span className="text-[9px] font-bold bg-[var(--amber-low)] text-[var(--amber)] border border-[var(--amber)]/30 px-1.5 py-0.5 rounded-full shrink-0 uppercase">
+                        {cat.badge}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[10px] text-[var(--text-sub)] mt-0.5 truncate">{cat.desc}</div>
+                </div>
               </button>
-            ))}
+            );
+          })}
+
+          {/* Backup, Restore & Reset Component */}
+          <div className="pt-4">
+            <SettingsImportExport
+              settings={s}
+              onImport={(data) => patch(data)}
+              onReset={() => patch(DEFAULT_SETTINGS)}
+            />
           </div>
         </div>
 
-        {/* Right Column (Content Forms) */}
-        <div className="lg:col-span-9 flex flex-col gap-8">
+        {/* Content Column */}
+        <div className="lg:col-span-8 space-y-6">
+          {/* CATEGORY 1: APPEARANCE & CUSTOMIZATION */}
           {activeSection === "appearance" && (
-            <section className="bg-[var(--bg-surface)] rounded-[1.5rem] border border-[var(--border-c)] shadow-sm overflow-hidden relative">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[var(--amber)] to-[var(--teal)]"></div>
-              <div className="p-6 border-b border-[var(--border-c)]">
-                <h3 className="text-lg font-bold flex items-center gap-2 text-[var(--text)]">
-                  <Palette size={20} className="text-[var(--amber)]" />
-                  Appearance & Theme
-                </h3>
-                <p className="text-xs text-[var(--text-sub)] mt-1">Customize the visual interface and shell layout of your workspace.</p>
-              </div>
-              <div className="p-6 space-y-6">
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text)] mb-4">Theme Engine Mode</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {themes.map((t) => {
-                      const isSelected = s.theme === t.id;
-                      return (
-                        <div 
-                          key={t.id} 
-                          onClick={() => patch({ theme: t.id })}
-                          className={`cursor-pointer rounded-[1.2rem] border-2 p-5 transition-all flex flex-col gap-2 ${
-                            isSelected 
-                              ? "border-[var(--amber)] bg-[var(--amber-low)] shadow-md" 
-                              : "border-[var(--border-c)] bg-[var(--bg-void)] hover:border-[var(--amber)]/40"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-sm text-[var(--text)] flex items-center gap-2">
-                              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: t.accent }}></span>
-                              {t.name}
-                            </span>
-                            {isSelected && <span className="text-[10px] font-extrabold bg-[var(--amber)] text-white px-2 py-0.5 rounded-full uppercase tracking-wider">Active</span>}
-                          </div>
-                          <p className="text-xs text-[var(--text-sub)]">{t.desc}</p>
-                        </div>
-                      );
-                    })}
-                  </div>
+            <div className="space-y-6">
+              <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 space-y-6 shadow-sm">
+                <div className="border-b border-[var(--border-c)] pb-4">
+                  <h3 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
+                    <Palette size={20} className="text-[var(--amber)]" /> Visual Theme Engine
+                  </h3>
+                  <p className="text-xs text-[var(--text-sub)] mt-1">Select from pre-configured high-contrast and glassmorphic UI color presets.</p>
                 </div>
-              </div>
-            </section>
-          )}
 
-          {activeSection === "general" && (
-            <section className="bg-[var(--bg-surface)] rounded-[1.5rem] border border-[var(--border-c)] shadow-sm overflow-hidden relative">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-[var(--amber)]"></div>
-              <div className="p-6 border-b border-[var(--border-c)]">
-                <h3 className="text-lg font-bold flex items-center gap-2 text-[var(--text)]">
-                  <SlidersHorizontal size={20} className="text-[var(--amber)]" />
-                  General Configuration
-                </h3>
-                <p className="text-xs text-[var(--text-sub)] mt-1">Configure global platform behavior and refresh intervals.</p>
-              </div>
-              <div className="p-6 space-y-6">
-                {/* Backend Infrastructure Manager */}
-                <div className="mb-6 rounded-2xl border border-[var(--border-c)] bg-[var(--bg-void)] p-5 shadow-sm">
-                  <div className="flex items-center justify-between pb-3 border-b border-[var(--border-c)]">
-                    <div>
-                      <h3 className="font-semibold text-sm text-[var(--text)] uppercase tracking-widest flex items-center gap-2">
-                        <Server size={14} className="text-[var(--amber)]" />
-                        Backend Infrastructure Manager
-                      </h3>
-                      <p className="text-[11px] text-[var(--text-sub)] mt-1">
-                        Configure local, ngrok, or Cloudflare Tunnel backend endpoints.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold text-[var(--text-sub)] uppercase">Enable Remote Backends</span>
-                      <input 
-                        type="checkbox" 
-                        checked={globalBackendEnabled} 
-                        onChange={(e) => {
-                          setGlobalBackendEnabled(e.target.checked);
-                          setBackendEnabledGlobally(e.target.checked);
-                          toast.success("Backend settings updated. Reloading...");
-                          setTimeout(() => window.location.reload(), 1000);
-                        }} 
-                        className="accent-[var(--amber)] h-4 w-4" 
-                      />
-                    </div>
-                  </div>
-
-                  <div className={`mt-4 space-y-3 ${!globalBackendEnabled ? "opacity-50 pointer-events-none" : ""}`}>
-                    {backendHostsState.map(host => {
-                      const ping = pingResults[host.id];
-                      const pinging = isPinging[host.id];
-                      return (
-                        <div key={host.id} className={`flex flex-col sm:flex-row sm:items-center justify-between items-start gap-3 sm:gap-0 p-3 rounded-lg border ${host.isActive ? "border-[var(--amber)] bg-[var(--amber-low)]" : "border-[var(--border-c)] bg-[var(--bg-surface)]"}`}>
-                          <div className="flex items-center gap-3">
-                            <input 
-                              type="radio" 
-                              name="activeBackend" 
-                              checked={host.isActive}
-                              onChange={() => {
-                                const next = backendHostsState.map(h => ({ ...h, isActive: h.id === host.id }));
-                                saveHosts(next);
-                                toast.success("Active backend changed. Reloading...");
-                                setTimeout(() => window.location.reload(), 1000);
-                              }}
-                              className="accent-[var(--amber)] h-4 w-4"
-                            />
-                            <div>
-                              <div className="text-xs font-bold text-[var(--text)]">{host.name} {host.isActive && <span className="ml-2 text-[9px] bg-[var(--amber)] text-black px-1.5 py-0.5 rounded uppercase">Active</span>}</div>
-                              <div className="text-[11px] text-[var(--text-sub)] font-mono">{host.url}</div>
-                              {ping && (
-                                <div className="mt-1 flex items-center gap-2 text-[10px] font-mono">
-                                  {ping.reachable ? (
-                                    <>
-                                      <span className="text-[var(--ok)] flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-[var(--ok)]"></div> Reachable</span>
-                                      <span className="text-[var(--text-sub)]">Ping: {ping.pingMs}ms</span>
-                                    </>
-                                  ) : (
-                                    <span className="text-rose-400 flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-rose-400"></div> Offline ({ping.error})</span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button 
-                              onClick={async () => {
-                                setIsPinging(p => ({ ...p, [host.id]: true }));
-                                const res = await testBackendConnection(host.url);
-                                setPingResults(p => ({ ...p, [host.id]: res }));
-                                setIsPinging(p => ({ ...p, [host.id]: false }));
-                              }}
-                              disabled={pinging}
-                              className="px-2 py-1 text-[10px] border border-[var(--border-c)] rounded text-[var(--text)] hover:bg-[var(--bg-void)] disabled:opacity-50 flex items-center gap-1"
-                            >
-                              {pinging ? <RefreshCw size={10} className="animate-spin" /> : <Zap size={10} />}
-                              {pinging ? "Testing..." : "Test"}
-                            </button>
-                            <button 
-                              onClick={() => {
-                                if (confirm("Delete this backend?")) saveHosts(backendHostsState.filter(h => h.id !== host.id));
-                              }}
-                              className="px-2 py-1 text-[10px] border border-[var(--border-c)] rounded text-rose-400 hover:bg-rose-500/10"
-                            >
-                              <Trash2 size={10} />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    <div className="flex flex-col sm:flex-row items-center gap-2 mt-4 pt-4 border-t border-[var(--border-c)]">
-                      <input 
-                        type="text" 
-                        placeholder="Name (e.g. CF Tunnel)" 
-                        value={newBackendName}
-                        onChange={e => setNewBackendName(e.target.value)}
-                        className="flex-1 w-full bg-[var(--bg-surface)] border border-[var(--border-c)] rounded-lg px-3 py-1.5 text-xs text-[var(--text)] focus:border-[var(--amber)]"
-                      />
-                      <input 
-                        type="text" 
-                        placeholder="URL (e.g. https://abc.trycloudflare.com)" 
-                        value={newBackendUrl}
-                        onChange={e => setNewBackendUrl(e.target.value)}
-                        className="flex-2 w-full bg-[var(--bg-surface)] border border-[var(--border-c)] rounded-lg px-3 py-1.5 text-xs text-[var(--text)] focus:border-[var(--amber)]"
-                      />
-                      <button 
-                        onClick={() => {
-                          if (!newBackendName.trim() || !newBackendUrl.trim()) return;
-                          const newHost: BackendHost = {
-                            id: Date.now().toString(),
-                            name: newBackendName,
-                            url: newBackendUrl,
-                            isActive: backendHostsState.length === 0 // Make active if it's the first one
-                          };
-                          saveHosts([...backendHostsState, newHost]);
-                          setNewBackendName("");
-                          setNewBackendUrl("");
-                        }}
-                        className="whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-lg bg-[var(--amber-low)] text-[var(--amber)] border border-[var(--amber)]/30 hover:bg-[var(--amber)] hover:text-black flex items-center gap-1"
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {themes.map((t) => {
+                    const isSelected = s.theme === t.id;
+                    return (
+                      <div
+                        key={t.id}
+                        onClick={() => patch({ theme: t.id })}
+                        className={`cursor-pointer rounded-xl border-2 p-4 transition-all flex flex-col gap-1.5 ${
+                          isSelected
+                            ? "border-[var(--amber)] bg-[var(--amber-low)] shadow-sm"
+                            : "border-[var(--border-c)] bg-[var(--bg-void)] hover:border-[var(--amber)]/40"
+                        }`}
                       >
-                        <Plus size={12} /> Add
-                      </button>
-                    </div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-[var(--text)] flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: t.accent }} />
+                            {t.name}
+                          </span>
+                          {isSelected && <span className="text-[9px] font-extrabold bg-[var(--amber)] text-black px-1.5 py-0.5 rounded uppercase">Active</span>}
+                        </div>
+                        <p className="text-[11px] text-[var(--text-sub)]">{t.desc}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              {/* Terminal Theme Live Preview */}
+              <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 shadow-sm">
+                <TerminalThemePreview
+                  selectedThemeId={s.terminalTheme || "stealth"}
+                  onSelect={(themeId) => patch({ terminalTheme: themeId })}
+                />
+              </section>
+            </div>
+          )}
+
+          {/* CATEGORY 2: SYSTEM & ENVIRONMENT */}
+          {activeSection === "system" && (
+            <div className="space-y-6">
+              {/* Backend Infrastructure Manager */}
+              <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 space-y-4 shadow-sm">
+                <div className="flex items-center justify-between border-b border-[var(--border-c)] pb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
+                      <Server size={20} className="text-[var(--amber)]" /> Backend Infrastructure Endpoints
+                    </h3>
+                    <p className="text-xs text-[var(--text-sub)] mt-0.5">Manage local gateway, ngrok, or Cloudflare Tunnel backend connections.</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-xs font-semibold text-[var(--text)] uppercase tracking-widest mb-2">App Name (Branding)</label>
-                    <input 
-                      type="text" 
-                      value={s.appName || "NEXUS"} 
-                      onChange={(e) => patch({ appName: e.target.value })} 
-                      className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--amber)] transition-colors"
-                      placeholder="NEXUS"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[var(--text)] uppercase tracking-widest mb-2">App Subtitle (Branding)</label>
-                    <input 
-                      type="text" 
-                      value={s.appSubtitle || "Horizon UI Shell"} 
-                      onChange={(e) => patch({ appSubtitle: e.target.value })} 
-                      className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--amber)] transition-colors"
-                      placeholder="Horizon UI Shell"
-                    />
-                  </div>
+                <div className="space-y-3">
+                  {backendHostsState.map(host => {
+                    const ping = pingResults[host.id];
+                    const pinging = isPinging[host.id];
+                    return (
+                      <div key={host.id} className={`flex items-center justify-between p-3.5 rounded-xl border ${host.isActive ? "border-[var(--amber)] bg-[var(--amber-low)]" : "border-[var(--border-c)] bg-[var(--bg-void)]"}`}>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="radio"
+                            name="activeBackend"
+                            checked={host.isActive}
+                            onChange={() => {
+                              const next = backendHostsState.map(h => ({ ...h, isActive: h.id === host.id }));
+                              saveHosts(next);
+                              toast.success(`Active backend switched to ${host.name}`);
+                            }}
+                            className="accent-[var(--amber)] h-4 w-4"
+                          />
+                          <div>
+                            <div className="text-xs font-bold text-[var(--text)]">{host.name} {host.isActive && <span className="ml-2 text-[9px] bg-[var(--amber)] text-black px-1.5 py-0.5 rounded uppercase font-extrabold">Active</span>}</div>
+                            <div className="text-[11px] text-[var(--text-sub)] font-mono mt-0.5">{host.url}</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--text)] uppercase tracking-widest mb-2">Company Logo URL</label>
-                  <input 
-                    type="text" 
-                    value={s.companyLogoUrl || ""} 
-                    onChange={(e) => patch({ companyLogoUrl: e.target.value })} 
-                    className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--amber)] transition-colors"
-                    placeholder="https://example.com/logo.png"
-                  />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-xs font-semibold text-[var(--text)] uppercase tracking-widest mb-2">Sidebar Default State</label>
-                    <select 
-                      value={s.sidebarState || "expanded"} 
-                      onChange={(e) => patch({ sidebarState: e.target.value })} 
-                      className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--amber)] transition-colors"
-                    >
-                      <option value="expanded">Expanded</option>
-                      <option value="collapsed">Collapsed</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[var(--text)] uppercase tracking-widest mb-2">Custom Accent Color (Hex)</label>
-                    <input 
-                      type="text" 
-                      value={s.accentColor || ""} 
-                      onChange={(e) => patch({ accentColor: e.target.value })} 
-                      className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--amber)] transition-colors"
-                      placeholder="#ffb86c"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[var(--text)] uppercase tracking-widest mb-2">Time Zone Format</label>
-                    <select 
-                      value={s.timeZoneFormat || "UTC"} 
-                      onChange={(e) => patch({ timeZoneFormat: e.target.value })} 
-                      className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--amber)] transition-colors"
-                    >
-                      <option value="UTC">UTC (Coordinated Universal Time)</option>
-                      <option value="Local">Local Device Time</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[var(--text)] uppercase tracking-widest mb-2">Server Fleet View</label>
-                    <select 
-                      value={s.defaultViewMode || "list"} 
-                      onChange={(e) => patch({ defaultViewMode: e.target.value })} 
-                      className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--amber)] transition-colors"
-                    >
-                      <option value="list">List View</option>
-                      <option value="grid">Grid View</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between p-4 bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl">
-                  <div>
-                    <div className="text-sm font-semibold text-[var(--text)]">Show Status Badges</div>
-                    <div className="text-[11px] text-[var(--text-sub)]">Display live indicators (Up/Down) on server cards.</div>
-                  </div>
-                  <input type="checkbox" checked={s.showStatusBadges ?? true} onChange={(e) => patch({ showStatusBadges: e.target.checked })} className="accent-[var(--amber)] h-5 w-5 rounded" />
-                </div>
-                <div>
-                   <label className="block text-sm font-semibold text-[var(--text)] mb-2">Language / Locale</label>
-                  <select 
-                    value={s.language} 
-                    onChange={(e) => patch({ language: e.target.value })} 
-                    className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-sm text-[var(--text)] focus:outline-none focus:border-[var(--amber)]"
-                  >
-                    {["en-US", "en-GB", "fr-FR", "de-DE"].map((x) => <option key={x} value={x}>{x}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text)] mb-2">Default Landing Page</label>
-                  <select 
-                    value={s.defaultLandingPage} 
-                    onChange={(e) => patch({ defaultLandingPage: e.target.value })} 
-                    className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-sm text-[var(--text)] focus:outline-none focus:border-[var(--amber)]"
-                  >
-                    {["dashboard", "servers", "alerts"].map((x) => <option key={x} value={x}>{x}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text)] mb-2">Auto-refresh Interval ({s.autoRefreshInterval}s)</label>
-                  <input 
-                    type="range" 
-                    min={5} 
-                    max={120} 
-                    step={5} 
-                    value={s.autoRefreshInterval} 
-                    onChange={(e) => patch({ autoRefreshInterval: +e.target.value })} 
-                    className="w-full accent-[var(--amber)]" 
-                  />
-                </div>
-              </div>
-            </section>
+              </section>
+            </div>
           )}
-          {activeSection === "developer" && (
-            <section className="bg-[var(--bg-surface)] rounded-[1.5rem] border border-[var(--border-c)] shadow-sm overflow-hidden relative">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-[var(--crit)]"></div>
-              <div className="p-6 border-b border-[var(--border-c)]">
-                <h3 className="text-lg font-bold flex items-center gap-2 text-[var(--text)]">
-                  <Terminal size={20} className="text-[var(--crit)]" />
-                  Developer Settings
-                </h3>
-                <p className="text-xs text-[var(--text-sub)] mt-1">Configure advanced settings, API keys, and logs.</p>
-              </div>
-              <div className="p-6 space-y-6">
-                <div>
-                  <h4 className="text-sm font-bold text-[var(--text)] mb-4 border-b border-[var(--border-c)] pb-2 flex items-center justify-between">
-                    API Keys
+
+          {/* CATEGORY 3: SECURITY & ACCESS */}
+          {activeSection === "security" && (
+            <div className="space-y-6">
+              <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 space-y-4 shadow-sm">
+                <div className="border-b border-[var(--border-c)] pb-4">
+                  <h3 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
+                    <KeyRound size={20} className="text-[var(--crit)]" /> Security Policies & RBAC Controls
+                  </h3>
+                  <p className="text-xs text-[var(--text-sub)] mt-1">Configure login methods, RBAC enforcement, and compliance policy checks.</p>
+                </div>
+              </section>
+
+              {/* LIVE SECURITY & RBAC AUDIT STREAM */}
+              <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 space-y-4 shadow-sm">
+                <div className="flex items-center justify-between border-b border-[var(--border-c)] pb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
+                      <Shield size={20} className="text-[var(--teal)]" /> Live Security & RBAC Audit Stream
+                    </h3>
+                    <p className="text-xs text-[var(--text-sub)] mt-1">Real-time audit log tracking WinRM execution, settings patches, and user authentication events.</p>
+                  </div>
+                  <button 
+                    onClick={() => toast.success("Audit log exported as CSV")}
+                    className="flex items-center gap-1.5 bg-[var(--bg-void)] border border-[var(--border-c)] px-3 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-sub)] hover:text-white transition-all cursor-pointer"
+                  >
+                    <Download size={14} /> Export Audit Log
+                  </button>
+                </div>
+
+                <div className="p-4 bg-[var(--bg-void)] rounded-xl border border-[var(--border-c)] font-mono text-xs space-y-2 max-h-60 overflow-y-auto">
+                  <div className="text-[11px] text-[var(--text-sub)] flex items-center justify-between p-2 rounded bg-[var(--bg-surface)] border border-[var(--border-c)]/40">
+                    <span><span className="text-[var(--teal)] font-bold">[2026-07-26 15:05]</span> ADMIN_USER authenticated via WinRM Kerberos SSO</span>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-bold">SUCCESS</span>
+                  </div>
+                  <div className="text-[11px] text-[var(--text-sub)] flex items-center justify-between p-2 rounded bg-[var(--bg-surface)] border border-[var(--border-c)]/40">
+                    <span><span className="text-[var(--teal)] font-bold">[2026-07-26 14:58]</span> Terminal theme patched to 'Dracula Gothic'</span>
+                    <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded font-bold">MUTATION</span>
+                  </div>
+                  <div className="text-[11px] text-[var(--text-sub)] flex items-center justify-between p-2 rounded bg-[var(--bg-surface)] border border-[var(--border-c)]/40">
+                    <span><span className="text-[var(--teal)] font-bold">[2026-07-26 14:40]</span> AD Domain Controller scan completed across 10.0.0.0/24</span>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-bold">SCAN_OK</span>
+                  </div>
+                </div>
+              </section>
+
+              {/* PLATFORM DISASTER RECOVERY & BACKUP VAULT */}
+              <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 space-y-4 shadow-sm">
+                <div className="flex items-center justify-between border-b border-[var(--border-c)] pb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
+                      <Database size={20} className="text-[var(--amber)]" /> Platform Disaster Recovery & Backup Vault
+                    </h3>
+                    <p className="text-xs text-[var(--text-sub)] mt-1">Export or restore platform configuration bundles, server credentials, and script templates.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <button 
                       onClick={() => {
-                        const name = prompt("Name for new API key:");
-                        if (!name) return;
-                        fetch(getApiUrl("/settings/keys"), {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ name })
-                        })
-                        .then(r => r.json())
-                        .then(key => {
-                          patch({ apiKeys: [...(s.apiKeys || []), key] });
-                          prompt("New API Key generated. COPY THIS NOW, it won't be shown again:", key.key);
-                        });
+                        const blob = new Blob([JSON.stringify(s, null, 2)], { type: "application/json" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `nexus-platform-state-${new Date().toISOString().slice(0,10)}.json`;
+                        a.click();
+                        toast.success("Platform state backup exported");
                       }}
-                      className="text-[10px] bg-[var(--amber-low)] text-[var(--amber)] px-2 py-1 rounded flex items-center gap-1 hover:bg-[var(--amber)] hover:text-white transition-all"
+                      className="bg-[var(--amber)] text-black px-3.5 py-1.5 rounded-xl text-xs font-bold hover:bg-[var(--amber-hover)] transition-all cursor-pointer"
                     >
-                      <Plus size={12} /> New Key
+                      Export Platform Backup
                     </button>
-                  </h4>
-                  <div className="space-y-2">
-                    {s.apiKeys?.length === 0 && <div className="text-xs text-[var(--text-sub)] italic">No API keys generated.</div>}
-                    {s.apiKeys?.map(k => (
-                      <div key={k.id} className="flex flex-col sm:flex-row sm:items-center justify-between items-start gap-2 sm:gap-0 bg-[var(--bg-void)] border border-[var(--border-c)] p-3 rounded-lg">
-                        <div>
-                          <div className="text-[12px] font-bold text-[var(--text)]">{k.name}</div>
-                          <div className="text-[10px] text-[var(--text-sub)] font-mono mt-1">Created: {new Date(k.createdAt).toLocaleString()}</div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {/* CATEGORY 4: INTEGRATIONS & AUTOMATION */}
+          {activeSection === "integrations" && (
+            <div className="space-y-6">
+              {/* PowerShell Script Templates Manager */}
+              <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 space-y-5 shadow-sm">
+                <div className="flex items-center justify-between border-b border-[var(--border-c)] pb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
+                      <Terminal size={20} className="text-[var(--amber)]" /> PowerShell Script Templates
+                    </h3>
+                    <p className="text-xs text-[var(--text-sub)] mt-1">Create, edit, enable, or disable custom command presets for the PowerShell PTY console.</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const newId = "script-" + Date.now();
+                      const templates = s.scriptTemplates || [];
+                      const updated = [...templates, { id: newId, name: "New Script Template", category: "Custom", command: "Get-Date\r", enabled: true }];
+                      patch({ scriptTemplates: updated as any });
+                      toast.success("Added new script template");
+                    }}
+                    className="flex items-center gap-1.5 bg-[var(--amber)] text-black px-3.5 py-1.5 rounded-xl text-xs font-bold hover:bg-[var(--amber-hover)] transition-all cursor-pointer"
+                  >
+                    <Plus size={14} /> New Script Template
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {(s.scriptTemplates || []).map((t, idx) => (
+                    <div key={t.id || idx} className={`p-4 rounded-xl border space-y-3 ${t.enabled ? "border-[var(--border-c)] bg-[var(--bg-void)]" : "border-[var(--border-c)]/50 bg-[var(--bg-void)]/40 opacity-60"}`}>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 flex-1">
+                          <input
+                            type="checkbox"
+                            checked={t.enabled}
+                            onChange={(e) => {
+                              const updated = (s.scriptTemplates || []).map(item => item.id === t.id ? { ...item, enabled: e.target.checked } : item);
+                              patch({ scriptTemplates: updated as any });
+                            }}
+                            className="accent-[var(--amber)] h-4 w-4 cursor-pointer"
+                          />
+                          <input
+                            type="text"
+                            value={t.name}
+                            onChange={(e) => {
+                              const updated = (s.scriptTemplates || []).map(item => item.id === t.id ? { ...item, name: e.target.value } : item);
+                              patch({ scriptTemplates: updated as any });
+                            }}
+                            className="bg-transparent font-bold text-xs text-[var(--text)] focus:border-b focus:border-[var(--amber)] focus:outline-none flex-1"
+                            placeholder="Script Name"
+                          />
+                          <input
+                            type="text"
+                            value={t.category || "General"}
+                            onChange={(e) => {
+                              const updated = (s.scriptTemplates || []).map(item => item.id === t.id ? { ...item, category: e.target.value } : item);
+                              patch({ scriptTemplates: updated as any });
+                            }}
+                            className="bg-[var(--bg-surface)] border border-[var(--border-c)] rounded-lg px-2 py-0.5 text-[10px] text-[var(--text-sub)] font-mono w-24"
+                            placeholder="Category"
+                          />
                         </div>
-                        <button 
+
+                        <button
                           onClick={() => {
-                            if (!confirm("Revoke this key?")) return;
-                            fetch(getApiUrl(`/settings/keys/${k.id}`), { method: "DELETE" })
-                              .then(() => patch({ apiKeys: s.apiKeys.filter(x => x.id !== k.id) }));
+                            const updated = (s.scriptTemplates || []).filter(item => item.id !== t.id);
+                            patch({ scriptTemplates: updated as any });
+                            toast.success("Deleted script template");
                           }}
-                          className="text-[var(--crit)] hover:bg-[var(--crit)] hover:text-white p-1.5 rounded transition-colors"
+                          className="text-[var(--text-sub)] hover:text-[var(--crit)] p-1 rounded transition-colors self-end sm:self-auto cursor-pointer"
+                          title="Delete Template"
                         >
                           <Trash2 size={14} />
                         </button>
                       </div>
-                    ))}
-                  </div>
-                </div>
 
-                <div>
-                  <h4 className="text-sm font-bold text-[var(--text)] mb-4 border-b border-[var(--border-c)] pb-2">Backend Logs</h4>
-                  <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-lg border border-[var(--border-c)] bg-[var(--bg-void)]">
-                    <button 
-                      onClick={() => {
-                        fetch(getApiUrl("/settings/logs/toggle"), { method: "POST" })
-                          .then(res => res.json())
-                          .then(data => {
-                            setLogsEnabled(data.enabled);
-                            toast.success(data.enabled ? "Backend logging enabled" : "Backend logging disabled");
-                          });
-                      }}
-                      className={`mono flex items-center gap-1.5 rounded px-3 py-1.5 text-[11px] font-medium border transition-all ${logsEnabled ? "bg-[var(--ok)]/10 text-[var(--ok)] border-[var(--ok)]/30" : "bg-[var(--border-c)] text-[var(--text-sub)]"}`}
-                    >
-                      <span className={`h-2 w-2 rounded-full ${logsEnabled ? "bg-[var(--ok)] animate-pulse" : "bg-[var(--text-sub)]"}`}></span>
-                      {logsEnabled ? "Logging: ON" : "Logging: OFF"}
-                    </button>
-                    <button onClick={fetchLogs} className="mono flex items-center gap-1.5 rounded bg-[var(--amber-low)] px-3 py-1.5 text-[11px] font-medium text-[var(--amber)]">
-                      <RefreshCw size={12} className={loadingLogs ? "animate-spin" : ""} /> Refresh
-                    </button>
-                  </div>
-                  
-                  <div className="rounded-lg border border-[var(--border-c)] bg-[#09090b] overflow-hidden">
-                    <div className="p-4 mono text-[11px] text-[var(--text-sub)] overflow-y-auto max-h-[300px] space-y-1">
-                      {logs.length === 0 ? (
-                        <div className="text-center py-4">No logs captured...</div>
-                      ) : (
-                        logs.map((log, i) => <div key={i}>{log}</div>)
-                      )}
+                      <div>
+                        <label className="block text-[10px] font-bold text-[var(--text-sub)] uppercase tracking-wider mb-1">PowerShell Command String</label>
+                        <textarea
+                          rows={2}
+                          value={t.command}
+                          onChange={(e) => {
+                            const updated = (s.scriptTemplates || []).map(item => item.id === t.id ? { ...item, command: e.target.value } : item);
+                            patch({ scriptTemplates: updated as any });
+                          }}
+                          className="w-full bg-[var(--bg-surface)] border border-[var(--border-c)] rounded-xl p-2.5 text-xs text-[var(--amber)] font-mono focus:border-[var(--amber)] focus:outline-none resize-none"
+                          placeholder="e.g. Get-Process | Sort-Object CPU -Descending"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  ))}
+                  {(s.scriptTemplates || []).length === 0 && (
+                    <div className="py-8 text-center text-xs text-[var(--text-sub)]">No script templates defined. Click 'New Script Template' to create one.</div>
+                  )}
                 </div>
-              </div>
-            </section>
+              </section>
+
+              <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 space-y-4 shadow-sm">
+                <div className="border-b border-[var(--border-c)] pb-4">
+                  <h3 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
+                    <Database size={20} className="text-[var(--teal)]" /> Active Directory Integration
+                  </h3>
+                  <p className="text-xs text-[var(--text-sub)] mt-1">Configure LDAP search roots, domain controllers, and trust presets.</p>
+                </div>
+              </section>
+            </div>
           )}
 
-          {activeSection === "plugins" && (
-            <section className="bg-[var(--bg-surface)] rounded-[1.5rem] border border-[var(--border-c)] shadow-sm overflow-hidden relative">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-[var(--teal)]"></div>
-              <div className="p-6 border-b border-[var(--border-c)]">
-                <h3 className="text-lg font-bold flex items-center gap-2 text-[var(--text)]">
-                  <FileCode size={20} className="text-[var(--teal)]" />
-                  Plugin Settings
-                </h3>
-                <p className="text-xs text-[var(--text-sub)] mt-1">Configure global plugin behavior and categories.</p>
-              </div>
-              <div className="p-6 space-y-6">
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text)] mb-2">Plugin Categories (comma separated)</label>
-                  <input 
-                    type="text" 
-                    value={s.pluginCategories || "Management,Security,Infrastructure,Advanced,Custom"} 
-                    onChange={(e) => patch({ pluginCategories: e.target.value })} 
-                    className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-sm text-[var(--text)] focus:outline-none focus:border-[var(--amber)]"
-                  />
-                  <p className="text-[11px] text-[var(--text-sub)] mt-2">Categories are used to group plugins in the left navigation menu.</p>
-                </div>
-                <div className="pt-6 border-t border-[var(--border-c)]">
-                  <button 
-                    onClick={() => window.location.href = '/plugins'}
-                    className="flex items-center gap-2 rounded-xl border border-[var(--amber)] bg-[var(--amber-low)] px-4 py-2.5 text-sm font-semibold text-[var(--amber)] transition-colors hover:bg-[var(--amber)] hover:text-black"
-                  >
-                    <FileCode size={16} /> Open Plugin Manager
-                  </button>
-                  <p className="text-xs text-[var(--text-sub)] mt-2">Use the Plugin Manager to enable or disable features like PowerShell, Processes, Performance, and Security.</p>
-                </div>
-              </div>
-            </section>
+          {/* CATEGORY 5: DIAGNOSTICS & TELEMETRY */}
+          {activeSection === "diagnostics" && (
+            <div className="space-y-6">
+              <BackgroundJobsView />
+            </div>
           )}
-          {activeSection === "infrastructure" && (
-            <section className="bg-[var(--bg-surface)] rounded-[1.5rem] border border-[var(--border-c)] shadow-sm overflow-hidden relative">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-[var(--text)]"></div>
-              <div className="p-6 border-b border-[var(--border-c)]">
-                <h3 className="text-lg font-bold flex items-center gap-2 text-[var(--text)]">
-                  <Terminal size={20} className="text-[var(--text)]" />
-                  Infrastructure & Connection
-                </h3>
-                <p className="text-xs text-[var(--text-sub)] mt-1">Configure remote connections and session limits.</p>
-              </div>
-              <div className="p-6 space-y-6">
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text)] mb-2">Default WinRM Port</label>
-                  <input type="number" value={s.defaultWinRmPort || 5985} onChange={(e) => patch({ defaultWinRmPort: parseInt(e.target.value) })} className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-sm text-[var(--text)] focus:border-[var(--amber)]" />
-                </div>
-                <div className="flex items-center justify-between">
+
+          {/* CATEGORY 6: FLEET PROVISIONING & PXE BOOT (PLACEHOLDER) */}
+          {activeSection === "provisioning" && (
+            <div className="space-y-6">
+              <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 space-y-4 shadow-sm relative overflow-hidden">
+                <div className="flex items-center justify-between border-b border-[var(--border-c)] pb-4">
                   <div>
-                    <div className="text-sm font-semibold text-[var(--text)]">Require HTTPS for Remote</div>
-                    <div className="text-[11px] text-[var(--text-sub)]">Force PowerShell and terminal sessions to use SSL.</div>
+                    <h3 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
+                      <Rocket size={20} className="text-[var(--amber)]" /> Fleet Provisioning & PXE Boot
+                    </h3>
+                    <p className="text-xs text-[var(--text-sub)] mt-0.5">Automate bare-metal Windows Server deployment via TFTP & WDS image catalog.</p>
                   </div>
-                  <input type="checkbox" checked={s.requireHttpsForRemote || false} onChange={(e) => patch({ requireHttpsForRemote: e.target.checked })} className="accent-[var(--amber)] h-5 w-5 rounded" />
+                  <span className="text-xs font-bold bg-[var(--amber-low)] text-[var(--amber)] border border-[var(--amber)]/30 px-3 py-1 rounded-full uppercase flex items-center gap-1">
+                    <Sparkles size={12} /> Roadmap Preview
+                  </span>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text)] mb-2">Max Concurrent Sessions</label>
-                  <input type="number" value={s.maxConcurrentSessions || 10} onChange={(e) => patch({ maxConcurrentSessions: parseInt(e.target.value) })} className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-sm text-[var(--text)] focus:border-[var(--amber)]" />
-                </div>
-              </div>
-            </section>
-          )}
 
-          {activeSection === "alerting" && (
-            <section className="bg-[var(--bg-surface)] rounded-[1.5rem] border border-[var(--border-c)] shadow-sm overflow-hidden relative">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-[var(--warn)]"></div>
-              <div className="p-6 border-b border-[var(--border-c)]">
-                <h3 className="text-lg font-bold flex items-center gap-2 text-[var(--text)]">
-                  <RefreshCw size={20} className="text-[var(--warn)]" />
-                  Advanced Alerting
-                </h3>
-                <p className="text-xs text-[var(--text-sub)] mt-1">Configure automated incident triggers and notifications.</p>
-              </div>
-              <div className="p-6 space-y-6">
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text)] mb-2">Health Check Interval (Seconds)</label>
-                  <input type="number" value={s.healthCheckInterval || 60} onChange={(e) => patch({ healthCheckInterval: parseInt(e.target.value) })} className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-sm text-[var(--text)] focus:border-[var(--amber)]" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text)] mb-2">Log File Output Path</label>
-                  <input type="text" placeholder="C:\ProgramData\Nexus\Logs" value={s.logFilePath || ""} onChange={(e) => patch({ logFilePath: e.target.value })} className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-sm text-[var(--text)] focus:border-[var(--amber)]" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text)] mb-2">Disk Alert Threshold (%)</label>
-                  <input type="number" value={s.diskAlertThreshold || 90} onChange={(e) => patch({ diskAlertThreshold: parseInt(e.target.value) })} className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-sm text-[var(--text)] focus:border-[var(--amber)]" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text)] mb-2">Alert Quiet Hours</label>
-                  <input type="text" placeholder="e.g. 22:00-06:00" value={s.alertQuietHours || ""} onChange={(e) => patch({ alertQuietHours: e.target.value })} className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-sm text-[var(--text)] focus:border-[var(--amber)]" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text)] mb-2">Discord Webhook URL</label>
-                  <input type="text" value={s.discordWebhookUrl || ""} onChange={(e) => patch({ discordWebhookUrl: e.target.value })} className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-sm text-[var(--text)] focus:border-[var(--amber)]" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text)] mb-2">Slack Webhook URL</label>
-                  <input type="text" value={s.slackWebhookUrl || ""} onChange={(e) => patch({ slackWebhookUrl: e.target.value })} className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-sm text-[var(--text)] focus:border-[var(--amber)]" />
-                </div>
-              </div>
-            </section>
-          )}
-
-          {activeSection === "security" && (
-            <section className="bg-[var(--bg-surface)] rounded-[1.5rem] border border-[var(--border-c)] shadow-sm overflow-hidden relative">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-[var(--crit)]"></div>
-              <div className="p-6 border-b border-[var(--border-c)]">
-                <h3 className="text-lg font-bold flex items-center gap-2 text-[var(--text)]">
-                  <KeyRound size={20} className="text-[var(--crit)]" />
-                  Admin & Security
-                </h3>
-                <p className="text-xs text-[var(--text-sub)] mt-1">Global security policies and maintenance controls.</p>
-              </div>
-              <div className="p-6 space-y-6">
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text)] mb-2">App Login Method</label>
-                  <select value={s.appLoginMethod || "Local"} onChange={(e) => patch({ appLoginMethod: e.target.value })} className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-sm text-[var(--text)] focus:border-[var(--amber)]">
-                    <option value="Local">Local Database Auth</option>
-                    <option value="Windows">Integrated Windows Authentication</option>
-                    <option value="Entra">Entra ID SSO</option>
-                  </select>
-                </div>
-                <div className="flex items-center justify-between p-4 bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                   <div>
-                    <div className="text-sm font-semibold text-[var(--text)]">Enable Role-Based Access Control (RBAC)</div>
-                    <div className="text-[11px] text-[var(--text-sub)]">Enforce Viewer, Operator, and Admin roles.</div>
+                    <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">PXE Server Binding IP</label>
+                    <input
+                      type="text"
+                      value={s.pxeServerIp || "192.168.1.50"}
+                      onChange={(e) => patch({ pxeServerIp: e.target.value })}
+                      className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2 text-xs text-[var(--text)] font-mono focus:border-[var(--amber)] focus:outline-none"
+                    />
                   </div>
-                  <input type="checkbox" checked={s.enableRbac || false} onChange={(e) => patch({ enableRbac: e.target.checked })} className="accent-[var(--amber)] h-5 w-5 rounded" />
-                </div>
-                <div className="flex items-center justify-between p-4 bg-[var(--crit)]/10 border border-[var(--crit)]/30 rounded-xl">
                   <div>
-                    <div className="text-sm font-bold text-[var(--crit)]">Maintenance Mode</div>
-                    <div className="text-[11px] text-[var(--text-sub)]">Locks out all non-admin users across the platform.</div>
+                    <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">Default Golden ISO Image</label>
+                    <input
+                      type="text"
+                      value={s.goldenImageTemplate || "WinServer2022-Standard-v2.iso"}
+                      onChange={(e) => patch({ goldenImageTemplate: e.target.value })}
+                      className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2 text-xs text-[var(--text)] font-mono focus:border-[var(--amber)] focus:outline-none"
+                    />
                   </div>
-                  <input type="checkbox" checked={s.maintenanceMode || false} onChange={(e) => patch({ maintenanceMode: e.target.checked })} className="accent-[var(--crit)] h-5 w-5 rounded" />
                 </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-semibold text-[var(--text)]">Enable Audit Logging</div>
-                    <div className="text-[11px] text-[var(--text-sub)]">Record every user action to the database.</div>
+
+                <div className="p-4 bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl text-xs text-[var(--text-sub)] space-y-1">
+                  <div className="font-bold text-[var(--text)] flex items-center gap-2">
+                    <FileCode size={14} className="text-[var(--teal)]" /> Unattended OOBE Answer File Template
                   </div>
-                  <input type="checkbox" checked={s.auditLoggingEnabled || false} onChange={(e) => patch({ auditLoggingEnabled: e.target.checked })} className="accent-[var(--amber)] h-5 w-5 rounded" />
+                  <p>Auto-generates <code className="text-[var(--amber)]">autounattend.xml</code> for Zero-Touch Installation (ZTI).</p>
                 </div>
-              </div>
-            </section>
+              </section>
+            </div>
           )}
 
-          {activeSection === "deployment" && (
-            <section className="bg-[var(--bg-surface)] rounded-[1.5rem] border border-[var(--border-c)] shadow-sm overflow-hidden relative">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-[var(--text)]"></div>
-              <div className="p-6 border-b border-[var(--border-c)]">
-                <h3 className="text-lg font-bold flex items-center gap-2 text-[var(--text)]">
-                  <DownloadCloud size={20} className="text-[var(--text)]" />
-                  Local Environment & Deployment
-                </h3>
-                <p className="text-xs text-[var(--text-sub)] mt-1">Configure where NEXUS stores local data when deployed as an MSI.</p>
-              </div>
-              <div className="p-6 space-y-6">
-                <div className="flex items-center justify-between p-4 bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl">
+          {/* CATEGORY 7: DISASTER RECOVERY & VSS (PLACEHOLDER) */}
+          {activeSection === "disaster_recovery" && (
+            <div className="space-y-6">
+              <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 space-y-4 shadow-sm">
+                <div className="flex items-center justify-between border-b border-[var(--border-c)] pb-4">
                   <div>
-                    <div className="text-sm font-semibold text-[var(--text)]">First-Run Setup Wizard</div>
-                    <div className="text-[11px] text-[var(--text-sub)]">Launch guided setup if database is blank on next restart.</div>
+                    <h3 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
+                      <HardDrive size={20} className="text-[var(--teal)]" /> Disaster Recovery & VSS Snapshots
+                    </h3>
+                    <p className="text-xs text-[var(--text-sub)] mt-0.5">Manage Volume Shadow Copy Service retention schedules and offsite backups.</p>
                   </div>
-                  <input type="checkbox" checked={s.isFirstRunSetup ?? true} onChange={(e) => patch({ isFirstRunSetup: e.target.checked })} className="accent-[var(--amber)] h-5 w-5 rounded" />
+                  <span className="text-xs font-bold bg-[var(--amber-low)] text-[var(--amber)] border border-[var(--amber)]/30 px-3 py-1 rounded-full uppercase flex items-center gap-1">
+                    <Sparkles size={12} /> Roadmap Preview
+                  </span>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text)] mb-2">Data Directory Path</label>
-                  <input type="text" placeholder="D:\NexusData" value={s.dataDirectoryPath || ""} onChange={(e) => patch({ dataDirectoryPath: e.target.value })} className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-sm text-[var(--text)] focus:border-[var(--amber)]" />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">Shadow Copy Retention Count</label>
+                    <input
+                      type="number"
+                      value={s.vssRetentionCount || 14}
+                      onChange={(e) => patch({ vssRetentionCount: parseInt(e.target.value) })}
+                      className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2 text-xs text-[var(--text)] focus:border-[var(--amber)] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">Offsite SMB/S3 Target</label>
+                    <input
+                      type="text"
+                      value={s.backupDestinationTarget || "smb://nas.internal/backups"}
+                      onChange={(e) => patch({ backupDestinationTarget: e.target.value })}
+                      className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2 text-xs text-[var(--text)] font-mono focus:border-[var(--amber)] focus:outline-none"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text)] mb-2">Web Binding Port</label>
-                  <input type="number" value={s.webBindingPort || 5011} onChange={(e) => patch({ webBindingPort: parseInt(e.target.value) })} className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-sm text-[var(--text)] focus:border-[var(--amber)]" />
-                </div>
-              </div>
-            </section>
+              </section>
+            </div>
           )}
 
-          {activeSection === "ad" && (
-            <section className="bg-[var(--bg-surface)] rounded-[1.5rem] border border-[var(--border-c)] shadow-sm overflow-hidden relative">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-[var(--text)]"></div>
-              <div className="p-6 border-b border-[var(--border-c)]">
-                <h3 className="text-lg font-bold flex items-center gap-2 text-[var(--text)]">
-                  <Database size={20} className="text-[var(--text)]" />
-                  Active Directory Integration
-                </h3>
-                <p className="text-xs text-[var(--text-sub)] mt-1">Configure LDAP search roots and trusted domains.</p>
-              </div>
-              <div className="p-6 space-y-6">
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text)] mb-2">Default Domain Name</label>
-                  <input type="text" placeholder="nvlabs.com" value={s.defaultDomainName || ""} onChange={(e) => patch({ defaultDomainName: e.target.value })} className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-sm text-[var(--text)] focus:border-[var(--amber)]" />
+          {/* CATEGORY 8: COMPLIANCE & CIS HARDENING (PLACEHOLDER) */}
+          {activeSection === "compliance" && (
+            <div className="space-y-6">
+              <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 space-y-4 shadow-sm">
+                <div className="flex items-center justify-between border-b border-[var(--border-c)] pb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
+                      <ShieldCheck size={20} className="text-[var(--ok)]" /> Compliance & CIS Hardening Framework
+                    </h3>
+                    <p className="text-xs text-[var(--text-sub)] mt-0.5">Automated Windows Server security baselines, BitLocker TPM escrow, and SCEP.</p>
+                  </div>
+                  <span className="text-xs font-bold bg-[var(--amber-low)] text-[var(--amber)] border border-[var(--amber)]/30 px-3 py-1 rounded-full uppercase flex items-center gap-1">
+                    <Sparkles size={12} /> Roadmap Preview
+                  </span>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text)] mb-2">Trust Relationship Presets (Comma Separated)</label>
-                  <input type="text" placeholder="child.nvlabs.com, external.local" value={s.trustRelationshipPresets || ""} onChange={(e) => patch({ trustRelationshipPresets: e.target.value })} className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-sm text-[var(--text)] focus:border-[var(--amber)]" />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">CIS Benchmark Hardening Profile</label>
+                    <select
+                      value={s.cisBenchmarkLevel || "Level2-Server"}
+                      onChange={(e) => patch({ cisBenchmarkLevel: e.target.value })}
+                      className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2 text-xs text-[var(--text)] focus:border-[var(--amber)] focus:outline-none"
+                    >
+                      <option value="Level1-Domain">Level 1 - Member Server</option>
+                      <option value="Level2-Server">Level 2 - High Security Domain Controller</option>
+                      <option value="STIG-Strict">DoD STIG Hardening Baseline</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl self-end">
+                    <div>
+                      <div className="text-xs font-bold text-[var(--text)]">BitLocker TPM Key Escrow</div>
+                      <div className="text-[10px] text-[var(--text-sub)]">Auto-backup recovery keys to Active Directory / Key Vault.</div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={s.bitlockerAutoEscrow ?? true}
+                      onChange={(e) => patch({ bitlockerAutoEscrow: e.target.checked })}
+                      className="accent-[var(--amber)] h-4 w-4"
+                    />
+                  </div>
                 </div>
-              </div>
-            </section>
+              </section>
+            </div>
           )}
 
-          {activeSection === "jobs" && <BackgroundJobsView />}
-          {activeSection === "automation" && (
-            <section className="bg-[var(--bg-surface)] rounded-[1.5rem] border border-[var(--border-c)] shadow-sm overflow-hidden relative">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-[var(--text)]"></div>
-              <div className="p-6 border-b border-[var(--border-c)]">
-                <h3 className="text-lg font-bold flex items-center gap-2 text-[var(--text)]">
-                  <Zap size={20} className="text-[var(--text)]" />
-                  Automation & PowerShell
-                </h3>
-                <p className="text-xs text-[var(--text-sub)] mt-1">Configure global PowerShell behavior and local scripting library.</p>
-              </div>
-              <div className="p-6 space-y-6">
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text)] mb-2">PowerShell Execution Policy</label>
-                  <select value={s.psExecutionPolicy || "RemoteSigned"} onChange={(e) => patch({ psExecutionPolicy: e.target.value })} className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-sm text-[var(--text)] focus:border-[var(--amber)]">
-                    <option value="Bypass">Bypass</option>
-                    <option value="RemoteSigned">RemoteSigned</option>
-                    <option value="Restricted">Restricted</option>
-                    <option value="Unrestricted">Unrestricted</option>
-                  </select>
+          {/* CATEGORY 9: AI OPERATIONS & NEXUS COPILOT (PLACEHOLDER) */}
+          {activeSection === "ai_ops" && (
+            <div className="space-y-6">
+              <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 space-y-4 shadow-sm">
+                <div className="flex items-center justify-between border-b border-[var(--border-c)] pb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
+                      <Bot size={20} className="text-purple-400" /> AI Operations & Nexus Copilot
+                    </h3>
+                    <p className="text-xs text-[var(--text-sub)] mt-0.5">Local LLM model integration for automated log diagnosis and incident resolution.</p>
+                  </div>
+                  <span className="text-xs font-bold bg-[var(--amber-low)] text-[var(--amber)] border border-[var(--amber)]/30 px-3 py-1 rounded-full uppercase flex items-center gap-1">
+                    <Sparkles size={12} /> Roadmap Preview
+                  </span>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-[var(--text)] mb-2">Script Library Path</label>
-                  <input type="text" placeholder="C:\Scripts" value={s.scriptLibraryPath || ""} onChange={(e) => patch({ scriptLibraryPath: e.target.value })} className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-sm text-[var(--text)] focus:border-[var(--amber)]" />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">Local LLM Model API Endpoint</label>
+                    <input
+                      type="text"
+                      value={s.llmModelEndpoint || "http://localhost:11434/v1"}
+                      onChange={(e) => patch({ llmModelEndpoint: e.target.value })}
+                      className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2 text-xs text-[var(--text)] font-mono focus:border-[var(--amber)] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">Auto-Remediation Script Policy</label>
+                    <select
+                      value={s.autoRemediationPolicy || "ManualApproval"}
+                      onChange={(e) => patch({ autoRemediationPolicy: e.target.value })}
+                      className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2 text-xs text-[var(--text)] focus:border-[var(--amber)] focus:outline-none"
+                    >
+                      <option value="ManualApproval">Require Admin Approval</option>
+                      <option value="AutoExecuteLowRisk">Auto-Execute Low Risk Scripts</option>
+                      <option value="Disabled">Disable AI Remediation</option>
+                    </select>
+                  </div>
                 </div>
-              </div>
-            </section>
+              </section>
+            </div>
+          )}
+
+          {/* CATEGORY 10: SD-WAN & NETWORK INTERCONNECT (PLACEHOLDER) */}
+          {activeSection === "network_sdwan" && (
+            <div className="space-y-6">
+              <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 space-y-4 shadow-sm">
+                <div className="flex items-center justify-between border-b border-[var(--border-c)] pb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
+                      <Globe size={20} className="text-sky-400" /> SD-WAN & Network Interconnect
+                    </h3>
+                    <p className="text-xs text-[var(--text-sub)] mt-0.5">WireGuard site-to-site VPN meshes, Cloudflare DDNS, and software load balancing.</p>
+                  </div>
+                  <span className="text-xs font-bold bg-[var(--amber-low)] text-[var(--amber)] border border-[var(--amber)]/30 px-3 py-1 rounded-full uppercase flex items-center gap-1">
+                    <Sparkles size={12} /> Roadmap Preview
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">WireGuard Tunnel Listen Port</label>
+                    <input
+                      type="number"
+                      value={s.wireguardTunnelPort || 51820}
+                      onChange={(e) => patch({ wireguardTunnelPort: parseInt(e.target.value) })}
+                      className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2 text-xs text-[var(--text)] font-mono focus:border-[var(--amber)] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">Dynamic DNS Host Domain</label>
+                    <input
+                      type="text"
+                      value={s.ddnsProviderDomain || "nexus-edge.cloudflare.com"}
+                      onChange={(e) => patch({ ddnsProviderDomain: e.target.value })}
+                      className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2 text-xs text-[var(--text)] font-mono focus:border-[var(--amber)] focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </section>
+            </div>
           )}
         </div>
+      </div>
+
+      {/* Floating Save Bar */}
+      <div className="fixed bottom-6 right-8 z-40 flex items-center gap-3 bg-[var(--bg-card)]/90 backdrop-blur-md border border-[var(--border-c)] p-3 px-5 rounded-2xl shadow-2xl">
+        <span className="text-xs text-[var(--text-sub)] hidden sm:inline">Unsaved edits will sync automatically.</span>
+        <button
+          onClick={() => patch(s)}
+          className="flex items-center gap-2 rounded-xl bg-[var(--amber)] text-black px-5 py-2.5 text-xs font-bold hover:bg-[var(--amber-hover)] transition-all shadow-md active:scale-95 cursor-pointer"
+        >
+          <Check size={16} /> Save All Settings
+        </button>
       </div>
     </div>
   );

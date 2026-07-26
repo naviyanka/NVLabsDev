@@ -1,3 +1,11 @@
+export interface ScriptTemplate {
+  id: string;
+  name: string;
+  category?: string;
+  command: string;
+  enabled: boolean;
+}
+
 export interface FrontendSettings {
   theme: string;
   terminalTheme: string;
@@ -6,18 +14,30 @@ export interface FrontendSettings {
   appSubtitle: string;
   companyLogoUrl: string;
   sidebarState: string;
+  autoRefreshInterval?: number;
+  scriptTemplates?: ScriptTemplate[];
 }
 
 const STORAGE_KEY = "nexus-frontend-settings";
 
+const defaultScriptTemplates: ScriptTemplate[] = [
+  { id: "1", name: "Audit Local Admins", category: "Security", command: "Get-LocalGroupMember -Group 'Administrators'\r", enabled: true },
+  { id: "2", name: "Active Network Connections", category: "Network", command: "Get-NetTCPConnection -State Established | Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort, State -First 15\r", enabled: true },
+  { id: "3", name: "Installed Windows Features", category: "System", command: "Get-WindowsFeature | Where-Object Installed | Select-Object Name, DisplayName -First 15\r", enabled: true },
+  { id: "4", name: "Top Memory Processes", category: "Performance", command: "Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 10 Name, Id, @{N='RAM_MB';E={[math]::Round($_.WorkingSet64/1MB,1)}}\r", enabled: true },
+  { id: "5", name: "Disk Free Space", category: "Storage", command: "Get-Volume | Select-Object DriveLetter, FileSystemLabel, SizeRemaining, Size\r", enabled: true }
+];
+
 const defaultSettings: FrontendSettings = {
   theme: "horizon",
-  terminalTheme: "xterm",
+  terminalTheme: "stealth",
   animationsEnabled: true,
   appName: "NEXUS",
   appSubtitle: "Horizon UI Shell",
   companyLogoUrl: "",
   sidebarState: "expanded",
+  autoRefreshInterval: 30,
+  scriptTemplates: defaultScriptTemplates
 };
 
 export function getFrontendSettings(): FrontendSettings {
@@ -26,7 +46,12 @@ export function getFrontendSettings(): FrontendSettings {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      return { ...defaultSettings, ...JSON.parse(stored) };
+      const parsed = JSON.parse(stored);
+      return { 
+        ...defaultSettings, 
+        ...parsed,
+        scriptTemplates: parsed.scriptTemplates && parsed.scriptTemplates.length > 0 ? parsed.scriptTemplates : defaultScriptTemplates
+      };
     }
   } catch (e) {
     console.warn("Failed to parse frontend settings from localStorage", e);
@@ -54,6 +79,11 @@ export function saveFrontendSettings(updates: Partial<FrontendSettings>) {
     if (updates.terminalTheme) {
       document.documentElement.setAttribute("data-terminal-theme", next.terminalTheme);
       try { localStorage.setItem("nexus-terminal-theme", next.terminalTheme); } catch(e) {}
+      window.dispatchEvent(new CustomEvent("nexus-terminal-theme-change", { detail: { theme: next.terminalTheme } }));
+    }
+
+    if (updates.scriptTemplates) {
+      window.dispatchEvent(new CustomEvent("nexus-scripts-change", { detail: { scriptTemplates: next.scriptTemplates } }));
     }
     
     if (updates.animationsEnabled !== undefined) {

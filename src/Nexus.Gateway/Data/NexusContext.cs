@@ -37,7 +37,7 @@ public class NexusContext : DbContext
         modelBuilder.Entity<SecurityEventLog>().HasIndex(e => e.ServerIp);
         modelBuilder.Entity<SecurityEventLog>().HasIndex(e => new { e.ServerIp, e.TimeCreated });
         
-        modelBuilder.Entity<AppSetting>().HasData(new AppSetting { Id = "global" });
+        modelBuilder.Entity<AppSetting>().HasData(new AppSetting { Id = "global", Theme = "horizon", TerminalTheme = "stealth" });
 
         modelBuilder.Entity<PluginEntity>().HasData(
             new PluginEntity { Id = "builtin-processes", Name = "Processes", Description = "Manage running processes", Icon = "app-window", Category = "Management", IsBuiltIn = true, IsActive = true, TargetRoute = "/processes" },

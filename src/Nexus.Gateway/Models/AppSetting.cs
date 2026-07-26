@@ -7,7 +7,7 @@ public class AppSetting
     public string DefaultLandingPage { get; set; } = "dashboard";
     public int AutoRefreshInterval { get; set; } = 30;
     
-    public string Theme { get; set; } = "dark";
+    public string Theme { get; set; } = "horizon";
     public string UiDensity { get; set; } = "comfortable";
     public bool AnimationsEnabled { get; set; } = true;
 
@@ -26,7 +26,7 @@ public class AppSetting
     public string PluginCategories { get; set; } = "Management,Security,Infrastructure,Advanced";
 
     // PowerShell terminal theme
-    public string TerminalTheme { get; set; } = "nexus-dark";
+    public string TerminalTheme { get; set; } = "stealth";
 
     // Editable Dashboard Layout JSON
     public string DashboardLayout { get; set; } = "";

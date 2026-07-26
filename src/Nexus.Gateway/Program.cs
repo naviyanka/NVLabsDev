@@ -149,11 +149,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowRestricted", policy =>
     {
-        var allowedOrigins = Environment.GetEnvironmentVariable("ALLOWED_ORIGINS")?.Split(',') ?? new[] { "http://localhost:5173", "https://localhost:5173" };
-        policy.WithOrigins(allowedOrigins)
+        policy.SetIsOriginAllowed(_ => true)
               .AllowAnyMethod()
               .AllowAnyHeader()
-              .AllowCredentials(); // Required for SignalR WebSocket transport
+              .AllowCredentials();
     });
 });
 

@@ -41,7 +41,14 @@ export function getBackendHosts(): BackendHost[] {
     }
   }
   
-  return [];
+  const defaultLocalHost: BackendHost = {
+    id: "local",
+    name: "Local Gateway",
+    url: "http://localhost:5010",
+    isActive: true
+  };
+
+  return [defaultLocalHost];
 }
 
 /**
@@ -56,7 +63,7 @@ export function setBackendHosts(hosts: BackendHost[]): void {
  * Check if the global "Use Remote Backend" toggle is enabled.
  */
 export function isBackendEnabledGlobally(): boolean {
-  if (typeof window === "undefined") return false;
+  if (typeof window === "undefined") return true;
   const val = localStorage.getItem(GLOBAL_TOGGLE_KEY);
   return val === null ? true : val === "true"; // Default to true if not set
 }

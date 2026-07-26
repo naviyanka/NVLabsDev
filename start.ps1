@@ -36,6 +36,35 @@ function Check-And-Install {
     }
 }
 
+function Stop-ExistingProcesses {
+    Write-Host "Checking for existing NEXUS processes to terminate..." -ForegroundColor Cyan
+
+    # 1. Kill named NEXUS executables
+    $namedProcesses = Get-Process -Name "Nexus.Gateway", "Nexus.Launcher" -ErrorAction SilentlyContinue
+    foreach ($proc in $namedProcesses) {
+        Write-Host "Terminating active process $($proc.ProcessName) (PID $($proc.Id))..." -ForegroundColor Yellow
+        Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+    }
+
+    # 2. Kill processes occupying ports 5010 (Gateway API) and 5173 (Frontend Dev)
+    $ports = @(5010, 5173)
+    foreach ($port in $ports) {
+        $connections = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
+        foreach ($conn in $connections) {
+            $ownerId = $conn.OwningProcess
+            if ($ownerId -gt 0 -and $ownerId -ne $PID) {
+                $proc = Get-Process -Id $ownerId -ErrorAction SilentlyContinue
+                if ($proc) {
+                    Write-Host "Terminating process $($proc.ProcessName) (PID $ownerId) holding port $port..." -ForegroundColor Yellow
+                    Stop-Process -Id $ownerId -Force -ErrorAction SilentlyContinue
+                }
+            }
+        }
+    }
+    
+    Start-Sleep -Seconds 1
+}
+
 function Start-App {
     $rootDir = $PSScriptRoot
 
@@ -66,4 +95,5 @@ function Start-App {
 }
 
 Check-And-Install
+Stop-ExistingProcesses
 Start-App

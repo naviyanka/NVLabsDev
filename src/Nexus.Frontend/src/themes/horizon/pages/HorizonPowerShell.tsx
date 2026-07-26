@@ -1,161 +1,260 @@
 import { createFileRoute, useSearch } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
-import { Terminal as TermIcon, Trash2, Plus, X } from "lucide-react";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { Terminal as TermIcon, Trash2, Plus, X, Download, Sliders, Shield, FileText, Play, ZoomIn, ZoomOut, TerminalIcon } from "lucide-react";
 
 import { getServersClient, type Server } from "@/api/client";
-import { getWsUrl } from "@/lib/backend";
+import { getFrontendSettings } from "@/lib/frontendSettings";
+import { terminalStore, getActiveTerminalTheme, type PtySession } from "@/lib/terminalStore";
+import { toast } from "sonner";
 
-import { Terminal } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
-import "@xterm/xterm/css/xterm.css";
-
-
-
-interface Session { id: string; serverId: string; ws?: WebSocket; xterm?: Terminal; fit?: FitAddon; }
-
-function getTheme() {
-  if (typeof window === "undefined") return { bg: "#050508", prompt: "#f59e0b", output: "#94a3b8", cursor: "#f59e0b" };
-  const id =
-    document.documentElement.getAttribute("data-terminal-theme") ||
-    (typeof localStorage !== "undefined" ? localStorage.getItem("nexus-terminal-theme") : null) ||
-    "nexus-dark";
-  const TERMINAL_THEMES: any = {
-    "nexus-dark":  { bg: "#050508", prompt: "#f59e0b", output: "#94a3b8", cursor: "#f59e0b" },
-    "win-classic": { bg: "#0c0c0c", prompt: "#cccccc", output: "#cccccc", cursor: "#ffffff" },
-    "matrix":      { bg: "#020e02", prompt: "#00ff41", output: "#009921", cursor: "#00ff41" },
-    "solarized":   { bg: "#002b36", prompt: "#268bd2", output: "#839496", cursor: "#268bd2" },
-    "dracula":     { bg: "#282a36", prompt: "#ff79c6", output: "#f8f8f2", cursor: "#bd93f9" },
-    "cobalt":      { bg: "#001e3c", prompt: "#00bcd4", output: "#b0bec5", cursor: "#00bcd4" },
-    "monokai":     { bg: "#272822", prompt: "#e6db74", output: "#f8f8f2", cursor: "#a6e22e" },
-    "nord":        { bg: "#2e3440", prompt: "#88c0d0", output: "#d8dee9", cursor: "#88c0d0" },
-  };
-  return TERMINAL_THEMES[id] ?? TERMINAL_THEMES["nexus-dark"];
-}
+const BUILTIN_SCRIPTS = [
+  { label: "Audit Local Admins", cmd: "Get-LocalGroupMember -Group 'Administrators'\r" },
+  { label: "Active Network Connections", cmd: "Get-NetTCPConnection -State Established | Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort, State -First 15\r" },
+  { label: "Installed Windows Features", cmd: "Get-WindowsFeature | Where-Object Installed | Select-Object Name, DisplayName -First 15\r" },
+  { label: "Top Memory Processes", cmd: "Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 10 Name, Id, @{N='RAM_MB';E={[math]::Round($_.WorkingSet64/1MB,1)}}\r" },
+  { label: "Disk Free Space", cmd: "Get-Volume | Select-Object DriveLetter, FileSystemLabel, SizeRemaining, Size\r" }
+];
 
 export function HorizonPowerShell() {
   const search: any = useSearch({ strict: false });
-  const initialServerIp = search.serverIp || "nexus01";
 
   const [servers, setServers] = useState<Server[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [activeId, setActiveId] = useState("");
+  const [sessions, setSessions] = useState<PtySession[]>(() => terminalStore.getSessions());
+  const [activeId, setActiveId] = useState<string>(() => terminalStore.getActiveSessionId());
+  const [fontSize, setFontSize] = useState(13);
+  const [theme, setTheme] = useState(() => getActiveTerminalTheme());
+  const [frontendSettings, setFrontendSettings] = useState(() => getFrontendSettings());
+
   const active = sessions.find((s) => s.id === activeId);
-  const [theme, setTheme] = useState(() => getTheme());
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  // Subscribe to store updates
+  useEffect(() => {
+    const unsubscribe = terminalStore.subscribe(() => {
+      setSessions(terminalStore.getSessions());
+      setActiveId(terminalStore.getActiveSessionId());
+    });
+    return unsubscribe;
+  }, []);
 
+  // Fetch servers & initialize first tab if empty
   useEffect(() => {
     getServersClient().then(data => {
       const svrs = data && data.length > 0 ? data : [];
       setServers(svrs);
-      const targetName = search.serverName || svrs[0]?.name || "nexus01";
-      setSessions([{ id: "s1", serverId: targetName }]);
-      setActiveId("s1");
+
+      if (terminalStore.getSessions().length === 0) {
+        const targetName = search.serverName || svrs[0]?.name || "nexus01";
+        terminalStore.createSession(targetName);
+      }
     });
   }, [search.serverIp]);
 
-  // Theme listener
+  // Theme & settings listener
   useEffect(() => {
-    const observer = new MutationObserver(() => setTheme(getTheme()));
+    const handleSync = () => {
+      setTheme(getActiveTerminalTheme());
+      setFrontendSettings(getFrontendSettings());
+      terminalStore.applyThemeToAll();
+    };
+
+    const observer = new MutationObserver(handleSync);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-terminal-theme"] });
-    return () => observer.disconnect();
+
+    window.addEventListener("nexus-terminal-theme-change", handleSync);
+    window.addEventListener("nexus-scripts-change", handleSync);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("nexus-terminal-theme-change", handleSync);
+      window.removeEventListener("nexus-scripts-change", handleSync);
+    };
   }, []);
 
+  const activeScripts = useMemo(() => {
+    const templates = frontendSettings.scriptTemplates;
+    if (templates && templates.length > 0) {
+      return templates.filter(t => t.enabled).map(t => ({ label: t.name, cmd: t.command.endsWith("\r") ? t.command : t.command + "\r" }));
+    }
+    return BUILTIN_SCRIPTS;
+  }, [frontendSettings.scriptTemplates]);
+
   function newSession() {
-    const id = "s" + (sessions.length + 1) + "-" + Date.now();
     const targetName = servers.length > 0 ? servers[0].name : "nexus01";
-    setSessions((s) => [...s, { id, serverId: targetName }]);
-    setActiveId(id);
+    terminalStore.createSession(targetName);
   }
 
   function closeSession(id: string) {
-    if (sessions.length === 1) return;
-    const idx = sessions.findIndex((s) => s.id === id);
-    const next = sessions.filter((s) => s.id !== id);
-    setSessions(next);
-    if (activeId === id) setActiveId(next[Math.max(0, idx - 1)].id);
+    terminalStore.closeSession(id);
   }
 
+  const exportTerminalLog = () => {
+    if (!active?.xterm) return;
+    const buffer = active.xterm.buffer.active;
+    let text = "";
+    for (let i = 0; i < buffer.length; i++) {
+      const line = buffer.getLine(i);
+      if (line) text += line.translateToString(true) + "\n";
+    }
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `nexus-terminal-${active.serverId}-${new Date().toISOString().slice(0,10)}.log`;
+    link.click();
+    toast.success("Terminal log exported");
+  };
+
+  const handleFontSizeChange = (newSize: number) => {
+    setFontSize(newSize);
+    terminalStore.updateFontSize(newSize);
+  };
+
   return (
-    <div className="max-w-[1600px] mx-auto space-y-8 font-sans">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4"><div><h2 className="text-3xl font-extrabold text-[var(--text)]">PowerShell PTY</h2><p className="text-sm text-[var(--text-sub)] mt-1">True Interactive WebSocket Sessions</p></div></div>
-      <div className="nx-card flex h-[65vh] md:h-[76vh] flex-col overflow-hidden">
-        {/* Tab bar */}
-        <div className="flex items-center gap-1 border-b border-[var(--border-c)] bg-[var(--bg-surface)] px-2 py-1.5 overflow-x-auto">
-          {sessions.map((s) => {
-            const sname = servers.find((m) => m.name === s.serverId)?.name ?? s.serverId;
-            const isActive = s.id === activeId;
-            return (
-              <div key={s.id} className={"mono flex items-center gap-2 rounded-md px-3 py-1 text-[11px] " + (isActive ? "bg-[var(--bg-card)] text-[var(--amber)]" : "text-[var(--text-sub)] hover:bg-[var(--bg-card)]")}>
-                <button onClick={() => setActiveId(s.id)}>
-                  <TermIcon size={11} className="mr-1.5 inline" />{sname}
-                </button>
-                {sessions.length > 1 && (
-                  <button onClick={() => closeSession(s.id)} className="text-[var(--text-ghost)] hover:text-[var(--crit)]">
-                    <X size={11} />
-                  </button>
-                )}
-              </div>
-            );
-          })}
-          <button onClick={newSession} className="mono ml-1 grid h-6 w-6 place-items-center rounded text-[var(--text-sub)] hover:bg-[var(--bg-card)] hover:text-[var(--amber)]">
-            <Plus size={12} />
-          </button>
-          <div className="ml-auto flex items-center gap-2 shrink-0">
-            <div className="flex items-center gap-1 border-r border-[var(--border-c)] pr-2 mr-1">
-              <span className="text-[10px] uppercase font-semibold text-[var(--text-sub)] mr-1">Snippets:</span>
-              {[
-                { label: "Services", cmd: "Get-Service | Where-Object Status -eq 'Running' | Select-Object -First 10\r" },
-                { label: "Processes", cmd: "Get-Process | Sort-Object CPU -Descending | Select-Object -First 10\r" },
-                { label: "Disks", cmd: "Get-Volume\r" },
-                { label: "Network", cmd: "Get-NetIPAddress -AddressFamily IPv4\r" }
-              ].map(s => (
-                <button
-                  key={s.label}
-                  onClick={() => {
-                    if (active?.ws && active.ws.readyState === WebSocket.OPEN) {
-                      active.ws.send(s.cmd);
-                    }
-                  }}
-                  className="mono text-[10px] px-2 py-0.5 rounded border border-[var(--border-dim)] bg-[var(--bg-card)] text-[var(--text-sub)] hover:text-[var(--amber)] hover:border-[var(--amber)] transition-colors"
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
+    <div className="max-w-[1600px] mx-auto space-y-6 font-sans pb-12">
+      {/* Page Header Toolbar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--bg-surface)] p-5 rounded-2xl border border-[var(--border-c)] shadow-sm">
+        <div>
+          <h2 className="text-2xl font-extrabold text-[var(--text)]">PowerShell PTY Console</h2>
+          <p className="text-xs text-[var(--text-sub)] mt-0.5">
+            Persistent WinRM PTY session manager across route navigation.
+          </p>
+        </div>
+
+        {/* Controls: Script Runner & Zoom */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase font-bold text-[var(--text-sub)]">Quick Script:</span>
             <select
-              value={active?.serverId || ""}
               onChange={(e) => {
-                const newServerId = e.target.value;
-                const newId = "s" + Date.now();
-                setSessions((sl) => sl.map((s) => s.id === activeId ? { id: newId, serverId: newServerId } : s));
-                setActiveId(newId);
+                const cmd = e.target.value;
+                if (cmd && active?.ws && active.ws.readyState === WebSocket.OPEN) {
+                  active.ws.send(cmd);
+                  toast.success("Script dispatched to PTY");
+                }
               }}
-              className="mono rounded border border-[var(--border-c)] bg-[var(--bg-card)] px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-[var(--amber)]"
+              defaultValue=""
+              className="mono text-xs bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-1.5 text-[var(--text)] focus:border-[var(--amber)] focus:outline-none cursor-pointer"
             >
-              {servers.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}
+              <option value="" disabled>Run Preset Script...</option>
+              {activeScripts.map(scr => (
+                <option key={scr.label} value={scr.cmd}>{scr.label}</option>
+              ))}
             </select>
+          </div>
+
+          <div className="flex items-center gap-1 bg-[var(--bg-void)] border border-[var(--border-c)] p-1 rounded-xl text-xs">
+            <button
+              onClick={() => handleFontSizeChange(Math.max(10, fontSize - 1))}
+              className="p-1 rounded hover:bg-[var(--amber-low)] hover:text-[var(--amber)] text-[var(--text-sub)] cursor-pointer"
+              title="Decrease Font Size"
+            >
+              <ZoomOut size={14} />
+            </button>
+            <span className="font-mono text-xs text-[var(--text)] px-1.5 font-bold">{fontSize}px</span>
+            <button
+              onClick={() => handleFontSizeChange(Math.min(24, fontSize + 1))}
+              className="p-1 rounded hover:bg-[var(--amber-low)] hover:text-[var(--amber)] text-[var(--text-sub)] cursor-pointer"
+              title="Increase Font Size"
+            >
+              <ZoomIn size={14} />
+            </button>
+          </div>
+
+          <button
+            onClick={exportTerminalLog}
+            className="flex items-center gap-1.5 bg-[var(--bg-void)] border border-[var(--border-c)] px-3 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-sub)] hover:text-white transition-all cursor-pointer"
+          >
+            <Download size={14} /> Export Log
+          </button>
+        </div>
+      </div>
+
+      {/* Terminal Window Frame (Identical styling to Image 2 design!) */}
+      <div 
+        className="flex h-[68vh] md:h-[78vh] flex-col overflow-hidden rounded-2xl border border-white/15 shadow-2xl transition-all duration-300 font-mono"
+        style={{ backgroundColor: theme.bg }}
+      >
+        {/* Window Top Bar */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0 select-none">
+          <div className="flex items-center gap-3">
+            {/* macOS Window Control Dots */}
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-rose-500/80 shadow-sm" />
+              <div className="w-3 h-3 rounded-full bg-amber-500/80 shadow-sm" />
+              <div className="w-3 h-3 rounded-full bg-emerald-500/80 shadow-sm" />
+            </div>
+
+            <span className="text-xs font-semibold flex items-center gap-1.5 opacity-70" style={{ color: theme.output }}>
+              <TermIcon size={13} /> PS C:\WINDOWS\system32&gt;
+            </span>
+          </div>
+
+          {/* Session Tabs (Middle) */}
+          <div className="flex items-center gap-1.5 overflow-x-auto mx-4">
+            {sessions.map((s) => {
+              const sname = servers.find((m) => m.name === s.serverId)?.name ?? s.serverId;
+              const isActive = s.id === activeId;
+              return (
+                <div 
+                  key={s.id} 
+                  className={`mono flex items-center gap-2 rounded-lg px-3 py-1 text-xs transition-all border ${
+                    isActive 
+                      ? "bg-white/15 text-white font-bold border-white/20 shadow-sm" 
+                      : "text-white/50 border-transparent hover:bg-white/10 hover:text-white"
+                  }`}
+                  style={isActive ? { color: theme.prompt, borderColor: theme.prompt + "40" } : {}}
+                >
+                  <button onClick={() => terminalStore.setActiveSessionId(s.id)} className="cursor-pointer">
+                    &gt;_ {sname}
+                  </button>
+                  {sessions.length > 1 && (
+                    <button onClick={() => closeSession(s.id)} className="hover:text-rose-400 cursor-pointer">
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+            <button onClick={newSession} className="mono grid h-6 w-6 place-items-center rounded-lg text-white/50 hover:bg-white/10 hover:text-white cursor-pointer" title="New PTY Tab">
+              <Plus size={14} />
+            </button>
+          </div>
+
+          {/* Active Theme Badge (Right) */}
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => active?.xterm?.clear()}
-              className="grid h-6 w-6 place-items-center rounded text-[var(--text-sub)] hover:text-[var(--crit)]"
-              title="Clear terminal"
+              className="p-1 rounded text-white/50 hover:text-rose-400 hover:bg-white/10 cursor-pointer mr-1"
+              title="Clear terminal buffer"
             >
-              <Trash2 size={12} />
+              <Trash2 size={14} />
             </button>
+
+            <span 
+              className="text-[10px] uppercase font-extrabold tracking-wider px-2.5 py-1 rounded-lg border shadow-sm"
+              style={{ 
+                color: theme.prompt, 
+                backgroundColor: theme.prompt + "18", 
+                borderColor: theme.prompt + "40" 
+              }}
+            >
+              {theme.name || "STEALTH OLED"}
+            </span>
           </div>
         </div>
 
-        {/* Terminal containers */}
+        {/* Terminal Container Canvas */}
         <div 
-          className="flex-1 w-full h-full relative"
-          style={{ background: theme.bg, padding: '12px' }}
+          className="flex-1 w-full h-full relative p-3"
+          style={{ backgroundColor: theme.bg }}
         >
           {sessions.map(s => (
-            <TerminalSession 
+            <TerminalSessionView 
               key={s.id} 
               session={s} 
               isActive={s.id === activeId} 
-              theme={theme} 
+              fontSize={fontSize}
+              theme={theme}
             />
           ))}
         </div>
@@ -164,96 +263,19 @@ export function HorizonPowerShell() {
   );
 }
 
-function TerminalSession({ session, isActive, theme }: { session: Session; isActive: boolean; theme: any }) {
+function TerminalSessionView({ session, isActive, fontSize, theme }: { session: PtySession; isActive: boolean; fontSize: number; theme: any }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
-    if (session.xterm) return;
-
-    const xterm = new Terminal({
-      theme: { background: theme.bg, foreground: theme.output, cursor: theme.cursor },
-      fontFamily: 'monospace',
-      fontSize: 13,
-      cursorBlink: true
-    });
-    const fit = new FitAddon();
-    xterm.loadAddon(fit);
-    
-    xterm.open(containerRef.current);
-    
-    const token = localStorage.getItem("nexus_token") || "";
-    const wsUrl = getWsUrl(`/api/terminal/ws?serverId=${session.serverId}&access_token=${token}`);
-    const ws = new WebSocket(wsUrl);
-    
-    ws.onopen = () => {
-      xterm.writeln(`\x1b[33mConnected to ${session.serverId}\x1b[0m`);
-    };
-    
-    ws.onmessage = (ev) => {
-      if (typeof ev.data === 'string') {
-        xterm.write(ev.data);
-      } else {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const buf = new Uint8Array(reader.result as ArrayBuffer);
-          xterm.write(buf);
-        };
-        reader.readAsArrayBuffer(ev.data);
-      }
-    };
-
-    ws.onclose = () => {
-      xterm.writeln('\x1b[31m\r\nConnection closed\x1b[0m');
-    };
-
-    xterm.onData(data => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
-      }
-    });
-
-    session.xterm = xterm;
-    session.fit = fit;
-    session.ws = ws;
-
-    const handleResize = () => fit.fit();
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      ws.close();
-      xterm.dispose();
-      session.xterm = undefined;
-      session.ws = undefined;
-      session.fit = undefined;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (session.xterm) {
-      session.xterm.options.theme = {
-        background: theme.bg,
-        foreground: theme.output,
-        cursor: theme.cursor
-      };
+    if (containerRef.current) {
+      terminalStore.attachTerminal(session.id, containerRef.current, fontSize);
     }
-  }, [theme]);
-
-  useEffect(() => {
-    if (isActive) {
-      setTimeout(() => {
-        session.fit?.fit();
-        session.xterm?.focus();
-      }, 10);
-    }
-  }, [isActive]);
+  }, [session.id, isActive, fontSize, theme]);
 
   return (
     <div 
       ref={containerRef}
-      style={{ display: isActive ? 'block' : 'none', width: '100%', height: '100%' }}
+      style={{ display: isActive ? "block" : "none", width: "100%", height: "100%", backgroundColor: theme.bg }}
     />
   );
 }
-
