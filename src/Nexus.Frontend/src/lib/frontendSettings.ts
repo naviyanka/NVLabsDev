@@ -16,6 +16,8 @@ export interface FrontendSettings {
   sidebarState: string;
   autoRefreshInterval?: number;
   scriptTemplates?: ScriptTemplate[];
+  copilotEnabled?: boolean;
+  geminiApiKey?: string;
 }
 
 const STORAGE_KEY = "nexus-frontend-settings";
@@ -37,7 +39,9 @@ const defaultSettings: FrontendSettings = {
   companyLogoUrl: "",
   sidebarState: "expanded",
   autoRefreshInterval: 30,
-  scriptTemplates: defaultScriptTemplates
+  scriptTemplates: defaultScriptTemplates,
+  copilotEnabled: true,
+  geminiApiKey: ""
 };
 
 export function getFrontendSettings(): FrontendSettings {
@@ -98,6 +102,12 @@ export function saveFrontendSettings(updates: Partial<FrontendSettings>) {
     if (updates.appName !== undefined || updates.appSubtitle !== undefined) {
       window.dispatchEvent(new CustomEvent("nexus-branding-change", { 
         detail: { appName: next.appName, appSubtitle: next.appSubtitle } 
+      }));
+    }
+
+    if (updates.copilotEnabled !== undefined || updates.geminiApiKey !== undefined) {
+      window.dispatchEvent(new CustomEvent("nexus-copilot-change", {
+        detail: { copilotEnabled: next.copilotEnabled, geminiApiKey: next.geminiApiKey }
       }));
     }
   } catch (e) {

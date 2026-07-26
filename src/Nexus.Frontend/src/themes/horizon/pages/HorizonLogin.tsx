@@ -1,8 +1,8 @@
-import { useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Shield, Server, KeyRound, User, Lock, Building, Settings2 } from "lucide-react";
-import { getApiUrl, getBackendUrl, setBackendUrl, clearBackendUrl, testBackendConnection } from "@/lib/backend";
+import { getApiUrl, getFullUrl, getBackendUrl, setBackendUrl, clearBackendUrl, testBackendConnection } from "@/lib/backend";
 
 
 
@@ -189,8 +189,8 @@ export function HorizonLogin() {
                 <button 
                   onClick={async () => {
                     setBackendStatus("testing");
-                    const ok = await testBackendConnection(backendInput);
-                    setBackendStatus(ok ? "success" : "error");
+                    const res = await testBackendConnection(backendInput);
+                    setBackendStatus(res.reachable ? "success" : "error");
                   }}
                   className="px-3 py-1.5 text-xs rounded border border-[var(--border-c)] hover:bg-[var(--bg-surface)] text-[var(--text)]"
                 >

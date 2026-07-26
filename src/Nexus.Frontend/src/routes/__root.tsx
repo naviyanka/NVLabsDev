@@ -20,8 +20,6 @@ import cyberpunkCssUrl from "../themes/cyberpunk/cyberpunk.css?url";
 import infraredCssUrl from "../themes/infrared/infrared.css?url";
 import horizonCssUrl from "../themes/horizon/horizon.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { Topbar } from "@/components/layout/Topbar";
 import { getApiUrl, getBackendUrl, isBackendEnabledGlobally } from "@/lib/backend";
 
 if (typeof window !== "undefined") {
@@ -55,82 +53,97 @@ if (typeof window !== "undefined") {
 }
 
 if (typeof window !== "undefined") {
-  // Save the very first original fetch to prevent double-patching during HMR
-  if (!(window as any).__nexus_original_fetch) {
-    (window as any).__nexus_original_fetch = window.fetch;
-  }
-  const originalFetch = (window as any).__nexus_original_fetch;
-  window.fetch = async (input, init) => {
-    let requestUrl = "";
-    if (typeof input === "string") {
-      requestUrl = input;
-    } else if (input instanceof Request) {
-      requestUrl = input.url;
+  try {
+    if (!(window as any).__nexus_original_fetch) {
+      (window as any).__nexus_original_fetch = window.fetch.bind(window);
     }
+    const originalFetch = (window as any).__nexus_original_fetch;
 
-    const token = localStorage.getItem("nexus_token");
-    
-    if (token && (requestUrl.includes("/api/") || requestUrl.includes("/hub/"))) {
-      if (input instanceof Request) {
-        try {
-          input.headers.set("Authorization", `Bearer ${token}`);
-        } catch (e) {
-          const newHeaders = new Headers(input.headers);
+    const customFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      let requestUrl = "";
+      if (typeof input === "string") {
+        requestUrl = input;
+      } else if (input instanceof URL) {
+        requestUrl = input.toString();
+      } else if (input instanceof Request) {
+        requestUrl = input.url;
+      }
+
+      const token = localStorage.getItem("nexus_token");
+      
+      if (token && (requestUrl.includes("/api/") || requestUrl.includes("/hub/"))) {
+        if (input instanceof Request) {
+          try {
+            input.headers.set("Authorization", `Bearer ${token}`);
+          } catch (e) {
+            const newHeaders = new Headers(input.headers);
+            newHeaders.set("Authorization", `Bearer ${token}`);
+            input = new Request(input, { headers: newHeaders });
+          }
+        } else {
+          if (!init) init = {};
+          if (!init.headers) init.headers = {};
+          const newHeaders = new Headers(init.headers);
           newHeaders.set("Authorization", `Bearer ${token}`);
-          input = new Request(input, { headers: newHeaders });
+          init.headers = newHeaders;
         }
-      } else {
-        if (!init) init = {};
-        if (!init.headers) init.headers = {};
-        const newHeaders = new Headers(init.headers);
-        newHeaders.set("Authorization", `Bearer ${token}`);
-        init.headers = newHeaders;
       }
-    }
 
-    let method = "GET";
-    if (init?.method) {
-      method = init.method;
-    } else if (input instanceof Request) {
-      method = input.method;
-    }
-
-    const backendUrl = getBackendUrl();
-    const isApiRequest = requestUrl.includes("/api/") || requestUrl.includes("/hub/");
-    
-    // STRICT MODE: If globally disabled in settings, mark offline mode
-    const isEnabled = isBackendEnabledGlobally();
-    if (!isEnabled && isApiRequest) {
-      if ((window as any).__nexus_backend_online !== false) {
-        (window as any).__nexus_set_backend_offline(method);
+      let method = "GET";
+      if (init?.method) {
+        method = init.method;
+      } else if (input instanceof Request) {
+        method = input.method;
       }
-      throw new TypeError("Backend disconnected (globally disabled in settings)");
-    }
+
+      const isApiRequest = requestUrl.includes("/api/") || requestUrl.includes("/hub/");
+      
+      // STRICT MODE: If globally disabled in settings, mark offline mode
+      const isEnabled = isBackendEnabledGlobally();
+      if (!isEnabled && isApiRequest) {
+        if ((window as any).__nexus_backend_online !== false) {
+          (window as any).__nexus_set_backend_offline(method);
+        }
+        throw new TypeError("Backend disconnected (globally disabled in settings)");
+      }
+
+      try {
+        const response = await originalFetch(input, init);
+
+        // Any valid HTTP response from backend means API is online
+        if (isApiRequest && (window as any).__nexus_backend_online !== true) {
+          (window as any).__nexus_set_backend_online();
+        }
+
+        if (response.status === 401 && window.location.pathname !== "/login") {
+          if (isApiRequest) {
+            localStorage.removeItem("nexus_token");
+            window.location.href = "/login";
+          }
+        }
+
+        return response;
+      } catch (error) {
+        if (isApiRequest) {
+          (window as any).__nexus_set_backend_offline(method);
+        }
+        throw error;
+      }
+    };
 
     try {
-      const response = await originalFetch(input, init);
-
-      // Any valid HTTP response from backend means API is online
-      if (isApiRequest && (window as any).__nexus_backend_online !== true) {
-        (window as any).__nexus_set_backend_online();
-      }
-
-      if (response.status === 401 && window.location.pathname !== "/login") {
-        if (isApiRequest) {
-          localStorage.removeItem("nexus_token");
-          window.location.href = "/login";
-        }
-      }
-
-      return response;
-    } catch (error) {
-      if (isApiRequest) {
-        (window as any).__nexus_set_backend_offline(method);
-      }
-      throw error;
+      Object.defineProperty(window, "fetch", {
+        value: customFetch,
+        writable: true,
+        configurable: true,
+      });
+    } catch {
+      (window as any).fetch = customFetch;
     }
-  };
-  (window as any).__nexus_fetch_patched = true;
+    (window as any).__nexus_fetch_patched = true;
+  } catch (err) {
+    console.warn("Could not patch window.fetch safely:", err);
+  }
 }
 
 function NotFoundComponent() {

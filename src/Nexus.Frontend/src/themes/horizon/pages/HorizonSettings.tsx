@@ -1,11 +1,12 @@
-import { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
-import { Palette, Terminal, FileCode, Download, KeyRound, Plus, Trash2, Server, Database, Zap, Activity, Search, ShieldCheck, Check, Rocket, HardDrive, Bot, Globe, Shield, Sparkles } from "lucide-react";
-import { getApiUrl, getFullUrl, BackendHost, getBackendHosts, setBackendHosts, isBackendEnabledGlobally, BackendPingResult } from "@/lib/backend";
-import { getFrontendSettings, saveFrontendSettings } from "@/lib/frontendSettings";
+import { Palette, SlidersHorizontal, Terminal, FileCode, RefreshCw, Download, KeyRound, Plus, Trash2, Server, Database, Zap, DownloadCloud, Activity, Search, ShieldCheck, Cpu, Check, AlertCircle, Rocket, HardDrive, Bot, Globe, Lock, Shield, Sparkles, Eye, EyeOff, Key, Package } from "lucide-react";
+import { getApiUrl, getFullUrl, BackendHost, getBackendHosts, setBackendHosts, isBackendEnabledGlobally, setBackendEnabledGlobally, testBackendConnection, BackendPingResult } from "@/lib/backend";
+import { getFrontendSettings, saveFrontendSettings, type FrontendSettings } from "@/lib/frontendSettings";
 import { BackgroundJobsView } from "./BackgroundJobsView";
 import { TerminalThemePreview } from "@/components/settings/TerminalThemePreview";
 import { SettingsImportExport } from "@/components/settings/SettingsImportExport";
+import { SoftwareRepoManager } from "@/components/apps/SoftwareRepoManager";
 
 interface AppSettings {
   language: string;
@@ -29,6 +30,8 @@ interface AppSettings {
   slackWebhookUrl?: string;
   maintenanceMode?: boolean;
   auditLoggingEnabled?: boolean;
+  copilotEnabled?: boolean;
+  geminiApiKey?: string;
 
   isFirstRunSetup?: boolean;
   dataDirectoryPath?: string;
@@ -84,6 +87,7 @@ const CATEGORIES = [
   { id: "appearance", label: "Appearance & Customization", icon: Palette, desc: "Themes, terminal colors, and app branding" },
   { id: "system", label: "System & Environment", icon: Server, desc: "Backend infrastructure, web bindings, WinRM" },
   { id: "security", label: "Security & Access", icon: KeyRound, desc: "Authentication, RBAC, API keys, maintenance mode" },
+  { id: "software_repo", label: "Software Repository & Packages", icon: Package, desc: "Manage software packages, winget feeds, and silent installer defaults" },
   { id: "integrations", label: "Integrations & Automation", icon: Zap, desc: "Active Directory, PowerShell policy, Webhooks" },
   { id: "diagnostics", label: "Diagnostics & Telemetry", icon: Activity, desc: "Background jobs, telemetry logs, alert triggers" },
   { id: "provisioning", label: "Fleet Provisioning & PXE", icon: Rocket, desc: "PXE boot servers, Golden ISO templates, OOBE join", badge: "Roadmap" },
@@ -99,12 +103,18 @@ export function HorizonSettings() {
   });
   const [activeSection, setActiveSection] = useState("appearance");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [logsEnabled, setLogsEnabled] = useState(false);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
   // Backend Connection State
   const [backendHostsState, setBackendHostsState] = useState<BackendHost[]>([]);
   const [globalBackendEnabled, setGlobalBackendEnabled] = useState(true);
-  const [pingResults] = useState<Record<string, BackendPingResult>>({});
-  const [isPinging] = useState<Record<string, boolean>>({});
+  const [newBackendName, setNewBackendName] = useState("");
+  const [newBackendUrl, setNewBackendUrl] = useState("");
+  const [pingResults, setPingResults] = useState<Record<string, BackendPingResult>>({});
+  const [isPinging, setIsPinging] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setBackendHostsState(getBackendHosts());
@@ -211,7 +221,7 @@ export function HorizonSettings() {
     });
   }
 
-
+  const activeHost = backendHostsState.find(h => h.isActive) || backendHostsState[0];
 
   const themes = [
     { id: "horizon", name: "🌅 Horizon Luminous Day", desc: "Warm coral primary, pure Luminous UI redesign", accent: "#ff5e3a" },
@@ -475,7 +485,14 @@ export function HorizonSettings() {
             </div>
           )}
 
-          {/* CATEGORY 4: INTEGRATIONS & AUTOMATION */}
+          {/* CATEGORY 4: SOFTWARE REPOSITORY & PACKAGES */}
+          {activeSection === "software_repo" && (
+            <div className="space-y-6">
+              <SoftwareRepoManager />
+            </div>
+          )}
+
+          {/* CATEGORY 5: INTEGRATIONS & AUTOMATION */}
           {activeSection === "integrations" && (
             <div className="space-y-6">
               {/* PowerShell Script Templates Manager */}
@@ -723,20 +740,103 @@ export function HorizonSettings() {
             </div>
           )}
 
-          {/* CATEGORY 9: AI OPERATIONS & NEXUS COPILOT (PLACEHOLDER) */}
+          {/* CATEGORY 9: AI OPERATIONS & NEXUS COPILOT */}
           {activeSection === "ai_ops" && (
             <div className="space-y-6">
+              {/* Copilot & Gemini API Configuration Card */}
+              <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 space-y-5 shadow-sm">
+                <div className="flex items-center justify-between border-b border-[var(--border-c)] pb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
+                      <Bot size={20} className="text-amber-400" /> Nexus Copilot & Gemini AI Integration
+                    </h3>
+                    <p className="text-xs text-[var(--text-sub)] mt-0.5">Control live AI SysAdmin Assistant features, Copilot drawers, and custom Gemini API keys.</p>
+                  </div>
+                  <span className="text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 px-3 py-1 rounded-full uppercase flex items-center gap-1">
+                    <Sparkles size={12} /> Live Feature
+                  </span>
+                </div>
+
+                {/* Enable / Disable Toggle */}
+                <div className="flex items-center justify-between p-4 bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl">
+                  <div className="space-y-0.5">
+                    <div className="text-xs font-bold text-[var(--text)] flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-400" /> Enable Nexus Copilot & AI Intelligence Cards
+                    </div>
+                    <div className="text-[11px] text-[var(--text-sub)]">
+                      When disabled, the topbar Nexus Copilot button and in-page AI diagnostic cards are hidden across all dashboards.
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={s.copilotEnabled !== false}
+                      onChange={(e) => {
+                        patch({ copilotEnabled: e.target.checked });
+                        toast.success(e.target.checked ? "Nexus Copilot Enabled" : "Nexus Copilot Disabled");
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                  </label>
+                </div>
+
+                {/* Gemini API Key Input Field */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-[var(--text)] uppercase tracking-wider flex items-center gap-1.5">
+                      <Key className="w-3.5 h-3.5 text-amber-400" /> Gemini API Key
+                    </label>
+                    <span className="text-[10px] text-[var(--text-sub)] font-mono">
+                      {s.geminiApiKey ? "Using Custom Key" : "Inheriting System Env (GEMINI_API_KEY)"}
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showApiKey ? "text" : "password"}
+                      value={s.geminiApiKey || ""}
+                      onChange={(e) => patch({ geminiApiKey: e.target.value })}
+                      placeholder="AIzaSy... (Leave empty to use default environment key)"
+                      className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl pl-3 pr-20 py-2.5 text-xs text-[var(--text)] font-mono focus:border-amber-500 focus:outline-none"
+                    />
+                    <div className="absolute right-2 top-2 flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        className="p-1 text-[var(--text-sub)] hover:text-white transition-colors cursor-pointer"
+                        title={showApiKey ? "Hide Key" : "Show Key"}
+                      >
+                        {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                      {s.geminiApiKey && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            patch({ geminiApiKey: "" });
+                            toast.info("Gemini API key cleared. Reverted to environment key.");
+                          }}
+                          className="px-2 py-0.5 text-[10px] bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded transition-all cursor-pointer font-sans"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-sub)]">
+                    Enter your custom Google Gemini API key to override the server's default configuration. You can obtain a key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-amber-400 underline">aistudio.google.com</a>.
+                  </p>
+                </div>
+              </section>
+
+              {/* Local LLM & Auto Remediation Roadmap Options */}
               <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 space-y-4 shadow-sm">
                 <div className="flex items-center justify-between border-b border-[var(--border-c)] pb-4">
                   <div>
                     <h3 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
-                      <Bot size={20} className="text-purple-400" /> AI Operations & Nexus Copilot
+                      <Cpu size={20} className="text-purple-400" /> Local LLM & Automated Remediation
                     </h3>
-                    <p className="text-xs text-[var(--text-sub)] mt-0.5">Local LLM model integration for automated log diagnosis and incident resolution.</p>
+                    <p className="text-xs text-[var(--text-sub)] mt-0.5">Ollama / LocalAI endpoints for air-gapped environments.</p>
                   </div>
-                  <span className="text-xs font-bold bg-[var(--amber-low)] text-[var(--amber)] border border-[var(--amber)]/30 px-3 py-1 rounded-full uppercase flex items-center gap-1">
-                    <Sparkles size={12} /> Roadmap Preview
-                  </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">

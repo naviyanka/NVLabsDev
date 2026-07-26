@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { getServersClient, addServerClient, deleteServerClient, editServerClient, restartServerClient, type Server } from "@/api/client";
-import { Server as ServerIcon, Plus, Trash2, Terminal, Monitor, X, RefreshCw, Search, Clock, Download, CheckSquare, Square, Activity, Cpu, HardDrive, Globe } from "lucide-react";
+import { getServersClient, addServerClient, deleteServerClient, editServerClient, restartServerClient, shutdownServerClient, type Server } from "@/api/client";
+import { Server as ServerIcon, Plus, Edit, Trash2, Terminal, Monitor, X, RefreshCw, Power, PowerOff, Search, Clock, Download, CheckSquare, Square, ShieldCheck, Zap, Activity, Cpu, HardDrive, Layers, Globe } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { getApiUrl } from "@/lib/backend";
@@ -8,6 +8,7 @@ import { getApiUrl } from "@/lib/backend";
 export function HorizonServers() {
   const [servers, setServers] = useState<Server[]>([]);
   const [filter, setFilter] = useState("all");
+  const [loading, setLoading] = useState(false);
   const [selectedIps, setSelectedIps] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());

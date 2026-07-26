@@ -22,7 +22,6 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -80,20 +79,21 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
     setSelectedIndex(0);
   }, [query]);
 
-  // Auto-scroll selected item into view
+  const selectedItemRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    if (!listRef.current) return;
-    const el = listRef.current.querySelector(`[data-cmd-index="${selectedIndex}"]`) as HTMLElement;
-    if (el) el.scrollIntoView({ block: "nearest" });
+    if (selectedItemRef.current) {
+      selectedItemRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
   }, [selectedIndex]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev + 1) % Math.max(filtered.length, 1));
+      setSelectedIndex((prev) => (filtered.length > 0 ? (prev + 1) % filtered.length : 0));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev - 1 + filtered.length) % Math.max(filtered.length, 1));
+      setSelectedIndex((prev) => (filtered.length > 0 ? (prev - 1 + filtered.length) % filtered.length : 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (filtered[selectedIndex]) {
@@ -101,6 +101,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
         onClose();
       }
     } else if (e.key === "Escape") {
+      e.preventDefault();
       onClose();
     }
   };
@@ -115,6 +116,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
       <div 
         className="w-full max-w-xl bg-[var(--bg-surface)] border border-[var(--border-c)] rounded-2xl shadow-2xl overflow-hidden flex flex-col mx-4 animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={handleKeyDown}
       >
         {/* Input Bar */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border-c)] bg-[var(--bg-card)]">
@@ -133,7 +135,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
         </div>
 
         {/* Results List */}
-        <div ref={listRef} className="max-h-[380px] overflow-y-auto p-2 divide-y divide-[var(--border-c)]/30">
+        <div className="max-h-[380px] overflow-y-auto p-2 divide-y divide-[var(--border-c)]/30">
           {filtered.length === 0 ? (
             <div className="py-12 text-center text-xs text-[var(--text-sub)]">
               No matching commands or routes found for "<span className="text-[var(--amber)]">{query}</span>"
@@ -145,12 +147,14 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
               return (
                 <div
                   key={item.id}
-                  data-cmd-index={idx}
+                  ref={isSelected ? selectedItemRef : null}
                   onClick={() => {
                     item.action();
                     onClose();
                   }}
-                  onMouseEnter={() => setSelectedIndex(idx)}
+                  onMouseMove={() => {
+                    if (selectedIndex !== idx) setSelectedIndex(idx);
+                  }}
                   className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl cursor-pointer transition-all ${
                     isSelected
                       ? "bg-[var(--amber)] text-white shadow-md font-semibold"

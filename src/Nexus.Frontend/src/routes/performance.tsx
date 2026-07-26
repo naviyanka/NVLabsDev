@@ -6,6 +6,7 @@ import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { NxCard } from "@/components/ui/NxCard";
 import { ServerSelector } from "@/components/ui/ServerSelector";
 import { getPerformanceHistoryClient, getProcessesClient, type PerfSample, type Process } from "@/api/client";
+import { GeminiIntelligenceCard } from "@/components/ai/GeminiIntelligenceCard";
 
 export const Route = createFileRoute("/performance")({
   head: () => ({ meta: [{ title: "Performance — NEXUS" }, { name: "description", content: "Live CPU, memory, disk and network metrics." }] }),
@@ -42,6 +43,19 @@ function Performance() {
     <PageWrapper>
       <PageHeader eyebrow="Telemetry" title="Performance Monitor" subtitle="Real-time metric streams refreshing every 3 seconds" />
       <ServerSelector value={server} onChange={setServer} />
+      
+      <GeminiIntelligenceCard
+        title="Performance Bottleneck Intelligence"
+        type="performance"
+        dataToAnalyze={{
+          selectedServer: server,
+          latestMetrics: last,
+          averages: { cpu: avg("cpu"), memory: avg("mem"), disk: avg("disk"), network: avg("net") },
+          topProcesses: procs.slice(0, 5),
+        }}
+        contextMessage="Analyze current telemetry stream and top running processes. Identify memory leaks, CPU spikes, or disk I/O bottlenecks."
+        defaultPromptLabel="Analyze Performance Bottlenecks"
+      />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <ChartCard label="CPU Usage" value={last ? Math.round(last.cpu) : 0} unit="%" trend={last && data.at(-2) ? last.cpu - data.at(-2)!.cpu : 0}
           stats={{ min: min("cpu"), max: max("cpu"), avg: avg("cpu") }}>

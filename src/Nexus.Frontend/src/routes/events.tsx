@@ -5,6 +5,7 @@ import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
 import { getEventsClient as getEvents, getServersClient, type EventEntry, type EventLevel, type Server } from "@/api/client";
 import { ThemeContext } from "./__root";
+import { GeminiIntelligenceCard } from "@/components/ai/GeminiIntelligenceCard";
 
 export const Route = createFileRoute("/events")({
   head: () => ({ meta: [{ title: "Event Viewer — NEXUS" }, { name: "description", content: "Browse system, application, and security event logs." }] }),
@@ -120,6 +121,21 @@ function EventsPage() {
           </p>
         </div>
         <ServerSelector value={server} onChange={setServer} />
+        
+        <GeminiIntelligenceCard
+          title="Event Log AI Root-Cause Diagnostics"
+          type="events"
+          dataToAnalyze={filtered.slice(0, 15).map((e) => ({
+            eventId: e.id,
+            level: e.level,
+            source: e.source,
+            message: e.message,
+            time: e.time,
+          }))}
+          contextMessage={`Analyze the active ${log} log entries on ${serverInfo?.name || server} and identify critical anomalies or errors.`}
+          defaultPromptLabel="Perform Log AI Diagnosis"
+        />
+
         <ControlBar q={q} setQ={setQ} onRefresh={() => fetchEvents(server, log)} onExport={exportCsv} autoRefresh={autoRefresh} setAutoRefresh={setAutoRefresh} loading={loading} lastRefresh={lastRefresh} />
         <div className="grid grid-cols-[240px_1fr] gap-5">
           <aside className="nx-card h-fit p-3">

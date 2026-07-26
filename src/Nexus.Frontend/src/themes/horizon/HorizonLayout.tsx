@@ -1,13 +1,16 @@
 import React, { ReactNode, useState, useEffect } from "react";
-import { getApiUrl, isBackendEnabledGlobally, getBackendUrl } from "@/lib/backend";
+import { getApiUrl, getFullUrl, isBackendEnabledGlobally, getBackendUrl, testBackendConnection } from "@/lib/backend";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { 
-  LayoutDashboard, Server, Bell, Settings as SettingsIcon, Search, HelpCircle, Terminal, Cpu, Shield, FileCode, Activity, Moon, Sun, AppWindow, Cog, HardDrive, FolderOpen, Calendar, Package, Layers, RefreshCw, Monitor, BadgeCheck, Users, KeyRound, Network, DatabaseZap, GitBranch, CopySlash, ScrollText, Puzzle, X, LogOut, User
+  LayoutDashboard, Server, Bell, Settings as SettingsIcon, Search, HelpCircle, Terminal, Cpu, Shield, FileCode, Activity, Moon, Sun, AppWindow, Cog, HardDrive, FolderOpen, Calendar, Package, Layers, RefreshCw, Monitor, BadgeCheck, Users, KeyRound, Network, DatabaseZap, GitBranch, CopySlash, ScrollText, Puzzle, Hexagon, X, LogOut, User, Sparkles
 } from "lucide-react";
 import { toast } from "sonner";
 import { BackendStatusModal } from "@/components/ui/BackendStatusModal";
+import { BackendStatusMonitor } from "@/components/ui/BackendStatusMonitor";
 import { CommandPalette } from "@/components/ui/CommandPalette";
+import { GeminiCopilotDrawer } from "@/components/ai/GeminiCopilotDrawer";
 import { getFrontendSettings } from "@/lib/frontendSettings";
+import { getNotificationsClient } from "@/api/client";
 
 type Item = { to: string; label: string; icon: React.ComponentType<{ className?: string; size?: number }> };
 type Group = { label: string; items: Item[] };
@@ -39,17 +42,37 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [userContext, setUserContext] = useState({ username: "Admin User", role: "Luminous Command", initials: "NX" });
-  const fs = getFrontendSettings();
-  const [brand, setBrand] = useState({ name: fs.appName || "NEXUS", subtitle: fs.appSubtitle || "Horizon UI Shell" });
+  const [brand, setBrand] = useState({ name: "NEXUS", subtitle: "Horizon UI Shell" });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   const [backendStatus, setBackendStatus] = useState({
-    enabled: isBackendEnabledGlobally(),
+    enabled: true,
     online: true,
-    url: getBackendUrl()
+    url: "http://localhost:5010"
   });
   const [showBackendModal, setShowBackendModal] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [copilotOpen, setCopilotOpen] = useState(false);
+  const [copilotEnabled, setCopilotEnabled] = useState(true);
+
+  useEffect(() => {
+    const fs = getFrontendSettings();
+    setBrand({ name: fs.appName || "NEXUS", subtitle: fs.appSubtitle || "Horizon UI Shell" });
+    setCopilotEnabled(fs.copilotEnabled !== false);
+    setBackendStatus(prev => ({
+      ...prev,
+      enabled: isBackendEnabledGlobally(),
+      url: getBackendUrl()
+    }));
+
+    const handleCopilotChange = (e: any) => {
+      if (e.detail && e.detail.copilotEnabled !== undefined) {
+        setCopilotEnabled(e.detail.copilotEnabled);
+      }
+    };
+    window.addEventListener("nexus-copilot-change", handleCopilotChange);
+    return () => window.removeEventListener("nexus-copilot-change", handleCopilotChange);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -66,30 +89,23 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
     const checkLiveHealth = async () => {
       const enabled = isBackendEnabledGlobally();
       const url = getBackendUrl();
-      let online = false;
-
-      try {
-        const targetUrl = url ? `${url.replace(/\/+$/, "")}/api/health` : `/api/health`;
-        const res = await fetch(targetUrl, { signal: AbortSignal.timeout(3000) });
-        online = res.ok;
-      } catch (err) {
-        // Fallback: try relative /api/health directly
-        try {
-          const res = await fetch("/api/health", { signal: AbortSignal.timeout(3000) });
-          online = res.ok;
-        } catch (e) {
-          online = false;
+      if (!enabled) {
+        setBackendStatus({ enabled: false, online: false, url });
+        if (typeof window !== "undefined") {
+          (window as any).__nexus_backend_online = false;
         }
+        return;
       }
 
-      setBackendStatus({ enabled, online, url });
+      const ping = await testBackendConnection(url);
+      setBackendStatus({ enabled, online: ping.reachable, url });
       if (typeof window !== "undefined") {
-        (window as any).__nexus_backend_online = online;
+        (window as any).__nexus_backend_online = ping.reachable;
       }
     };
 
     checkLiveHealth();
-    const interval = setInterval(checkLiveHealth, 3000);
+    const interval = setInterval(checkLiveHealth, 5000);
 
     const handleBackendStatus = (e: any) => {
       if (e.detail?.online !== undefined) {
@@ -121,11 +137,11 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    fetch(getApiUrl("/notifications")).then(r => r.json()).then(n => {
+    getNotificationsClient().then(n => {
       if (Array.isArray(n)) {
         setNotifications(n.map((x: any) => ({ id: x.id.toString(), msg: x.message, time: new Date(x.timestamp) })));
       }
-    }).catch(()=>{});
+    }).catch(() => {});
     
     const handler = (e: any) => {
       setBrand({ name: e.detail.appName || "NEXUS", subtitle: e.detail.appSubtitle || "Horizon UI Shell" });
@@ -334,45 +350,24 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
             </kbd>
           </button>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {/* Gemini AI Copilot Launcher */}
+          {copilotEnabled && (
+            <button
+              onClick={() => setCopilotOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-400 font-semibold text-xs transition-all shadow-xs hover:shadow-md hover:scale-105 cursor-pointer"
+              title="Open Gemini SysAdmin Copilot Chatbot"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+              <span className="hidden sm:inline font-mono">Nexus Copilot</span>
+            </button>
+          )}
           
-          {/* Heartbeat Backend Status Icon Button */}
-          <button 
+          {/* Live Backend Status Monitor */}
+          <BackendStatusMonitor 
             onClick={() => setShowBackendModal(true)}
-            className={`relative p-2 rounded-full transition-all hover:scale-110 cursor-pointer flex items-center justify-center ${
-              !backendStatus.enabled
-                ? "hover:bg-[var(--amber-low)] text-[var(--amber)]"
-                : backendStatus.online 
-                  ? "hover:bg-[var(--ok)]/10 text-[var(--ok)]" 
-                  : "hover:bg-[var(--crit)]/10 text-[var(--crit)]"
-            }`}
-            title={
-              !backendStatus.enabled 
-                ? "Offline Mode (Local Cache Only)" 
-                : backendStatus.online 
-                  ? `Backend Online (${backendStatus.url || "http://localhost:5010"})` 
-                  : "Backend Dead / Unreachable"
-            }
-          >
-            <Activity 
-              size={19} 
-              className={`${
-                !backendStatus.enabled 
-                  ? "text-[var(--amber)]" 
-                  : backendStatus.online 
-                    ? "text-[var(--ok)] animate-pulse" 
-                    : "text-[var(--crit)] animate-bounce"
-              }`} 
-            />
-            {/* Status Heartbeat Dot */}
-            <span className={`absolute top-1 right-1 h-2 w-2 rounded-full ${
-              !backendStatus.enabled 
-                ? "bg-[var(--amber)]" 
-                : backendStatus.online 
-                  ? "bg-[var(--ok)] shadow-[0_0_8px_var(--ok)] animate-ping" 
-                  : "bg-[var(--crit)] shadow-[0_0_8px_var(--crit)] animate-ping"
-            }`} />
-          </button>
+            className="cursor-pointer"
+          />
           <button 
             onClick={() => document.documentElement.classList.toggle('dark')} 
             className="text-[var(--text-sub)] hover:bg-[var(--amber-low)] hover:text-[var(--amber)] rounded-full p-2 transition-all relative"
@@ -437,6 +432,13 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
         isOpen={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
       />
+
+      {copilotEnabled && (
+        <GeminiCopilotDrawer
+          isOpen={copilotOpen}
+          onClose={() => setCopilotOpen(false)}
+        />
+      )}
     </div>
   );
 }

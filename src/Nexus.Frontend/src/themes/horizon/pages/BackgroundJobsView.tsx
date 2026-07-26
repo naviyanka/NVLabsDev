@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { getApiUrl } from "@/lib/backend";
 import { toast } from "sonner";
 import { Activity, Terminal, RefreshCw, StopCircle, CheckCircle, XCircle } from "lucide-react";

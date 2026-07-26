@@ -38,17 +38,16 @@ export function BackendStatusModal({
     const start = performance.now();
     try {
       // testBackendConnection will use the input URL if we pass it, or default to configured
-      const success = await testBackendConnection(url);
-      const end = performance.now();
-      const ms = Math.round(end - start);
+      const pingRes = await testBackendConnection(url);
+      const ms = pingRes.pingMs ?? 0;
       
-      if (success) {
+      if (pingRes.reachable) {
         setPingResult({ status: 'success', ms, message: `Reachable (${ms}ms)` });
         if (!isOnline) {
           (window as any).__nexus_set_backend_online?.();
         }
       } else {
-        setPingResult({ status: 'error', message: "Unreachable / Timeout" });
+        setPingResult({ status: 'error', message: pingRes.error || "Unreachable / Timeout" });
       }
     } catch (e) {
       setPingResult({ status: 'error', message: "Connection failed" });

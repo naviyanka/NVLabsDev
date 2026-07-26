@@ -1,27 +1,18 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { getServersClient, getNotificationsClient, type Server, type Notification } from "@/api/client";
 import { Server as ServerIcon, CheckCircle, XCircle, AlertTriangle, ChevronRight, Zap, RefreshCw, Activity, Terminal, Sparkles, Layers, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import { getApiUrl } from "@/lib/backend";
 import { getFrontendSettings } from "@/lib/frontendSettings";
+import { GeminiIntelligenceCard } from "@/components/ai/GeminiIntelligenceCard";
 
 export function HorizonDashboard() {
-  // Initialize from local cache or empty array (no hardcoded server names)
-  const [servers, setServers] = useState<Server[]>(() => {
-    try {
-      const cached = localStorage.getItem("nexus_cached_servers");
-      if (cached) return JSON.parse(cached);
-    } catch(e) {}
-    return [];
-  });
-
-  const [notifications, setNotifications] = useState<Notification[]>(() => {
-    try {
-      const cached = localStorage.getItem("nexus_cached_notifs");
-      if (cached) return JSON.parse(cached);
-    } catch(e) {}
-    return [];
-  });
+  const [servers, setServers] = useState<Server[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [greeting, setGreeting] = useState("Good day");
+  const [userName, setUserName] = useState("Admin");
+  const [loading, setLoading] = useState(true);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const navigate = useNavigate();
@@ -50,22 +41,29 @@ export function HorizonDashboard() {
       console.warn("Error refreshing dashboard data", e);
     } finally {
       setIsRefreshing(false);
+      setLoading(false);
     }
   };
 
-  const hour = new Date().getHours();
-  let greeting = "Good evening";
-  if (hour >= 5 && hour < 12) greeting = "Good morning";
-  else if (hour >= 12 && hour < 17) greeting = "Good afternoon";
-
-  const [userName] = useState(() => {
-    try {
-      const userStr = localStorage.getItem("nexus-user");
-      return userStr ? JSON.parse(userStr).username || "Admin" : "Admin";
-    } catch(e) { return "Admin"; }
-  });
-
   useEffect(() => {
+    // Determine greeting on client
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) setGreeting("Good morning");
+    else if (hour >= 12 && hour < 17) setGreeting("Good afternoon");
+    else setGreeting("Good evening");
+
+    // Read cached values and user on client
+    try {
+      const cachedSrvs = localStorage.getItem("nexus_cached_servers");
+      if (cachedSrvs) setServers(JSON.parse(cachedSrvs));
+
+      const cachedNotifs = localStorage.getItem("nexus_cached_notifs");
+      if (cachedNotifs) setNotifications(JSON.parse(cachedNotifs));
+
+      const userStr = localStorage.getItem("nexus-user");
+      if (userStr) setUserName(JSON.parse(userStr).username || "Admin");
+    } catch (e) {}
+
     loadData();
     
     // Read user-configured refresh interval from settings (default 30s)
@@ -203,6 +201,33 @@ export function HorizonDashboard() {
         </div>
       </section>
 
+      {/* Gemini AI Fleet Diagnostic Intelligence */}
+      <GeminiIntelligenceCard
+        title="Fleet Diagnostic Intelligence"
+        type="metrics"
+        dataToAnalyze={{
+          totalManagedNodes: servers.length,
+          onlineCount: online,
+          offlineCount: offline,
+          warningCount: warning,
+          averageCpuUtilizationPercent: avgCpu,
+          averageRamUtilizationPercent: avgRam,
+          activeAlerts: alerts,
+          serversSummary: servers.map((s) => ({
+            id: s.id,
+            name: s.name,
+            ip: s.ip,
+            status: s.status,
+            os: s.os,
+            cpu: s.cpu,
+            mem: s.mem,
+            roles: s.roles,
+          })),
+        }}
+        contextMessage="Run full topology check and provide actionable performance optimizations and security precautions."
+        defaultPromptLabel="Generate AI Infrastructure Assessment"
+      />
+
       {/* Quick Launch Operations Action Bar */}
       <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-4 sm:p-6 shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -245,7 +270,14 @@ export function HorizonDashboard() {
             </button>
           </div>
           <div className="overflow-x-auto">
-            {servers.length === 0 ? (
+            {loading && servers.length === 0 ? (
+              <div className="p-6 space-y-4">
+                <div className="nx-skeleton h-10 w-full rounded-lg"></div>
+                <div className="nx-skeleton h-10 w-full rounded-lg"></div>
+                <div className="nx-skeleton h-10 w-full rounded-lg"></div>
+                <div className="nx-skeleton h-10 w-full rounded-lg"></div>
+              </div>
+            ) : servers.length === 0 ? (
               <div className="py-12 text-center text-xs text-[var(--text-sub)] space-y-2">
                 <ServerIcon size={24} className="mx-auto text-[var(--text-sub)] opacity-50" />
                 <p>No servers discovered in database.</p>

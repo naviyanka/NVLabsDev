@@ -1,7 +1,8 @@
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { getWsUrl } from "@/lib/backend";
+import { getWsUrl, isBackendConfigured } from "@/lib/backend";
 import { getFrontendSettings } from "@/lib/frontendSettings";
+import { createSimulatedPowerShell } from "@/lib/powershellEngine";
 
 export interface PtySession {
   id: string;
@@ -10,6 +11,7 @@ export interface PtySession {
   xterm?: Terminal;
   fit?: FitAddon;
   container?: HTMLElement;
+  simulatedEngine?: ReturnType<typeof createSimulatedPowerShell>;
 }
 
 export interface TerminalPalette {
@@ -189,40 +191,61 @@ class TerminalStore {
       xterm.loadAddon(fit);
       xterm.open(element);
 
-      const token = localStorage.getItem("nexus_token") || "";
-      const wsUrl = getWsUrl(`/api/terminal/ws?serverId=${session.serverId}&access_token=${token}`);
-      const ws = new WebSocket(wsUrl);
+      if (isBackendConfigured()) {
+        const token = localStorage.getItem("nexus_token") || "";
+        const wsUrl = getWsUrl(`/api/terminal/ws?serverId=${session.serverId}&access_token=${token}`);
+        
+        try {
+          const ws = new WebSocket(wsUrl);
 
-      ws.onopen = () => {
-        // Clean WebSocket connection
-      };
-
-      ws.onmessage = (ev) => {
-        if (typeof ev.data === "string") {
-          xterm.write(ev.data);
-        } else {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const buf = new Uint8Array(reader.result as ArrayBuffer);
-            xterm.write(buf);
+          ws.onopen = () => {
+            xterm.writeln(`\x1b[32m[WS] Connected live WebSocket stream to ${session.serverId}\x1b[0m`);
           };
-          reader.readAsArrayBuffer(ev.data);
-        }
-      };
 
-      ws.onclose = () => {
-        xterm.writeln("\x1b[31m\r\nConnection closed\x1b[0m");
-      };
+          ws.onmessage = (ev) => {
+            if (typeof ev.data === "string") {
+              xterm.write(ev.data);
+            } else {
+              const reader = new FileReader();
+              reader.onload = () => {
+                const buf = new Uint8Array(reader.result as ArrayBuffer);
+                xterm.write(buf);
+              };
+              reader.readAsArrayBuffer(ev.data);
+            }
+          };
+
+          ws.onerror = () => {
+            if (!session.simulatedEngine) {
+              session.simulatedEngine = createSimulatedPowerShell(xterm, session.serverId);
+            }
+          };
+
+          ws.onclose = () => {
+            if (!session.simulatedEngine) {
+              session.simulatedEngine = createSimulatedPowerShell(xterm, session.serverId);
+            }
+          };
+
+          session.ws = ws;
+        } catch {
+          session.simulatedEngine = createSimulatedPowerShell(xterm, session.serverId);
+        }
+      } else {
+        // Default interactive simulated PowerShell Core
+        session.simulatedEngine = createSimulatedPowerShell(xterm, session.serverId);
+      }
 
       xterm.onData(data => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(data);
+        if (session.ws && session.ws.readyState === WebSocket.OPEN) {
+          session.ws.send(data);
+        } else if (session.simulatedEngine) {
+          session.simulatedEngine.handleInput(data);
         }
       });
 
       session.xterm = xterm;
       session.fit = fit;
-      session.ws = ws;
       session.container = element;
     } else {
       if (session.container !== element) {
@@ -233,11 +256,6 @@ class TerminalStore {
 
     session.xterm.options.theme = palette;
     session.xterm.options.fontSize = fontSize;
-    try {
-      (session.xterm as any)._core?._renderService?.clear();
-      (session.xterm as any).clearTextureAtlas?.();
-    } catch(e) {}
-    session.xterm.refresh(0, Math.max(0, session.xterm.rows - 1));
 
     if (element) {
       element.style.backgroundColor = palette.bg;
@@ -261,11 +279,6 @@ class TerminalStore {
       if (session.xterm) {
         session.xterm.options.fontSize = fontSize;
         session.xterm.options.theme = palette;
-        try {
-          (session.xterm as any)._core?._renderService?.clear();
-          (session.xterm as any).clearTextureAtlas?.();
-        } catch(e) {}
-        session.xterm.refresh(0, Math.max(0, session.xterm.rows - 1));
         if (session.container) {
           session.container.style.backgroundColor = palette.bg;
           session.container.style.color = palette.foreground;
@@ -280,16 +293,20 @@ class TerminalStore {
     }
   }
 
+  public setTheme(themeId: string) {
+    if (typeof window !== "undefined") {
+      document.documentElement.setAttribute("data-terminal-theme", themeId);
+      localStorage.setItem("nexus-terminal-theme", themeId);
+      window.dispatchEvent(new CustomEvent("nexus-terminal-theme-change"));
+    }
+    this.applyThemeToAll();
+  }
+
   public applyThemeToAll() {
     const palette = getActiveTerminalTheme();
     for (const session of this.sessions.values()) {
       if (session.xterm) {
         session.xterm.options.theme = palette;
-        try {
-          (session.xterm as any)._core?._renderService?.clear();
-          (session.xterm as any).clearTextureAtlas?.();
-        } catch(e) {}
-        session.xterm.refresh(0, Math.max(0, session.xterm.rows - 1));
         if (session.container) {
           session.container.style.backgroundColor = palette.bg;
           session.container.style.color = palette.foreground;

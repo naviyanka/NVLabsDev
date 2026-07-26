@@ -6,24 +6,40 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
-
+import fs from 'fs';
 
 export default defineConfig({
   vite: {
     server: {
       allowedHosts: "all",
-      port: 5173,
+      port: 3000,
       host: "0.0.0.0",
       proxy: {
         '/api': {
           target: 'http://127.0.0.1:5010',
           ws: true,
-          secure: false
+          secure: false,
+          configure: (proxy) => {
+            proxy.on('error', (_err, _req, res) => {
+              if ('writeHead' in res && !res.headersSent) {
+                res.writeHead(503, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Backend gateway offline', offline: true }));
+              }
+            });
+          }
         },
         '/hub': {
           target: 'http://127.0.0.1:5010',
           ws: true,
-          secure: false
+          secure: false,
+          configure: (proxy) => {
+            proxy.on('error', (_err, _req, res) => {
+              if ('writeHead' in res && !res.headersSent) {
+                res.writeHead(503, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Backend gateway offline', offline: true }));
+              }
+            });
+          }
         }
       }
     },

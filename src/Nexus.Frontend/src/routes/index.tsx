@@ -82,7 +82,70 @@ function Dashboard() {
   if (loading) {
     return (
       <PageWrapper>
-        <div className="flex h-64 items-center justify-center text-[var(--text-sub)] text-sm">Loading fleet data…</div>
+        <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6">
+          {/* Topology Skeleton */}
+          <div className="nx-card p-5 space-y-4">
+            <div className="nx-skeleton h-3 w-24"></div>
+            <div className="nx-skeleton h-6 w-36"></div>
+            <div className="nx-skeleton h-[300px] w-full rounded-full my-2"></div>
+            <div className="flex justify-center gap-4 pt-2">
+              <div className="nx-skeleton h-3 w-16"></div>
+              <div className="nx-skeleton h-3 w-16"></div>
+              <div className="nx-skeleton h-3 w-16"></div>
+            </div>
+          </div>
+
+          {/* Details & Telemetry Skeleton */}
+          <div className="flex flex-col gap-5">
+            <div className="nx-card p-5 space-y-4">
+              <div className="flex justify-between items-start">
+                <div className="space-y-2">
+                  <div className="nx-skeleton h-3 w-24"></div>
+                  <div className="nx-skeleton h-7 w-48"></div>
+                  <div className="nx-skeleton h-3 w-64"></div>
+                </div>
+                <div className="nx-skeleton h-6 w-20 rounded-full"></div>
+              </div>
+
+              <div className="mt-5 grid grid-cols-3 gap-5">
+                <div className="nx-skeleton h-10 w-full rounded-md"></div>
+                <div className="nx-skeleton h-10 w-full rounded-md"></div>
+                <div className="nx-skeleton h-10 w-full rounded-md"></div>
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <div className="nx-skeleton h-9 w-full rounded-md"></div>
+                <div className="nx-skeleton h-9 w-full rounded-md"></div>
+                <div className="nx-skeleton h-9 w-full rounded-md"></div>
+                <div className="nx-skeleton h-9 w-full rounded-md"></div>
+              </div>
+            </div>
+
+            {/* KPI Stat Tiles Skeleton */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="nx-card p-4 space-y-2">
+                <div className="nx-skeleton h-3 w-16"></div>
+                <div className="nx-skeleton h-8 w-12"></div>
+              </div>
+              <div className="nx-card p-4 space-y-2">
+                <div className="nx-skeleton h-3 w-16"></div>
+                <div className="nx-skeleton h-8 w-12"></div>
+              </div>
+              <div className="nx-card p-4 space-y-2">
+                <div className="nx-skeleton h-3 w-16"></div>
+                <div className="nx-skeleton h-8 w-12"></div>
+              </div>
+            </div>
+
+            {/* Alerts Table Skeleton */}
+            <div className="nx-card p-5 space-y-3">
+              <div className="nx-skeleton h-4 w-32"></div>
+              <div className="nx-skeleton h-10 w-full"></div>
+              <div className="nx-skeleton h-10 w-full"></div>
+              <div className="nx-skeleton h-10 w-full"></div>
+            </div>
+          </div>
+        </div>
       </PageWrapper>
     );
   }
