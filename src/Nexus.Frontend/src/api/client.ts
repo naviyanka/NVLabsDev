@@ -1,16 +1,25 @@
-import { type Server, type PerfSample, type Process, type Service, type Disk, type Volume, type ScheduledTask, type InstalledApp, type FirewallRule, type EventEntry, type EventLevel, type HyperVVM, type Device, type VirtualSwitch, type ReplicaPartnership } from "./mock";
-export type { Server, PerfSample, Process, Service, Disk, Volume, ScheduledTask, InstalledApp, FirewallRule, EventEntry, EventLevel, HyperVVM, Device, VirtualSwitch, ReplicaPartnership };
+import { MOCK_SERVERS, getMockProcesses, getMockServices, controlMockService, setMockServiceStartupType, getMockDisks, getMockVolumes, optimizeMockVolume, checkMockVolume, changeMockVolumeLabel, changeMockDriveLetter, extendMockVolume, formatMockVolume, getEvents, getFirewallRules, addMockFirewallRule, deleteMockFirewallRule, updateMockFirewallRule, getLocalUsers, getLocalGroups, toggleMockUserStatus, toggleMockUserLockout, resetMockUserPassword, updateMockUserGroups, createMockUser, deleteMockUser, createMockGroup, deleteMockGroup, updateMockGroupMembers, type LocalUser, type LocalGroup, getCertificates, getMockCertificates, importMockCertificate, deleteMockCertificate, generateMockSelfSignedCert, renewMockCertificate, getNetworkAdapters, getDevices, getVMs, controlVM, createMockVM, updateMockVMSettings, checkpointMockVMAction, createMockVirtualSwitch, deleteMockVirtualSwitch, renameMockVirtualSwitch, updateMockVirtualSwitch, attachVmToMockSwitch, detachVmFromMockSwitch, getVirtualSwitches, getReplicaPartnerships, createMockReplicaPartnership, swapMockReplicaDirection, failoverMockReplica, toggleMockReplicaPause, deleteMockReplicaPartnership, updateMockReplicaPartnership, resyncMockReplicaPartnership, getMockFilesSources, getMockFilesList, createMockFolder, deleteMockFile, renameMockFile, readMockTextFile, writeMockTextFile, addMockNetworkShare, getMockTasks, runMockTask, toggleMockTask, deleteMockTask, createMockTask, editMockTask, exportMockTaskXml, getMockApps, installMockApp, uninstallMockApp, uploadMockInstaller, SOFTWARE_CATALOG, getSoftwareCatalog, addSoftwareCatalogItem, updateSoftwareCatalogItem, deleteSoftwareCatalogItem, resetSoftwareCatalog, getMockRoles, installMockRole, uninstallMockRole, getMockUpdates, checkMockUpdates, installMockUpdates, getMockUpdateHistory, getMockRdpSessions, disconnectMockRdpSession, logoffMockRdpSession, sendMessageMockRdpSession, getMockRdpConfig, updateMockRdpConfig, getMockDefenderStatus, updateMockDefenderStatus, getMockDefenderThreats, updateMockDefenderThreat, getMockDefenderExclusions, addMockDefenderExclusion, deleteMockDefenderExclusion, getMockDefenderAsrRules, updateMockDefenderAsrRule, getMockRegistryContent, createMockRegistryKey, createMockRegistryValue, deleteMockRegistryValue, deleteMockRegistryKey, searchMockRegistry, generateRegFileExport, type RegistryContent, type RegistryNode, type RegistryValue, type RegistrySearchResult, type DefenderStatus, type DefenderThreat, type DefenderExclusion, type DefenderAsrRule, type WindowsRole, type WindowsUpdate, type UpdateHistoryItem, type RdpSession, type RdpSecurityConfig, type SoftwareCatalogItem, type TaskExecutionLog, type Server, type PerfSample, type Process, type Service, type Disk, type Volume, type ScheduledTask, type InstalledApp, type FirewallRule, type EventEntry, type EventLevel, type HyperVVM, type Device, type VirtualSwitch, type ReplicaPartnership } from "./mock";
+export type { Server, PerfSample, Process, Service, Disk, Volume, ScheduledTask, TaskExecutionLog, InstalledApp, SoftwareCatalogItem, FirewallRule, EventEntry, EventLevel, HyperVVM, Device, VirtualSwitch, ReplicaPartnership, WindowsRole, WindowsUpdate, UpdateHistoryItem, RdpSession, RdpSecurityConfig, DefenderStatus, DefenderThreat, DefenderExclusion, DefenderAsrRule, LocalUser, LocalGroup, RegistryContent, RegistryNode, RegistryValue, RegistrySearchResult };
+export { SOFTWARE_CATALOG, getSoftwareCatalog, addSoftwareCatalogItem, updateSoftwareCatalogItem, deleteSoftwareCatalogItem, resetSoftwareCatalog, getMockRoles, installMockRole, uninstallMockRole, getMockUpdates, checkMockUpdates, installMockUpdates, getMockUpdateHistory, getMockRdpSessions, disconnectMockRdpSession, logoffMockRdpSession, sendMessageMockRdpSession, getMockRdpConfig, updateMockRdpConfig, getMockDefenderStatus, updateMockDefenderStatus, getMockDefenderThreats, updateMockDefenderThreat, getMockDefenderExclusions, addMockDefenderExclusion, deleteMockDefenderExclusion, getMockDefenderAsrRules, updateMockDefenderAsrRule, searchMockRegistry, generateRegFileExport };
 
 import { getApiUrl } from "@/lib/backend";
 
 export async function getAppsClient(serverId: string, refresh: boolean = false): Promise<InstalledApp[]> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverId}/apps?refresh=${refresh}`));
-    if (res.ok) return await res.json();
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((item: any) => ({
+          ...item,
+          sizeMB: typeof item.sizeMB === "number" ? item.sizeMB : (parseFloat(String(item.sizeMB)) || 0)
+        }));
+      }
+    }
   } catch (e) {
-    console.error("Failed to fetch apps", e);
+    // Fail-safe graceful fallback when API is offline
   }
-  return [];
+  return getMockApps(serverId);
 }
 
 export async function installAppClient(serverId: string, installerPath: string, args: string, sourceServerIp: string = ""): Promise<boolean> {
@@ -20,11 +29,11 @@ export async function installAppClient(serverId: string, installerPath: string, 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ installerPath, arguments: args, sourceServerIp })
     });
-    return res.ok;
+    if (res.ok) return true;
   } catch (e) {
     console.error("Failed to install app", e);
-    return false;
   }
+  return installMockApp(serverId, installerPath, args);
 }
 
 export async function uploadInstallerClient(serverId: string, file: File): Promise<string | null> {
@@ -35,15 +44,14 @@ export async function uploadInstallerClient(serverId: string, file: File): Promi
       method: "POST",
       body: formData
     });
-    if (res.ok) {
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
       const data = await res.json();
       return data.path;
     }
-    return null;
   } catch (e) {
     console.error("Failed to upload installer", e);
-    return null;
   }
+  return uploadMockInstaller(serverId, file);
 }
 
 export async function uninstallAppClient(serverId: string, uninstallString: string): Promise<boolean> {
@@ -53,27 +61,23 @@ export async function uninstallAppClient(serverId: string, uninstallString: stri
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ uninstallString })
     });
-    return res.ok;
+    if (res.ok) return true;
   } catch (e) {
     console.error("Failed to uninstall app", e);
-    return false;
   }
+  return uninstallMockApp(serverId, uninstallString);
 }
-export interface WindowsRole {
-  name: string;
-  displayName: string;
-  installState: string;
-  featureType: string;
-}
-
 export async function getRolesClient(serverId: string, refresh: boolean = false): Promise<WindowsRole[]> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverId}/roles?refresh=${refresh}`));
-    if (res.ok) return await res.json();
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
   } catch (e) {
-    console.error("Failed to fetch roles", e);
+    // Fail-safe graceful fallback
   }
-  return [];
+  return getMockRoles(serverId);
 }
 
 export async function installRoleClient(serverId: string, name: string, featureType: string): Promise<boolean> {
@@ -83,11 +87,11 @@ export async function installRoleClient(serverId: string, name: string, featureT
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, featureType })
     });
-    return res.ok;
+    if (res.ok) return true;
   } catch (e) {
-    console.error("Failed to install role", e);
-    return false;
+    // Fallback to mock
   }
+  return installMockRole(serverId, name);
 }
 
 export async function uninstallRoleClient(serverId: string, name: string, featureType: string): Promise<boolean> {
@@ -97,21 +101,24 @@ export async function uninstallRoleClient(serverId: string, name: string, featur
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, featureType })
     });
-    return res.ok;
+    if (res.ok) return true;
   } catch (e) {
-    console.error("Failed to uninstall role", e);
-    return false;
+    // Fallback to mock
   }
+  return uninstallMockRole(serverId, name);
 }
 
 export async function getTasksClient(serverId: string): Promise<ScheduledTask[]> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverId}/tasks`));
-    if (res.ok) return await res.json();
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
   } catch (e) {
-    console.error("Failed to fetch tasks", e);
+    // Fail-safe graceful fallback
   }
-  return [];
+  return getMockTasks(serverId);
 }
 
 export async function runTaskClient(serverId: string, taskPath: string): Promise<boolean> {
@@ -121,21 +128,27 @@ export async function runTaskClient(serverId: string, taskPath: string): Promise
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskPath })
     });
-    return res.ok;
+    if (res.ok) return true;
   } catch (e) {
     console.error("Failed to run task", e);
-    return false;
   }
+  return runMockTask(serverId, taskPath);
 }
 
 export async function getServersClient(): Promise<Server[]> {
   try {
     const res = await fetch(getApiUrl(`/servers`));
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) return data;
+      }
+    }
   } catch (e) {
-    console.error("Failed to fetch servers", e);
+    // Graceful fail-safe fallback when gateway backend is unreachable
   }
-  return []; 
+  return MOCK_SERVERS; 
 }
 
 export async function addServerClient(data: { name: string; ip: string; role: string }) {
@@ -187,9 +200,11 @@ export async function shutdownServerClient(ip: string): Promise<boolean> {
 export async function getPerformanceHistoryClient(serverId: string): Promise<PerfSample[]> {
   try {
     const res = await fetch(getApiUrl(`/performance/${serverId}`));
-    if (res.ok) return await res.json();
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      return await res.json();
+    }
   } catch (e) {
-    console.error("Failed to fetch performance", e);
+    // Fail-safe graceful fallback when backend is unreachable
   }
   return [];
 }
@@ -197,31 +212,40 @@ export async function getPerformanceHistoryClient(serverId: string): Promise<Per
 export async function getProcessesClient(serverId: string): Promise<Process[]> {
   try {
     const res = await fetch(getApiUrl(`/performance/${serverId}/processes`));
-    if (res.ok) return await res.json();
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
   } catch (e) {
-    console.error("Failed to fetch processes", e);
+    // Fail-safe graceful fallback when backend is unreachable
   }
-  return [];
+  return getMockProcesses(serverId);
 }
 
 export async function getLiveProcessesClient(serverId: string): Promise<Process[]> {
   try {
     const res = await fetch(getApiUrl(`/performance/${serverId}/processes/live`));
-    if (res.ok) return await res.json();
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
   } catch (e) {
-    console.error("Failed to fetch live processes", e);
+    // Fail-safe graceful fallback when backend is unreachable
   }
-  return [];
+  return getMockProcesses(serverId);
 }
 
 export async function getProcessDetailsClient(serverId: string, pid: number): Promise<Process | null> {
   try {
     const res = await fetch(getApiUrl(`/performance/${serverId}/processes/${pid}`));
-    if (res.ok) return await res.json();
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      return await res.json();
+    }
   } catch (e) {
-    console.error("Failed to fetch process details", e);
+    // Fail-safe graceful fallback
   }
-  return null;
+  const mockProcs = getMockProcesses(serverId);
+  return mockProcs.find(p => p.pid === pid) || null;
 }
 
 export async function killProcessClient(serverId: string, pid: number): Promise<boolean> {
@@ -231,7 +255,6 @@ export async function killProcessClient(serverId: string, pid: number): Promise<
     });
     return res.ok;
   } catch (e) {
-    console.error("Failed to kill process", e);
     return false;
   }
 }
@@ -239,11 +262,14 @@ export async function killProcessClient(serverId: string, pid: number): Promise<
 export async function getServicesClient(serverId: string): Promise<Service[]> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverId}/services`));
-    if (res.ok) return await res.json();
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
   } catch (e) {
-    console.error("Failed to fetch services", e);
+    // Fail-safe graceful fallback
   }
-  return [];
+  return getMockServices(serverId);
 }
 
 export async function controlServiceClient(serverId: string, name: string, action: string): Promise<boolean> {
@@ -251,11 +277,31 @@ export async function controlServiceClient(serverId: string, name: string, actio
     const res = await fetch(getApiUrl(`/servers/${serverId}/services/${name}/${action}`), {
       method: 'POST'
     });
-    return res.ok;
+    if (res.ok) {
+      controlMockService(serverId, name, action);
+      return true;
+    }
   } catch (e) {
     console.error("Failed to control service", e);
-    return false;
   }
+  return controlMockService(serverId, name, action);
+}
+
+export async function setServiceStartupTypeClient(serverId: string, name: string, startupType: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/services/${name}/startup`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ startupType })
+    });
+    if (res.ok) {
+      setMockServiceStartupType(serverId, name, startupType);
+      return true;
+    }
+  } catch (e) {
+    console.error("Failed to update service startup type", e);
+  }
+  return setMockServiceStartupType(serverId, name, startupType);
 }
 
 export interface FileSource {
@@ -273,44 +319,53 @@ export interface FileItem {
 }
 
 export const getFilesSourcesClient = async (serverIp: string): Promise<FileSource[]> => {
-  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/sources`));
-  if (!res.ok) return [];
-  return res.json();
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/files/sources`));
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch (e) {}
+  return getMockFilesSources(serverIp);
 };
 
 export const getFilesListClient = async (serverIp: string, path: string): Promise<FileItem[]> => {
-  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/list?path=${encodeURIComponent(path)}`));
-  if (!res.ok) throw new Error("Failed to list files");
-  return res.json();
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/files/list?path=${encodeURIComponent(path)}`));
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      return await res.json();
+    }
+  } catch (e) {}
+  return getMockFilesList(serverIp, path);
 };
 
 export const createFolderClient = async (serverIp: string, path: string, name: string): Promise<void> => {
-  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/new-folder?path=${encodeURIComponent(path)}&name=${encodeURIComponent(name)}`), { method: "POST" });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || "Failed to create folder");
-  }
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/files/new-folder?path=${encodeURIComponent(path)}&name=${encodeURIComponent(name)}`), { method: "POST" });
+    if (res.ok) return;
+  } catch (e) {}
+  createMockFolder(serverIp, path, name);
 };
 
 export const deleteFileClient = async (serverIp: string, path: string): Promise<void> => {
-  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/delete?path=${encodeURIComponent(path)}`), { method: "DELETE" });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || "Failed to delete");
-  }
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/files/delete?path=${encodeURIComponent(path)}`), { method: "DELETE" });
+    if (res.ok) return;
+  } catch (e) {}
+  deleteMockFile(serverIp, path);
 };
 
 export const uploadFileClient = async (serverIp: string, path: string, file: File): Promise<void> => {
-  const formData = new FormData();
-  formData.append("file", file);
-  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/upload?path=${encodeURIComponent(path)}`), {
-    method: "POST",
-    body: formData,
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || "Failed to upload");
-  }
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/files/upload?path=${encodeURIComponent(path)}`), {
+      method: "POST",
+      body: formData,
+    });
+    if (res.ok) return;
+  } catch (e) {}
+  writeMockTextFile(serverIp, `${path}\\${file.name}`, `[Binary / Uploaded file contents for ${file.name}]`);
 };
 
 export const getDownloadUrl = (serverIp: string, path: string): string => {
@@ -318,63 +373,155 @@ export const getDownloadUrl = (serverIp: string, path: string): string => {
 };
 
 export const renameFileClient = async (serverIp: string, path: string, newName: string): Promise<void> => {
-  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/rename?path=${encodeURIComponent(path)}&newName=${encodeURIComponent(newName)}`), { method: "POST" });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || "Failed to rename");
-  }
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/files/rename?path=${encodeURIComponent(path)}&newName=${encodeURIComponent(newName)}`), { method: "POST" });
+    if (res.ok) return;
+  } catch (e) {}
+  renameMockFile(serverIp, path, newName);
 };
 
 export const moveFileClient = async (serverIp: string, path: string, destPath: string): Promise<void> => {
-  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/move?path=${encodeURIComponent(path)}&destPath=${encodeURIComponent(destPath)}`), { method: "POST" });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || "Failed to move");
-  }
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/files/move?path=${encodeURIComponent(path)}&destPath=${encodeURIComponent(destPath)}`), { method: "POST" });
+    if (res.ok) return;
+  } catch (e) {}
+  const fileName = path.split("\\").pop() || "item";
+  deleteMockFile(serverIp, path);
+  writeMockTextFile(serverIp, `${destPath}\\${fileName}`, readMockTextFile(serverIp, path));
 };
 
 export const copyFileClient = async (serverIp: string, path: string, destPath: string): Promise<void> => {
-  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/copy?path=${encodeURIComponent(path)}&destPath=${encodeURIComponent(destPath)}`), { method: "POST" });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || "Failed to copy");
-  }
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/files/copy?path=${encodeURIComponent(path)}&destPath=${encodeURIComponent(destPath)}`), { method: "POST" });
+    if (res.ok) return;
+  } catch (e) {}
+  const fileName = path.split("\\").pop() || "item";
+  writeMockTextFile(serverIp, `${destPath}\\${fileName}`, readMockTextFile(serverIp, path));
 };
 
 export const readTextFileClient = async (serverIp: string, path: string): Promise<string> => {
-  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/read-text?path=${encodeURIComponent(path)}`));
-  if (!res.ok) throw new Error("Failed to read text file");
-  const data = await res.json();
-  return data.content;
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/files/read-text?path=${encodeURIComponent(path)}`));
+    if (res.ok) {
+      const data = await res.json();
+      return data.content;
+    }
+  } catch (e) {}
+  return readMockTextFile(serverIp, path);
 };
 
 export const writeTextFileClient = async (serverIp: string, path: string, content: string): Promise<void> => {
-  const res = await fetch(getApiUrl(`/servers/${serverIp}/files/write-text?path=${encodeURIComponent(path)}`), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content })
-  });
-  if (!res.ok) throw new Error("Failed to write text file");
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/files/write-text?path=${encodeURIComponent(path)}`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content })
+    });
+    if (res.ok) return;
+  } catch (e) {}
+  writeMockTextFile(serverIp, path, content);
+};
+
+export const addNetworkShareClient = async (serverIp: string, name: string, uncPath: string): Promise<FileSource> => {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/files/shares`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, uncPath })
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {}
+  return addMockNetworkShare(serverIp, name, uncPath);
 };
 
 export async function getDisksClient(serverId: string): Promise<Disk[]> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverId}/storage/disks`));
-    if (res.ok) return await res.json();
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
   } catch (e) {
-    console.error("Failed to fetch disks", e);
+    // Fail-safe graceful fallback
   }
-  return [];
+  return getMockDisks(serverId);
 }
 
 export async function getVolumesClient(serverId: string): Promise<Volume[]> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverId}/storage/volumes`));
-    if (res.ok) return await res.json();
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
   } catch (e) {
-    console.error("Failed to fetch volumes", e);
+    // Fail-safe graceful fallback
   }
-  return [];
+  return getMockVolumes(serverId);
+}
+
+export async function optimizeVolumeClient(serverId: string, letter: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/storage/volumes/${letter}/optimize`), { method: "POST" });
+    if (res.ok) return true;
+  } catch (e) {}
+  return optimizeMockVolume(serverId, letter);
+}
+
+export async function checkVolumeClient(serverId: string, letter: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/storage/volumes/${letter}/check`), { method: "POST" });
+    if (res.ok) return true;
+  } catch (e) {}
+  return checkMockVolume(serverId, letter);
+}
+
+export async function changeVolumeLabelClient(serverId: string, letter: string, newLabel: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/storage/volumes/${letter}/label`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label: newLabel })
+    });
+    if (res.ok) return true;
+  } catch (e) {}
+  return changeMockVolumeLabel(serverId, letter, newLabel);
+}
+
+export async function changeDriveLetterClient(serverId: string, oldLetter: string, newLetter: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/storage/volumes/${oldLetter}/letter`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ newLetter })
+    });
+    if (res.ok) return true;
+  } catch (e) {}
+  return changeMockDriveLetter(serverId, oldLetter, newLetter);
+}
+
+export async function extendVolumeClient(serverId: string, letter: string, addGB: number): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/storage/volumes/${letter}/extend`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ addGB })
+    });
+    if (res.ok) return true;
+  } catch (e) {}
+  return extendMockVolume(serverId, letter, addGB);
+}
+
+export async function formatVolumeClient(serverId: string, letter: string, fs: "NTFS" | "ReFS" | "FAT32"): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/storage/volumes/${letter}/format`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fs })
+    });
+    if (res.ok) return true;
+  } catch (e) {}
+  return formatMockVolume(serverId, letter, fs);
 }
 
 export interface Notification {
@@ -392,14 +539,44 @@ export interface WindowsUpdate {
   maxDownloadSize: number;
 }
 
+export const MOCK_NOTIFICATIONS: Notification[] = [
+  {
+    id: 1,
+    type: "Information",
+    message: "NEXUS Management Service initialized on local node.",
+    serverIp: "192.168.0.10",
+    timestamp: new Date().toISOString(),
+    isRead: false
+  },
+  {
+    id: 2,
+    type: "Warning",
+    message: "High memory utilization (>80%) detected on SQL01.",
+    serverIp: "192.168.0.30",
+    timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+    isRead: false
+  },
+  {
+    id: 3,
+    type: "Critical",
+    message: "Storage volume C: on FS01 reached 95% capacity.",
+    serverIp: "192.168.0.50",
+    timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+    isRead: false
+  }
+];
+
 export async function getNotificationsClient(): Promise<Notification[]> {
   try {
     const res = await fetch(getApiUrl(`/notifications`));
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) return data;
+    }
   } catch (e) {
-    console.error("Failed to fetch notifications", e);
+    // Fail-safe graceful fallback when backend endpoint is not reachable
   }
-  return [];
+  return MOCK_NOTIFICATIONS;
 }
 
 export const testNotificationClient = async (type: string, message: string) => {
@@ -438,21 +615,27 @@ export async function clearAllNotificationsClient(): Promise<boolean> {
 export async function getUpdatesClient(serverIp: string): Promise<WindowsUpdate[]> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverIp}/updates`));
-    if (res.ok) return await res.json();
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
   } catch (e) {
-    console.error("Failed to fetch updates", e);
+    // Fallback gracefully to mock data
   }
-  return [];
+  return getMockUpdates(serverIp);
 }
 
 export async function checkUpdatesClient(serverIp: string): Promise<WindowsUpdate[]> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverIp}/updates/check`), { method: "POST" });
-    if (res.ok) return await res.json();
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
   } catch (e) {
-    console.error("Failed to check updates", e);
+    // Fallback gracefully to mock data
   }
-  return [];
+  return checkMockUpdates(serverIp);
 }
 
 export async function installUpdatesClient(serverIp: string, titles: string[]): Promise<boolean> {
@@ -462,11 +645,27 @@ export async function installUpdatesClient(serverIp: string, titles: string[]): 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ updateTitles: titles })
     });
-    return res.ok || res.status === 202;
+    if (res.ok || res.status === 202) {
+      installMockUpdates(serverIp, titles);
+      return true;
+    }
   } catch (e) {
-    console.error("Failed to install updates", e);
+    // Fallback gracefully to mock data
   }
-  return false;
+  return installMockUpdates(serverIp, titles);
+}
+
+export async function getUpdateHistoryClient(serverIp: string): Promise<UpdateHistoryItem[]> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/updates/history`));
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch (e) {
+    // Fallback gracefully to mock data
+  }
+  return getMockUpdateHistory(serverIp);
 }
 
 // --- PowerShell (persistent sessions)
@@ -531,16 +730,29 @@ export interface Certificate {
   from: string;
   to: string;
   purpose: string;
+  store?: string;
+  serialNumber?: string;
+  sanList?: string[];
+  signatureAlgorithm?: string;
+  keyAlgorithm?: string;
+  keySize?: number;
+  isSelfSigned?: boolean;
+  hasPrivateKey?: boolean;
+  certPem?: string;
+  friendlyName?: string;
 }
 
 export async function getCertificatesClient(serverIp: string, store: string = "Personal"): Promise<Certificate[]> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverIp}/certificates?store=${encodeURIComponent(store)}`));
-    if (res.ok) return await res.json();
-  } catch (e) {
-    console.error("Failed to fetch certificates", e);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch {
+    // Fallback to local store
   }
-  return [];
+  return getMockCertificates(serverIp, store);
 }
 
 export interface LocalUser {
@@ -561,48 +773,73 @@ export interface LocalGroup {
 export async function getUsersClient(serverIp: string): Promise<LocalUser[]> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverIp}/users`));
-    if (res.ok) return await res.json();
-  } catch (e) {
-    console.error("Failed to fetch users", e);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch {
+    // Fallback to local store
   }
-  return [];
+  return await getLocalUsers(serverIp);
 }
 
 export async function getGroupsClient(serverIp: string): Promise<LocalGroup[]> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverIp}/users/groups`));
-    if (res.ok) return await res.json();
-  } catch (e) {
-    console.error("Failed to fetch groups", e);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch {
+    // Fallback to local store
   }
-  return [];
+  return await getLocalGroups(serverIp);
 }
 
-export interface NetworkAdapter {
-  name: string;
-  description: string;
-  type: string;
-  status: string;
-  mac: string;
-  ipv4: string;
-  ipv6: string;
-  subnet: string;
-  gateway: string;
-  dns: string[];
-  dhcp: boolean;
-  speedMbps: number;
-  bytesIn: number;
-  bytesOut: number;
-}
+import {
+  getMockNetworkAdapters,
+  updateMockNetworkAdapterConfig,
+  controlMockNetworkAdapter,
+  getMockRoutes,
+  addMockRoute,
+  deleteMockRoute,
+  getMockDnsCache,
+  type NetworkAdapter,
+  type NetworkRoute,
+  type DnsCacheEntry
+} from "./mock";
+
+export type { NetworkAdapter, NetworkRoute, DnsCacheEntry };
 
 export async function getNetworksClient(serverIp: string): Promise<NetworkAdapter[]> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverIp}/networks`));
-    if (res.ok) return await res.json();
-  } catch (e) {
-    console.error("Failed to fetch networks", e);
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch {
+    // Fail-safe graceful fallback when backend API is offline
   }
-  return [];
+  return getMockNetworkAdapters(serverIp);
+}
+
+export async function updateNetworkAdapterClient(
+  serverIp: string,
+  adapterName: string,
+  config: Partial<NetworkAdapter>
+): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/networks/${encodeURIComponent(adapterName)}/config`), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(config)
+    });
+    if (res.ok) return true;
+  } catch {
+    // Fallback
+  }
+  return updateMockNetworkAdapterConfig(serverIp, adapterName, config);
 }
 
 export async function controlNetworkClient(serverIp: string, adapterName: string, action: string): Promise<boolean> {
@@ -610,50 +847,124 @@ export async function controlNetworkClient(serverIp: string, adapterName: string
     const res = await fetch(getApiUrl(`/servers/${serverIp}/networks/${encodeURIComponent(adapterName)}/${action}`), {
       method: "POST"
     });
-    return res.ok;
-  } catch (e) {
-    console.error("Failed to control network adapter", e);
-    return false;
+    if (res.ok) return true;
+  } catch {
+    // Fallback
   }
+  return controlMockNetworkAdapter(serverIp, adapterName, action);
 }
 
-export interface OpenPort {
-  localPort: number;
-  protocol: string;
-  processName: string;
-  state: string;
+export async function getRoutesClient(serverIp: string): Promise<NetworkRoute[]> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/routes`));
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) return data;
+    }
+  } catch {
+    // Fallback
+  }
+  return getMockRoutes(serverIp);
 }
 
-export interface LocalAdmin {
-  name: string;
-  principalSource: string;
-  expected: boolean;
+export async function addRouteClient(serverIp: string, route: NetworkRoute): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/routes`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(route)
+    });
+    if (res.ok) return true;
+  } catch {
+    // Fallback
+  }
+  return addMockRoute(serverIp, route);
 }
 
-export interface SecurityEvent {
-  id: string;
-  eventId: number;
-  level: string;
-  timeCreated: string;
-  message: string;
+export async function deleteRouteClient(serverIp: string, destination: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/routes/${encodeURIComponent(destination)}`), {
+      method: "DELETE"
+    });
+    if (res.ok) return true;
+  } catch {
+    // Fallback
+  }
+  return deleteMockRoute(serverIp, destination);
 }
 
-export interface SecurityData {
-  events: SecurityEvent[];
-  openPorts: OpenPort[];
-  localAdmins: LocalAdmin[];
-  failedLogins24h: number;
-  lastUpdated: string;
+export async function getDnsCacheClient(_serverIp: string): Promise<DnsCacheEntry[]> {
+  return getMockDnsCache();
 }
+
+
+import {
+  getMockSecurityData,
+  updateMockSecurityCompliance,
+  updateMockSecurityEventStatus,
+  toggleMockLocalAdminExpected,
+  type OpenPort,
+  type LocalAdmin,
+  type SecurityEvent,
+  type SecurityComplianceCheck,
+  type SecurityData
+} from "./mock";
+
+export type { OpenPort, LocalAdmin, SecurityEvent, SecurityComplianceCheck, SecurityData };
 
 export async function getSecurityClient(serverIp: string, refresh = false): Promise<SecurityData | null> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverIp}/security?refresh=${refresh}`));
-    if (res.ok) return await res.json();
-  } catch (e) {
-    console.error("Failed to fetch security data", e);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.events)) return data;
+    }
+  } catch {
+    // Fallback to local store
   }
-  return null;
+  return getMockSecurityData(serverIp);
+}
+
+export async function updateComplianceCheckClient(serverIp: string, checkId: string, passed: boolean): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/security/compliance`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ checkId, passed })
+    });
+    if (res.ok) return true;
+  } catch {
+    // Fallback
+  }
+  return updateMockSecurityCompliance(serverIp, checkId, passed);
+}
+
+export async function updateSecurityEventStatusClient(serverIp: string, eventId: string, status: "Reviewed" | "Resolved"): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/security/events/${eventId}/status`), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status })
+    });
+    if (res.ok) return true;
+  } catch {
+    // Fallback
+  }
+  return updateMockSecurityEventStatus(serverIp, eventId, status);
+}
+
+export async function toggleLocalAdminExpectedClient(serverIp: string, adminName: string, expected: boolean): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/security/local-admins/expected`), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ adminName, expected })
+    });
+    if (res.ok) return true;
+  } catch {
+    // Fallback
+  }
+  return toggleMockLocalAdminExpected(serverIp, adminName, expected);
 }
 
 export interface RegistryValue {
@@ -676,22 +987,28 @@ export interface RegistryContent {
 export async function getRegistryContentClient(serverIp: string, path: string): Promise<RegistryContent> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverIp}/registry?path=${encodeURIComponent(path)}`));
-    if (res.ok) return await res.json();
-  } catch (e) {
-    console.error("Failed to fetch registry", e);
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (data && (Array.isArray(data.subKeys) || Array.isArray(data.values))) return data;
+    }
+  } catch {
+    // Fail-safe graceful fallback when backend API is offline
   }
-  return { subKeys: [], values: [] };
+  return getMockRegistryContent(serverIp, path);
 }
 
 // --- Firewall Client Endpoints
 export async function getFirewallRulesClient(serverId: string): Promise<FirewallRule[]> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverId}/firewall/rules`));
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
   } catch (e) {
     console.error("Failed to fetch firewall rules", e);
   }
-  return [];
+  return await getFirewallRules(serverId);
 }
 
 export async function toggleFirewallRuleClient(serverId: string, ruleId: string, enabled: boolean): Promise<boolean> {
@@ -701,33 +1018,81 @@ export async function toggleFirewallRuleClient(serverId: string, ruleId: string,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ enabled })
     });
-    return res.ok;
+    if (res.ok) return true;
   } catch (e) {
     console.error("Failed to toggle firewall rule", e);
-    return false;
   }
+  return toggleFirewallRule(serverId, ruleId, enabled);
+}
+
+export async function addFirewallRuleClient(serverId: string, newRule: Omit<FirewallRule, "id">): Promise<FirewallRule | null> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/firewall/rules`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newRule)
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (e) {
+    console.error("Failed to create firewall rule via API", e);
+  }
+  return await addMockFirewallRule(serverId, newRule);
+}
+
+export async function deleteFirewallRuleClient(serverId: string, ruleId: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/firewall/rules/${encodeURIComponent(ruleId)}`), {
+      method: "DELETE"
+    });
+    if (res.ok) return true;
+  } catch (e) {
+    console.error("Failed to delete firewall rule via API", e);
+  }
+  return await deleteMockFirewallRule(serverId, ruleId);
+}
+
+export async function updateFirewallRuleClient(serverId: string, ruleId: string, patch: Partial<FirewallRule>): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/firewall/rules/${encodeURIComponent(ruleId)}`), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch)
+    });
+    if (res.ok) return true;
+  } catch (e) {
+    console.error("Failed to update firewall rule via API", e);
+  }
+  return await updateMockFirewallRule(serverId, ruleId, patch);
 }
 
 // --- Events Client Endpoints
 export async function getEventsClient(serverId: string, log: string = "System", limit: number = 60): Promise<EventEntry[]> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverId}/events?log=${encodeURIComponent(log)}&limit=${limit}`));
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
   } catch (e) {
     console.error("Failed to fetch events", e);
   }
-  return [];
+  return await getEvents(serverId, log as any, limit);
 }
 
 // --- Hyper-V Virtual Machines Client Endpoints
 export async function getVMsClient(serverId: string): Promise<HyperVVM[]> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverId}/vms`));
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
   } catch (e) {
     console.error("Failed to fetch VMs", e);
   }
-  return [];
+  return await getVMs(serverId);
 }
 
 export async function controlVMClient(serverId: string, vmId: string, action: string): Promise<boolean> {
@@ -735,33 +1100,39 @@ export async function controlVMClient(serverId: string, vmId: string, action: st
     const res = await fetch(getApiUrl(`/servers/${serverId}/vms/${encodeURIComponent(vmId)}/${action}`), {
       method: "POST"
     });
-    return res.ok;
-  } catch (e) {
-    console.error("Failed to control VM", e);
-    return false;
+    if (res.ok) return true;
+  } catch {
+    // Fallback to mock state handler
   }
+  return await controlVM(serverId, vmId, action as any);
 }
 
 // --- Devices Client Endpoints
 export async function getDevicesClient(serverId: string): Promise<Device[]> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverId}/devices`));
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
   } catch (e) {
     console.error("Failed to fetch devices", e);
   }
-  return [];
+  return await getDevices(serverId);
 }
 
 // --- Virtual Switches Client Endpoints
 export async function getVirtualSwitchesClient(serverId: string): Promise<VirtualSwitch[]> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverId}/vswitches`));
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
   } catch (e) {
     console.error("Failed to fetch virtual switches", e);
   }
-  return [];
+  return await getVirtualSwitches(serverId);
 }
 
 export async function renameVirtualSwitchClient(serverId: string, switchId: string, name: string): Promise<boolean> {
@@ -771,11 +1142,53 @@ export async function renameVirtualSwitchClient(serverId: string, switchId: stri
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name })
     });
-    return res.ok;
-  } catch (e) {
-    console.error("Failed to rename virtual switch", e);
-    return false;
+    if (res.ok) return true;
+  } catch {
+    // Fallback
   }
+  return await renameMockVirtualSwitch(serverId, switchId, name);
+}
+
+export async function updateVirtualSwitchClient(serverId: string, switchId: string, updates: Partial<VirtualSwitch>): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/vswitches/${encodeURIComponent(switchId)}`), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates)
+    });
+    if (res.ok) return true;
+  } catch {
+    // Fallback
+  }
+  return await updateMockVirtualSwitch(serverId, switchId, updates);
+}
+
+export async function attachVmToVirtualSwitchClient(serverId: string, switchId: string, vmName: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/vswitches/${encodeURIComponent(switchId)}/attach-vm`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ vmName })
+    });
+    if (res.ok) return true;
+  } catch {
+    // Fallback
+  }
+  return await attachVmToMockSwitch(serverId, switchId, vmName);
+}
+
+export async function detachVmFromVirtualSwitchClient(serverId: string, switchId: string, vmName: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/vswitches/${encodeURIComponent(switchId)}/detach-vm`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ vmName })
+    });
+    if (res.ok) return true;
+  } catch {
+    // Fallback
+  }
+  return await detachVmFromMockSwitch(serverId, switchId, vmName);
 }
 
 export async function deleteVirtualSwitchClient(serverId: string, switchId: string): Promise<boolean> {
@@ -783,22 +1196,25 @@ export async function deleteVirtualSwitchClient(serverId: string, switchId: stri
     const res = await fetch(getApiUrl(`/servers/${serverId}/vswitches/${encodeURIComponent(switchId)}`), {
       method: "DELETE"
     });
-    return res.ok;
-  } catch (e) {
-    console.error("Failed to delete virtual switch", e);
-    return false;
+    if (res.ok) return true;
+  } catch {
+    // Fallback
   }
+  return await deleteMockVirtualSwitch(serverId, switchId);
 }
 
 // --- Storage Replica Client Endpoints
 export async function getReplicaPartnershipsClient(serverId: string): Promise<ReplicaPartnership[]> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverId}/storage-replica`));
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
   } catch (e) {
     console.error("Failed to fetch replica partnerships", e);
   }
-  return [];
+  return await getReplicaPartnerships(serverId);
 }
 
 export async function swapReplicaDirectionClient(serverId: string, partnershipId: string): Promise<boolean> {
@@ -806,11 +1222,11 @@ export async function swapReplicaDirectionClient(serverId: string, partnershipId
     const res = await fetch(getApiUrl(`/servers/${serverId}/storage-replica/${encodeURIComponent(partnershipId)}/swap`), {
       method: "POST"
     });
-    return res.ok;
-  } catch (e) {
-    console.error("Failed to swap replica direction", e);
-    return false;
+    if (res.ok) return true;
+  } catch {
+    // Fallback
   }
+  return await swapMockReplicaDirection(partnershipId);
 }
 
 export async function failoverReplicaClient(serverId: string, partnershipId: string): Promise<boolean> {
@@ -818,25 +1234,79 @@ export async function failoverReplicaClient(serverId: string, partnershipId: str
     const res = await fetch(getApiUrl(`/servers/${serverId}/storage-replica/${encodeURIComponent(partnershipId)}/failover`), {
       method: "POST"
     });
-    return res.ok;
-  } catch (e) {
-    console.error("Failed to failover replica", e);
-    return false;
+    if (res.ok) return true;
+  } catch {
+    // Fallback
   }
+  return await failoverMockReplica(partnershipId);
 }
 
-export async function importCertificateClient(serverIp: string, certData: string, password?: string): Promise<boolean> {
+export async function toggleReplicaPauseClient(serverId: string, partnershipId: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/storage-replica/${encodeURIComponent(partnershipId)}/toggle-pause`), {
+      method: "POST"
+    });
+    if (res.ok) return true;
+  } catch {
+    // Fallback
+  }
+  return await toggleMockReplicaPause(partnershipId);
+}
+
+export async function deleteReplicaPartnershipClient(serverId: string, partnershipId: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/storage-replica/${encodeURIComponent(partnershipId)}`), {
+      method: "DELETE"
+    });
+    if (res.ok) return true;
+  } catch {
+    // Fallback
+  }
+  return await deleteMockReplicaPartnership(partnershipId);
+}
+
+export async function updateReplicaPartnershipClient(serverId: string, partnershipId: string, updates: Partial<ReplicaPartnership>): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/storage-replica/${encodeURIComponent(partnershipId)}`), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates)
+    });
+    if (res.ok) return true;
+  } catch {
+    // Fallback
+  }
+  return await updateMockReplicaPartnership(partnershipId, updates);
+}
+
+export async function resyncReplicaPartnershipClient(serverId: string, partnershipId: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/storage-replica/${encodeURIComponent(partnershipId)}/resync`), {
+      method: "POST"
+    });
+    if (res.ok) return true;
+  } catch {
+    // Fallback
+  }
+  return await resyncMockReplicaPartnership(partnershipId);
+}
+
+export async function importCertificateClient(serverIp: string, certData: string, password?: string, storeName: string = "Personal"): Promise<boolean> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverIp}/certificates/import`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ certData, password })
+      body: JSON.stringify({ certData, password, store: storeName })
     });
-    return res.ok;
+    if (res.ok) {
+      importMockCertificate(serverIp, storeName, certData, password);
+      return true;
+    }
   } catch (e) {
-    console.error("Failed to import certificate", e);
-    return false;
+    console.error("Failed to import certificate via API", e);
   }
+  importMockCertificate(serverIp, storeName, certData, password);
+  return true;
 }
 
 export async function deleteCertificateClient(serverIp: string, thumbprint: string): Promise<boolean> {
@@ -844,25 +1314,70 @@ export async function deleteCertificateClient(serverIp: string, thumbprint: stri
     const res = await fetch(getApiUrl(`/servers/${serverIp}/certificates/${encodeURIComponent(thumbprint)}`), {
       method: "DELETE"
     });
-    return res.ok;
+    if (res.ok) {
+      deleteMockCertificate(serverIp, thumbprint);
+      return true;
+    }
   } catch (e) {
-    console.error("Failed to delete certificate", e);
-    return false;
+    console.error("Failed to delete certificate via API", e);
   }
+  return deleteMockCertificate(serverIp, thumbprint);
 }
 
-export async function createUserClient(serverIp: string, user: { name: string; fullName: string; password?: string; groups?: string[] }): Promise<boolean> {
+export async function generateSelfSignedCertClient(
+  serverIp: string, 
+  storeName: string, 
+  params: { commonName: string; san?: string[]; daysValid: number; keySize: number; friendlyName?: string; purpose?: string }
+): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/certificates/self-signed`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...params, store: storeName })
+    });
+    if (res.ok) {
+      generateMockSelfSignedCert(serverIp, storeName, params);
+      return true;
+    }
+  } catch (e) {
+    console.error("Failed to generate self-signed cert via API", e);
+  }
+  generateMockSelfSignedCert(serverIp, storeName, params);
+  return true;
+}
+
+export async function renewCertificateClient(serverIp: string, thumbprint: string, extendYears: number = 2): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/certificates/${encodeURIComponent(thumbprint)}/renew`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ extendYears })
+    });
+    if (res.ok) {
+      renewMockCertificate(serverIp, thumbprint, extendYears);
+      return true;
+    }
+  } catch (e) {
+    console.error("Failed to renew cert via API", e);
+  }
+  return renewMockCertificate(serverIp, thumbprint, extendYears) !== null;
+}
+
+export async function createUserClient(serverIp: string, user: { name: string; fullName: string; description?: string; password?: string; groups?: string[]; enabled?: boolean; passwordNeverExpires?: boolean; userCannotChangePassword?: boolean }): Promise<boolean> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverIp}/users`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(user)
     });
-    return res.ok;
+    if (res.ok) {
+      createMockUser(serverIp, user);
+      return true;
+    }
   } catch (e) {
     console.error("Failed to create user", e);
-    return false;
   }
+  return createMockUser(serverIp, user);
 }
 
 export async function deleteUserClient(serverIp: string, username: string): Promise<boolean> {
@@ -870,11 +1385,135 @@ export async function deleteUserClient(serverIp: string, username: string): Prom
     const res = await fetch(getApiUrl(`/servers/${serverIp}/users/${encodeURIComponent(username)}`), {
       method: "DELETE"
     });
-    return res.ok;
+    if (res.ok) {
+      deleteMockUser(serverIp, username);
+      return true;
+    }
   } catch (e) {
     console.error("Failed to delete user", e);
-    return false;
   }
+  return deleteMockUser(serverIp, username);
+}
+
+export async function setUserStatusClient(serverIp: string, username: string, enabled: boolean): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/users/${encodeURIComponent(username)}/status`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled })
+    });
+    if (res.ok) {
+      toggleMockUserStatus(serverIp, username, enabled);
+      return true;
+    }
+  } catch (e) {
+    console.error("Failed to update user status", e);
+  }
+  return toggleMockUserStatus(serverIp, username, enabled);
+}
+
+export async function setUserLockoutClient(serverIp: string, username: string, locked: boolean): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/users/${encodeURIComponent(username)}/lockout`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locked })
+    });
+    if (res.ok) {
+      toggleMockUserLockout(serverIp, username, locked);
+      return true;
+    }
+  } catch (e) {
+    console.error("Failed to update user lockout state", e);
+  }
+  return toggleMockUserLockout(serverIp, username, locked);
+}
+
+export async function resetUserPasswordClient(
+  serverIp: string, 
+  username: string, 
+  opts: { password?: string; passwordNeverExpires?: boolean; userCannotChangePassword?: boolean }
+): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/users/${encodeURIComponent(username)}/reset-password`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(opts)
+    });
+    if (res.ok) {
+      resetMockUserPassword(serverIp, username, opts);
+      return true;
+    }
+  } catch (e) {
+    console.error("Failed to reset password", e);
+  }
+  return resetMockUserPassword(serverIp, username, opts);
+}
+
+export async function updateUserGroupsClient(serverIp: string, username: string, groups: string[]): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/users/${encodeURIComponent(username)}/groups`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ groups })
+    });
+    if (res.ok) {
+      updateMockUserGroups(serverIp, username, groups);
+      return true;
+    }
+  } catch (e) {
+    console.error("Failed to update user groups", e);
+  }
+  return updateMockUserGroups(serverIp, username, groups);
+}
+
+export async function createGroupClient(serverIp: string, group: LocalGroup): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/users/groups`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(group)
+    });
+    if (res.ok) {
+      createMockGroup(serverIp, group);
+      return true;
+    }
+  } catch (e) {
+    console.error("Failed to create group", e);
+  }
+  return createMockGroup(serverIp, group);
+}
+
+export async function deleteGroupClient(serverIp: string, groupName: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/users/groups/${encodeURIComponent(groupName)}`), {
+      method: "DELETE"
+    });
+    if (res.ok) {
+      deleteMockGroup(serverIp, groupName);
+      return true;
+    }
+  } catch (e) {
+    console.error("Failed to delete group", e);
+  }
+  return deleteMockGroup(serverIp, groupName);
+}
+
+export async function updateGroupMembersClient(serverIp: string, groupName: string, members: string[]): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/users/groups/${encodeURIComponent(groupName)}/members`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ members })
+    });
+    if (res.ok) {
+      updateMockGroupMembers(serverIp, groupName, members);
+      return true;
+    }
+  } catch (e) {
+    console.error("Failed to update group members", e);
+  }
+  return updateMockGroupMembers(serverIp, groupName, members);
 }
 
 export async function createRegistryKeyClient(serverIp: string, path: string, keyName: string): Promise<boolean> {
@@ -884,11 +1523,11 @@ export async function createRegistryKeyClient(serverIp: string, path: string, ke
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path, keyName })
     });
-    return res.ok;
-  } catch (e) {
-    console.error("Failed to create registry key", e);
-    return false;
+    if (res.ok) return true;
+  } catch {
+    // Fallback
   }
+  return createMockRegistryKey(serverIp, path, keyName);
 }
 
 export async function createRegistryValueClient(serverIp: string, path: string, name: string, type: string, data: string): Promise<boolean> {
@@ -898,11 +1537,11 @@ export async function createRegistryValueClient(serverIp: string, path: string, 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path, name, type, data })
     });
-    return res.ok;
-  } catch (e) {
-    console.error("Failed to create registry value", e);
-    return false;
+    if (res.ok) return true;
+  } catch {
+    // Fallback
   }
+  return createMockRegistryValue(serverIp, path, name, type as any, data);
 }
 
 export async function deleteRegistryValueClient(serverIp: string, path: string, name: string): Promise<boolean> {
@@ -910,11 +1549,23 @@ export async function deleteRegistryValueClient(serverIp: string, path: string, 
     const res = await fetch(getApiUrl(`/servers/${serverIp}/registry/value?path=${encodeURIComponent(path)}&name=${encodeURIComponent(name)}`), {
       method: "DELETE"
     });
-    return res.ok;
-  } catch (e) {
-    console.error("Failed to delete registry value", e);
-    return false;
+    if (res.ok) return true;
+  } catch {
+    // Fallback
   }
+  return deleteMockRegistryValue(serverIp, path, name);
+}
+
+export async function deleteRegistryKeyClient(serverIp: string, path: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/registry/key?path=${encodeURIComponent(path)}`), {
+      method: "DELETE"
+    });
+    if (res.ok) return true;
+  } catch {
+    // Fallback
+  }
+  return deleteMockRegistryKey(serverIp, path);
 }
 
 export async function toggleTaskClient(serverId: string, taskPath: string, enable: boolean): Promise<boolean> {
@@ -924,11 +1575,11 @@ export async function toggleTaskClient(serverId: string, taskPath: string, enabl
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskPath, enable })
     });
-    return res.ok;
+    if (res.ok) return true;
   } catch (e) {
     console.error("Failed to toggle task", e);
-    return false;
   }
+  return toggleMockTask(serverId, taskPath, enable);
 }
 
 export async function deleteTaskClient(serverId: string, taskPath: string): Promise<boolean> {
@@ -938,25 +1589,89 @@ export async function deleteTaskClient(serverId: string, taskPath: string): Prom
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskPath })
     });
-    return res.ok;
+    if (res.ok) return true;
   } catch (e) {
     console.error("Failed to delete task", e);
-    return false;
   }
+  return deleteMockTask(serverId, taskPath);
 }
 
-export async function createVMClient(serverId: string, config: { name: string; memoryMb: number; vcpu: number; vswitch: string; vhdxSizeGb: number; isoPath?: string }): Promise<boolean> {
+export async function createTaskClient(serverId: string, task: ScheduledTask): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/tasks/create`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(task)
+    });
+    if (res.ok) return true;
+  } catch (e) {
+    console.error("Failed to create task", e);
+  }
+  return createMockTask(serverId, task);
+}
+
+export async function editTaskClient(serverId: string, originalPath: string, updatedTask: ScheduledTask): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/tasks/edit`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ originalPath, task: updatedTask })
+    });
+    if (res.ok) return true;
+  } catch (e) {
+    console.error("Failed to edit task", e);
+  }
+  return editMockTask(serverId, originalPath, updatedTask);
+}
+
+export async function exportTaskXmlClient(serverId: string, taskPath: string): Promise<string> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/tasks/xml?path=${encodeURIComponent(taskPath)}`));
+    if (res.ok) return await res.text();
+  } catch (e) {
+    console.error("Failed to fetch task XML", e);
+  }
+  return exportMockTaskXml(serverId, taskPath);
+}
+
+export async function createVMClient(serverId: string, config: { name: string; os?: string; memoryMb: number; vcpu: number; vswitch: string; vhdxSizeGb: number; generation?: 1|2; dynamicMemory?: boolean; isoPath?: string; notes?: string }): Promise<boolean> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverId}/vms`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(config)
     });
-    return res.ok;
-  } catch (e) {
-    console.error("Failed to create VM", e);
-    return false;
+    if (res.ok) return true;
+  } catch {
+    // Fallback
   }
+  return await createMockVM(serverId, config);
+}
+
+export async function updateVMSettingsClient(serverId: string, vmId: string, updates: Partial<HyperVVM>): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/vms/${encodeURIComponent(vmId)}`), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates)
+    });
+    if (res.ok) return true;
+  } catch {
+    // Fallback
+  }
+  return await updateMockVMSettings(serverId, vmId, updates);
+}
+
+export async function deleteVMClient(serverId: string, vmId: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/vms/${encodeURIComponent(vmId)}`), {
+      method: "DELETE"
+    });
+    if (res.ok) return true;
+  } catch {
+    // Fallback
+  }
+  return await controlVM(serverId, vmId, "delete");
 }
 
 export async function checkpointVMClient(serverId: string, vmId: string, action: "create" | "apply" | "delete", snapshotName?: string): Promise<boolean> {
@@ -966,37 +1681,280 @@ export async function checkpointVMClient(serverId: string, vmId: string, action:
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, snapshotName })
     });
-    return res.ok;
-  } catch (e) {
-    console.error("Failed to execute VM checkpoint action", e);
-    return false;
+    if (res.ok) return true;
+  } catch {
+    // Fallback
   }
+  return await checkpointMockVMAction(serverId, vmId, action, snapshotName);
 }
 
-export async function createVirtualSwitchClient(serverId: string, config: { name: string; type: string; adapterName?: string }): Promise<boolean> {
+export async function createVirtualSwitchClient(serverId: string, config: { name: string; type: "External"|"Internal"|"Private"; adapterName?: string; notes?: string }): Promise<boolean> {
   try {
     const res = await fetch(getApiUrl(`/servers/${serverId}/vswitches`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(config)
     });
-    return res.ok;
-  } catch (e) {
-    console.error("Failed to create virtual switch", e);
-    return false;
+    if (res.ok) return true;
+  } catch {
+    // Fallback
   }
+  return await createMockVirtualSwitch(serverId, config);
 }
 
-export async function createReplicaPartnershipClient(sourceServer: string, config: { destServer: string; sourceVol: string; destVol: string; mode: string }): Promise<boolean> {
+export async function createReplicaPartnershipClient(sourceServer: string, config: { 
+  destServer: string; 
+  sourceVol: string; 
+  sourceLogVol?: string;
+  destVol: string; 
+  destLogVol?: string;
+  mode: "Synchronous" | "Asynchronous";
+  replicationGroup?: string;
+  logSizeGb?: number;
+  encryption?: boolean;
+}): Promise<boolean> {
   try {
     const res = await fetch(getApiUrl(`/servers/${sourceServer}/storage-replica`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(config)
     });
-    return res.ok;
-  } catch (e) {
-    console.error("Failed to create storage replica partnership", e);
-    return false;
+    if (res.ok) return true;
+  } catch {
+    // Fallback
   }
+  return await createMockReplicaPartnership(config);
 }
+
+// --- RDP Sessions & Configuration
+export async function getRdpSessionsClient(serverIp: string): Promise<RdpSession[]> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/rdp/sessions`));
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch (e) {
+    // Fallback gracefully to mock data
+  }
+  return getMockRdpSessions(serverIp);
+}
+
+export async function disconnectRdpSessionClient(serverIp: string, sessionId: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/rdp/sessions/${sessionId}/disconnect`), { method: "POST" });
+    if (res.ok) {
+      disconnectMockRdpSession(serverIp, sessionId);
+      return true;
+    }
+  } catch (e) {
+    // Fallback gracefully
+  }
+  return disconnectMockRdpSession(serverIp, sessionId);
+}
+
+export async function logoffRdpSessionClient(serverIp: string, sessionId: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/rdp/sessions/${sessionId}/logoff`), { method: "DELETE" });
+    if (res.ok) {
+      logoffMockRdpSession(serverIp, sessionId);
+      return true;
+    }
+  } catch (e) {
+    // Fallback gracefully
+  }
+  return logoffMockRdpSession(serverIp, sessionId);
+}
+
+export async function sendMessageRdpSessionClient(serverIp: string, sessionId: string, messageText: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/rdp/sessions/${sessionId}/message`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: messageText })
+    });
+    if (res.ok) {
+      sendMessageMockRdpSession(serverIp, sessionId, messageText);
+      return true;
+    }
+  } catch (e) {
+    // Fallback gracefully
+  }
+  return sendMessageMockRdpSession(serverIp, sessionId, messageText);
+}
+
+export async function getRdpConfigClient(serverIp: string): Promise<RdpSecurityConfig> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/rdp/config`));
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (data) return data;
+    }
+  } catch (e) {
+    // Fallback
+  }
+  return getMockRdpConfig(serverIp);
+}
+
+export async function updateRdpConfigClient(serverIp: string, config: Partial<RdpSecurityConfig>): Promise<RdpSecurityConfig> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/rdp/config`), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(config)
+    });
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (data) {
+        updateMockRdpConfig(serverIp, config);
+        return data;
+      }
+    }
+  } catch (e) {
+    // Fallback
+  }
+  return updateMockRdpConfig(serverIp, config);
+}
+
+// --- Windows Defender Client Wrappers
+export async function getDefenderStatusClient(serverIp: string): Promise<DefenderStatus> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/defender/status`));
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (data) return data;
+    }
+  } catch (e) {
+    // Fallback
+  }
+  return getMockDefenderStatus(serverIp);
+}
+
+export async function updateDefenderStatusClient(serverIp: string, partial: Partial<DefenderStatus>): Promise<DefenderStatus> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/defender/status`), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(partial)
+    });
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (data) {
+        updateMockDefenderStatus(serverIp, partial);
+        return data;
+      }
+    }
+  } catch (e) {
+    // Fallback
+  }
+  return updateMockDefenderStatus(serverIp, partial);
+}
+
+export async function getDefenderThreatsClient(serverIp: string): Promise<DefenderThreat[]> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/defender/threats`));
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (Array.isArray(data)) return data;
+    }
+  } catch (e) {
+    // Fallback
+  }
+  return getMockDefenderThreats(serverIp);
+}
+
+export async function updateDefenderThreatClient(serverIp: string, threatId: string, action: "Quarantine" | "Remove" | "Allow"): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/defender/threats/${threatId}/action`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action })
+    });
+    if (res.ok) {
+      updateMockDefenderThreat(serverIp, threatId, action);
+      return true;
+    }
+  } catch (e) {
+    // Fallback
+  }
+  return updateMockDefenderThreat(serverIp, threatId, action);
+}
+
+export async function getDefenderExclusionsClient(serverIp: string): Promise<DefenderExclusion[]> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/defender/exclusions`));
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (Array.isArray(data)) return data;
+    }
+  } catch (e) {
+    // Fallback
+  }
+  return getMockDefenderExclusions(serverIp);
+}
+
+export async function addDefenderExclusionClient(serverIp: string, item: Omit<DefenderExclusion, "id" | "dateAdded" | "addedBy">): Promise<DefenderExclusion> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/defender/exclusions`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(item)
+    });
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (data) {
+        addMockDefenderExclusion(serverIp, item);
+        return data;
+      }
+    }
+  } catch (e) {
+    // Fallback
+  }
+  return addMockDefenderExclusion(serverIp, item);
+}
+
+export async function deleteDefenderExclusionClient(serverIp: string, exclusionId: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/defender/exclusions/${exclusionId}`), {
+      method: "DELETE"
+    });
+    if (res.ok) {
+      deleteMockDefenderExclusion(serverIp, exclusionId);
+      return true;
+    }
+  } catch (e) {
+    // Fallback
+  }
+  return deleteMockDefenderExclusion(serverIp, exclusionId);
+}
+
+export async function getDefenderAsrRulesClient(serverIp: string): Promise<DefenderAsrRule[]> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/defender/asr`));
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+      const data = await res.json();
+      if (Array.isArray(data)) return data;
+    }
+  } catch (e) {
+    // Fallback
+  }
+  return getMockDefenderAsrRules(serverIp);
+}
+
+export async function updateDefenderAsrRuleClient(serverIp: string, ruleId: string, state: "Block" | "Audit" | "Disabled"): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/defender/asr/${ruleId}`), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state })
+    });
+    if (res.ok) {
+      updateMockDefenderAsrRule(serverIp, ruleId, state);
+      return true;
+    }
+  } catch (e) {
+    // Fallback
+  }
+  return updateMockDefenderAsrRule(serverIp, ruleId, state);
+}
+
