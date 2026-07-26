@@ -14,6 +14,15 @@ export interface PtySession {
   simulatedEngine?: ReturnType<typeof createSimulatedPowerShell>;
 }
 
+function sanitizePtyStream(input: string): string {
+  if (!input) return input;
+  // Strip VT100 DEC graphic box drawing initial noise (e.g. jjjjh... lines, \x1b(0 sequences, and resize symbol artifacts)
+  return input
+    .replace(/\x1b\(0[jhqkmlxq]+\x1b\(B/gi, "")
+    .replace(/^j{3,}[h]{3,}\r?\n?/gm, "")
+    .replace(/^[\u2921\u2922\u2197\u2198\u2196\u2199\s\/\.\\]*(?=Windows|PS\s|\x1b)/m, "");
+}
+
 export interface TerminalPalette {
   id: string;
   name: string;
@@ -204,12 +213,14 @@ class TerminalStore {
 
           ws.onmessage = (ev) => {
             if (typeof ev.data === "string") {
-              xterm.write(ev.data);
+              const cleaned = sanitizePtyStream(ev.data);
+              if (cleaned) xterm.write(cleaned);
             } else {
               const reader = new FileReader();
               reader.onload = () => {
-                const buf = new Uint8Array(reader.result as ArrayBuffer);
-                xterm.write(buf);
+                const text = new TextDecoder().decode(reader.result as ArrayBuffer);
+                const cleaned = sanitizePtyStream(text);
+                if (cleaned) xterm.write(cleaned);
               };
               reader.readAsArrayBuffer(ev.data);
             }
