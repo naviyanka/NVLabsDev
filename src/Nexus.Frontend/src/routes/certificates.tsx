@@ -3,8 +3,9 @@ import { useEffect, useState, useMemo } from "react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { getCertificatesClient, type Certificate } from "@/api/client";
-import { Loader2, ArrowDownAZ, ArrowUpZA, ShieldCheck, Search } from "lucide-react";
+import { getCertificatesClient, importCertificateClient, deleteCertificateClient, type Certificate } from "@/api/client";
+import { Loader2, ArrowDownAZ, ArrowUpZA, ShieldCheck, Search, Plus, Trash2, X, Upload } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/certificates")({
   head: () => ({ meta: [{ title: "Certificates — NEXUS" }, { name: "description", content: "Inspect installed certificates." }] }),
@@ -25,11 +26,12 @@ function CertificatesPage() {
   const [store, setStore] = useState("Personal");
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [isImportOpen, setIsImportOpen] = useState(false);
   
   const [sortCol, setSortCol] = useState<keyof Certificate>("subject");
   const [sortAsc, setSortAsc] = useState(true);
 
-  useEffect(() => {
+  const loadCertificates = () => {
     setLoading(true);
     getCertificatesClient(server, store)
       .then((data) => {
@@ -42,7 +44,27 @@ function CertificatesPage() {
       .finally(() => {
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    loadCertificates();
   }, [server, store]);
+
+  const handleDelete = async (cert: Certificate) => {
+    if (!confirm(`Delete certificate "${cert.subject}"?`)) return;
+    try {
+      const ok = await deleteCertificateClient(server, cert.thumbprint);
+      if (ok) {
+        toast.success("Certificate deleted successfully");
+        setSel(null);
+        loadCertificates();
+      } else {
+        toast.error("Failed to delete certificate");
+      }
+    } catch (e) {
+      toast.error("Delete failed");
+    }
+  };
 
   const filteredCerts = useMemo(() => {
     let result = certs;
@@ -82,15 +104,23 @@ function CertificatesPage() {
             </button>
           ))}
         </div>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-sub)]" />
-          <input
-            type="text"
-            placeholder="Search certificates..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-64 bg-[var(--bg-card)] border border-[var(--border-dim)] rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-[var(--amber)] transition-colors text-[var(--text)] placeholder:text-[var(--text-sub)]"
-          />
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-sub)]" />
+            <input
+              type="text"
+              placeholder="Search certificates..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-64 bg-[var(--bg-card)] border border-[var(--border-dim)] rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-[var(--amber)] transition-colors text-[var(--text)] placeholder:text-[var(--text-sub)]"
+            />
+          </div>
+          <button
+            onClick={() => setIsImportOpen(true)}
+            className="flex items-center gap-2 rounded-lg bg-[var(--amber)] text-black px-4 py-2 text-sm font-semibold hover:bg-[var(--amber-hover)] transition-colors shadow-sm"
+          >
+            <Plus size={16} /> Import Cert
+          </button>
         </div>
       </div>
 
@@ -175,6 +205,15 @@ function CertificatesPage() {
                   <Field k="Purpose" v={sel.purpose} />
                 </dl>
               </div>
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => handleDelete(sel)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--crit)]/10 border border-[var(--crit)]/30 text-[var(--crit)] hover:bg-[var(--crit)] hover:text-black transition-colors text-xs font-semibold"
+                >
+                  <Trash2 size={14} /> Remove Certificate
+                </button>
+              </div>
             </div>
           ) : (
             <div className="py-16 text-center text-[var(--text-sub)] flex flex-col items-center justify-center">
@@ -184,7 +223,98 @@ function CertificatesPage() {
           )}
         </aside>
       </div>
+
+      {isImportOpen && (
+        <ImportCertModal
+          server={server}
+          store={store}
+          onClose={() => setIsImportOpen(false)}
+          onImported={() => {
+            setIsImportOpen(false);
+            loadCertificates();
+          }}
+        />
+      )}
     </PageWrapper>
+  );
+}
+
+function ImportCertModal({ server, store, onClose, onImported }: { server: string; store: string; onClose: () => void; onImported: () => void }) {
+  const [certContent, setCertContent] = useState("");
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const ok = await importCertificateClient(server, certContent, password);
+      if (ok) {
+        toast.success(`Certificate imported into ${store} store`);
+        onImported();
+      } else {
+        toast.error("Failed to import certificate");
+      }
+    } catch (e) {
+      toast.error("Import error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <form onSubmit={handleSubmit} className="bg-[var(--bg-card)] border border-[var(--border-c)] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between p-5 border-b border-[var(--border-c)] bg-[var(--bg-surface)]">
+          <div className="flex items-center gap-2">
+            <Upload size={18} className="text-[var(--amber)]" />
+            <h3 className="text-lg font-bold text-[var(--text)]">Import Certificate</h3>
+          </div>
+          <button type="button" onClick={onClose} className="text-[var(--text-sub)] hover:text-[var(--text)] p-1 rounded-full hover:bg-[var(--bg-void)]">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-2">Target Store</label>
+            <input disabled value={store} className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-xs text-[var(--text-sub)] font-mono" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-2">Certificate Data (PEM / Base64 / PFX)</label>
+            <textarea
+              required
+              rows={5}
+              value={certContent}
+              onChange={(e) => setCertContent(e.target.value)}
+              placeholder="Paste -----BEGIN CERTIFICATE----- or Base64 encoded string..."
+              className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] p-3 text-xs text-[var(--text)] font-mono focus:border-[var(--amber)] focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-2">Private Key Password (Optional for PFX)</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter PFX password if required"
+              className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-xs text-[var(--text)] focus:border-[var(--amber)] focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="p-5 border-t border-[var(--border-c)] flex justify-end gap-3 bg-[var(--bg-surface)]">
+          <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-sub)] hover:text-[var(--text)]">
+            Cancel
+          </button>
+          <button disabled={submitting} type="submit" className="px-5 py-2 rounded-xl text-xs font-bold bg-[var(--amber)] text-black hover:bg-[var(--amber-hover)] disabled:opacity-50">
+            {submitting ? "Importing..." : "Import Certificate"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 

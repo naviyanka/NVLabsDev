@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Play } from "lucide-react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { getTasksClient, runTaskClient, type ScheduledTask } from "@/api/client";
+import { getTasksClient, runTaskClient, toggleTaskClient, deleteTaskClient, type ScheduledTask } from "@/api/client";
+import { Play, Power, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/tasks")({
   head: () => ({ meta: [{ title: "Scheduled Tasks — NEXUS" }, { name: "description", content: "Manage Windows scheduled tasks." }] }),
@@ -42,12 +43,49 @@ function TasksPage() {
       const fullPath = sel.path.endsWith("\\") ? sel.path + sel.name : sel.path + "\\" + sel.name;
       const success = await runTaskClient(server, fullPath);
       if (success) {
+        toast.success(`Task "${sel.name}" started.`);
         await fetchTasks();
       } else {
-        alert("Failed to start task.");
+        toast.error("Failed to start task.");
       }
     } finally {
       setIsActivating(false);
+    }
+  };
+
+  const handleToggleTask = async () => {
+    if (!sel) return;
+    const isCurrentlyDisabled = sel.status === "Disabled";
+    const actionName = isCurrentlyDisabled ? "Enable" : "Disable";
+    const fullPath = sel.path.endsWith("\\") ? sel.path + sel.name : sel.path + "\\" + sel.name;
+    try {
+      const ok = await toggleTaskClient(server, fullPath, isCurrentlyDisabled);
+      if (ok) {
+        toast.success(`Task "${sel.name}" ${actionName.toLowerCase()}d.`);
+        await fetchTasks();
+      } else {
+        toast.error(`Failed to ${actionName.toLowerCase()} task.`);
+      }
+    } catch (e) {
+      toast.error("Toggle error");
+    }
+  };
+
+  const handleDeleteTask = async () => {
+    if (!sel) return;
+    if (!confirm(`Delete task "${sel.name}"?`)) return;
+    const fullPath = sel.path.endsWith("\\") ? sel.path + sel.name : sel.path + "\\" + sel.name;
+    try {
+      const ok = await deleteTaskClient(server, fullPath);
+      if (ok) {
+        toast.success(`Task "${sel.name}" deleted.`);
+        setSel(null);
+        await fetchTasks();
+      } else {
+        toast.error("Failed to delete task.");
+      }
+    } catch (e) {
+      toast.error("Delete error");
     }
   };
 
@@ -127,12 +165,22 @@ function TasksPage() {
               <div className="eyebrow pb-1">Task</div>
               <h3 className="display text-[15px] font-semibold break-words">{sel.name}</h3>
               <div className="mono pt-0.5 text-[10px] text-[var(--text-sub)] break-words">{sel.path}</div>
-              <div className="my-4 flex gap-1.5">
+              <div className="my-4 flex flex-wrap gap-1.5">
                 <button 
                   onClick={handleRunTask}
                   disabled={isActivating}
                   className={`mono flex items-center gap-1.5 rounded-md border border-[var(--amber)] px-2.5 py-1.5 text-[10px] uppercase tracking-[0.2em] transition-colors ${isActivating ? 'opacity-50 cursor-not-allowed bg-[var(--amber-low)] text-[var(--amber)]' : 'bg-[var(--bg-surface)] text-[var(--amber)] hover:bg-[var(--amber-low)]'}`}>
                   <Play size={11} /> {isActivating ? "Starting..." : "Run Now"}
+                </button>
+                <button 
+                  onClick={handleToggleTask}
+                  className="mono flex items-center gap-1.5 rounded-md border border-[var(--border-c)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[10px] uppercase tracking-[0.2em] text-[var(--text)] hover:border-[var(--amber)] transition-colors">
+                  <Power size={11} /> {sel.status === "Disabled" ? "Enable" : "Disable"}
+                </button>
+                <button 
+                  onClick={handleDeleteTask}
+                  className="mono flex items-center gap-1.5 rounded-md border border-[var(--crit)]/40 bg-[var(--crit)]/10 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.2em] text-[var(--crit)] hover:bg-[var(--crit)] hover:text-black transition-colors">
+                  <Trash2 size={11} /> Delete
                 </button>
               </div>
               <div className="eyebrow pb-1 pt-2">Triggers</div>

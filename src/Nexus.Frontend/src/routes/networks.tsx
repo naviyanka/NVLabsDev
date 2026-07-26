@@ -5,6 +5,7 @@ import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { getNetworksClient, controlNetworkClient, type NetworkAdapter } from "@/api/client";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/networks")({
   head: () => ({ meta: [{ title: "Networks — NEXUS" }, { name: "description", content: "Adapters, IP config, and DNS." }] }),
@@ -47,7 +48,7 @@ function NetworksPage() {
     if (success) {
       await fetchNetworks();
     } else {
-      alert(`Failed to ${action} adapter ${a.name}`);
+      toast.error(`Failed to ${action} adapter ${a.name}`);
     }
   };
 

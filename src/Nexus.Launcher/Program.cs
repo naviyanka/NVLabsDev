@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Net.Sockets;
 using System.ServiceProcess;
 using System.Text.Json;
 
@@ -12,51 +13,91 @@ static class Program
     static void Main()
     {
         string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-        // The launcher sits directly in {app}, so Backend folder is a peer
-        string appSettingsPath = Path.Combine(baseDir, "Backend", "appsettings.json");
         
-        string hostUrl = "localhost";
-        int port = 443;
-        
-        if (File.Exists(appSettingsPath))
+        // Candidate locations for Gateway appsettings.json
+        string[] candidatePaths = new[]
         {
-            try
+            Path.Combine(baseDir, "Backend", "appsettings.json"),
+            Path.Combine(baseDir, "..", "Nexus.Gateway", "appsettings.json"),
+            Path.Combine(baseDir, "..", "..", "..", "Nexus.Gateway", "appsettings.json"),
+            Path.Combine(baseDir, "..", "..", "..", "src", "Nexus.Gateway", "appsettings.json"),
+            Path.Combine(baseDir, "appsettings.json")
+        };
+
+        string hostUrl = "localhost";
+        int port = 5010;
+        string scheme = "http";
+
+        foreach (var path in candidatePaths)
+        {
+            if (File.Exists(path))
             {
-                string json = File.ReadAllText(appSettingsPath);
-                using JsonDocument doc = JsonDocument.Parse(json);
-                if (doc.RootElement.TryGetProperty("Nexus", out JsonElement nexusEl))
+                try
                 {
-                    if (nexusEl.TryGetProperty("HostUrl", out JsonElement hostEl))
+                    string json = File.ReadAllText(path);
+                    using JsonDocument doc = JsonDocument.Parse(json);
+
+                    if (doc.RootElement.TryGetProperty("Nexus", out JsonElement nexusEl))
                     {
-                        hostUrl = hostEl.GetString() ?? "localhost";
+                        if (nexusEl.TryGetProperty("HostUrl", out JsonElement hostEl))
+                            hostUrl = hostEl.GetString() ?? "localhost";
+                        if (nexusEl.TryGetProperty("WebBindingPort", out JsonElement portEl) && portEl.TryGetInt32(out int pVal))
+                            port = pVal;
                     }
+
+                    if (doc.RootElement.TryGetProperty("Kestrel", out JsonElement kestrelEl) &&
+                        kestrelEl.TryGetProperty("Endpoints", out JsonElement endpointsEl))
+                    {
+                        if (endpointsEl.TryGetProperty("Http", out JsonElement httpEl) &&
+                            httpEl.TryGetProperty("Url", out JsonElement httpUrlEl))
+                        {
+                            string urlStr = httpUrlEl.GetString() ?? "";
+                            scheme = "http";
+                            int colonIdx = urlStr.LastIndexOf(':');
+                            if (colonIdx >= 0 && int.TryParse(urlStr.Substring(colonIdx + 1), out int parsedPort))
+                                port = parsedPort;
+                        }
+                        else if (endpointsEl.TryGetProperty("Https", out JsonElement httpsEl) &&
+                                 httpsEl.TryGetProperty("Url", out JsonElement httpsUrlEl))
+                        {
+                            string urlStr = httpsUrlEl.GetString() ?? "";
+                            scheme = "https";
+                            int colonIdx = urlStr.LastIndexOf(':');
+                            if (colonIdx >= 0 && int.TryParse(urlStr.Substring(colonIdx + 1), out int parsedPort))
+                                port = parsedPort;
+                        }
+                    }
+                    break;
                 }
-                
-                if (doc.RootElement.TryGetProperty("Kestrel", out JsonElement kestrelEl) &&
-                    kestrelEl.TryGetProperty("Endpoints", out JsonElement endpointsEl) &&
-                    endpointsEl.TryGetProperty("Https", out JsonElement httpsEl) &&
-                    httpsEl.TryGetProperty("Url", out JsonElement urlEl))
+                catch
                 {
-                    string urlStr = urlEl.GetString() ?? "";
-                    int colonIdx = urlStr.LastIndexOf(':');
-                    if (colonIdx >= 0)
-                    {
-                        int.TryParse(urlStr.Substring(colonIdx + 1), out port);
-                    }
+                    // Fallback to default settings
                 }
-            }
-            catch
-            {
-                // Fallback to default
             }
         }
-        
-        // Start services if not running
+
+        if (hostUrl == "0.0.0.0" || hostUrl == "*") hostUrl = "localhost";
+
+        // Step 1: Start services if installed
         EnsureServiceRunning("Nexus Backend");
         EnsureServiceRunning("nexus-frontend");
-        
-        // Open browser
-        string finalUrl = $"https://{hostUrl}:{port}/";
+
+        // Step 2: Fallback — if Gateway isn't running on configured port, start it directly
+        if (!IsPortOpen(hostUrl, port))
+        {
+            TryStartGatewayProcess(baseDir);
+        }
+
+        // Step 3: Detect if Vite dev server (port 5173) is active; if so, open it, else open Gateway
+        int targetPort = port;
+        if (IsPortOpen(hostUrl, 5173))
+        {
+            targetPort = 5173;
+            scheme = "http";
+        }
+
+        string finalUrl = $"{scheme}://{hostUrl}:{targetPort}/";
+
         try
         {
             Process.Start(new ProcessStartInfo
@@ -67,10 +108,10 @@ static class Program
         }
         catch
         {
-            // Ignore
+            // Ignore browser launch errors
         }
     }
-    
+
     static void EnsureServiceRunning(string serviceName)
     {
         try
@@ -95,12 +136,76 @@ static class Program
                     WindowStyle = ProcessWindowStyle.Hidden
                 };
                 var proc = Process.Start(startInfo);
-                proc?.WaitForExit(5000);
+                proc?.WaitForExit(3000);
             }
             catch
             {
-                // Ignore if UAC prompt was rejected
+                // Ignore if Windows service is not installed or UAC prompt was rejected
             }
+        }
+    }
+
+    static bool IsPortOpen(string host, int port)
+    {
+        try
+        {
+            using var client = new TcpClient();
+            var result = client.BeginConnect(host, port, null, null);
+            bool success = result.AsyncWaitHandle.WaitOne(TimeSpan.FromMilliseconds(500));
+            if (success && client.Connected)
+            {
+                client.EndConnect(result);
+                return true;
+            }
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    static void TryStartGatewayProcess(string baseDir)
+    {
+        try
+        {
+            // Installed exe path
+            string exePath = Path.Combine(baseDir, "Backend", "Nexus.Gateway.exe");
+            if (!File.Exists(exePath)) exePath = Path.Combine(baseDir, "Nexus.Gateway.exe");
+
+            if (File.Exists(exePath))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = exePath,
+                    WorkingDirectory = Path.GetDirectoryName(exePath),
+                    UseShellExecute = true
+                });
+                return;
+            }
+
+            // Dev csproj path
+            string csprojPath = Path.Combine(baseDir, "..", "Nexus.Gateway", "Nexus.Gateway.csproj");
+            if (!File.Exists(csprojPath))
+                csprojPath = Path.Combine(baseDir, "..", "..", "..", "Nexus.Gateway", "Nexus.Gateway.csproj");
+            if (!File.Exists(csprojPath))
+                csprojPath = Path.Combine(baseDir, "..", "..", "..", "src", "Nexus.Gateway", "Nexus.Gateway.csproj");
+
+            if (File.Exists(csprojPath))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "dotnet",
+                    Arguments = $"run --project \"{Path.GetFullPath(csprojPath)}\"",
+                    WorkingDirectory = Path.GetDirectoryName(csprojPath),
+                    UseShellExecute = true,
+                    WindowStyle = ProcessWindowStyle.Normal
+                });
+            }
+        }
+        catch
+        {
+            // Ignore process start errors
         }
     }
 }

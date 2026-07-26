@@ -4,6 +4,7 @@ import { ShieldAlert, RefreshCw, Download, CheckSquare, ChevronUp, ChevronDown, 
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
 import { getUpdatesClient, checkUpdatesClient, installUpdatesClient, type WindowsUpdate } from "@/api/client";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/updates")({
   head: () => ({ meta: [{ title: "Windows Updates — NEXUS" }] }),
@@ -74,7 +75,7 @@ function UpdatesPage() {
       setUpdates(data);
       setSelected(new Set());
     } catch (e) {
-      alert("Failed to check for updates");
+      toast.error("Failed to check for updates");
     } finally {
       setIsLoading(false);
     }
@@ -101,13 +102,14 @@ function UpdatesPage() {
       const success = await installUpdatesClient(server, titles);
       if (success) {
         // We do not wait for the long install job, the backend returns Accepted() and runs it in the background
+        toast.success(`Installation started for ${titles.length} update${titles.length === 1 ? "" : "s"}. This runs in the background.`);
         setUpdates(updates.filter(u => !titles.includes(u.title)));
         setSelected(new Set());
       } else {
-        alert("Failed to start installation.");
+        toast.error("Failed to start installation.");
       }
     } catch (e) {
-      alert("An error occurred starting the installation.");
+      toast.error("An error occurred starting the installation.");
     } finally {
       setIsLoading(false);
     }

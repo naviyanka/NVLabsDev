@@ -8,6 +8,7 @@ import {
   createFolderClient, deleteFileClient, uploadFileClient, getDownloadUrl,
   renameFileClient, moveFileClient, copyFileClient, readTextFileClient, writeTextFileClient
 } from "@/api/client";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/files")({
   validateSearch: (search: Record<string, unknown>): { path?: string } => {
@@ -306,7 +307,7 @@ function FilesPage() {
       }
       fetchFiles();
     } catch (e: any) {
-      alert(`Operation failed: ${e.message || "Unknown error"}`);
+      toast.error(`Operation failed: ${e.message || "Unknown error"}`);
     }
   };
 
@@ -330,7 +331,7 @@ function FilesPage() {
       }
       fetchFiles();
     } catch (e: any) {
-      alert(`Operation failed: ${e.message || "Unknown error"}`);
+      toast.error(`Operation failed: ${e.message || "Unknown error"}`);
     }
   };
 
@@ -341,7 +342,7 @@ function FilesPage() {
       await deleteFileClient(server, path.join("\\") + "\\" + selectedFile.name);
       fetchFiles();
     } catch (e) {
-      alert("Failed to delete");
+      toast.error("Failed to delete");
     }
   };
 
@@ -357,7 +358,7 @@ function FilesPage() {
       await uploadFileClient(server, path.join("\\"), file);
       fetchFiles();
     } catch (err) {
-      alert("Failed to upload");
+      toast.error("Failed to upload");
     } finally {
       setIsLoading(false);
     }
@@ -381,11 +382,11 @@ function FilesPage() {
     setIsSaving(true);
     try {
       await writeTextFileClient(server, path.join("\\") + "\\" + editorFile, editorContent);
-      alert("File saved successfully.");
+      toast.success("File saved successfully.");
       setIsEditorOpen(false);
       fetchFiles();
     } catch (e) {
-      alert("Failed to save file.");
+      toast.error("Failed to save file.");
     } finally {
       setIsSaving(false);
     }

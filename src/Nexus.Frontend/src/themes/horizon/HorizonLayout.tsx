@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { BackendStatusModal } from "@/components/ui/BackendStatusModal";
+import { CommandPalette } from "@/components/ui/CommandPalette";
 import { getFrontendSettings } from "@/lib/frontendSettings";
 
 type Item = { to: string; label: string; icon: React.ComponentType<{ className?: string; size?: number }> };
@@ -48,6 +49,18 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
     url: getBackendUrl()
   });
   const [showBackendModal, setShowBackendModal] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     const handleBackendStatus = (e: any) => {
@@ -271,14 +284,18 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
           <span>{pathname === "/" ? "Dashboard" : pathname.slice(1).toUpperCase()}</span>
         </div>
         <div className="flex-1 max-w-md mx-2 sm:mx-4 md:mx-8">
-          <div className="relative focus-within:ring-2 focus-within:ring-[var(--amber)]/30 rounded-full transition-all">
-            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-sub)] z-10 pointer-events-none" />
-            <input 
-              className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-full py-2 pl-12 pr-4 text-xs focus:outline-none focus:border-[var(--amber)] focus:bg-[var(--bg-surface)] transition-colors text-[var(--text)] placeholder-[var(--text-sub)]" 
-              placeholder="Search servers, IPs, or alerts..." 
-              type="text" 
-            />
-          </div>
+          <button
+            onClick={() => setCommandPaletteOpen(true)}
+            className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-full py-1.5 pl-4 pr-3 text-xs flex items-center justify-between text-[var(--text-sub)] hover:border-[var(--amber)] hover:bg-[var(--bg-surface)] transition-all cursor-pointer group"
+          >
+            <div className="flex items-center gap-2.5">
+              <Search size={15} className="text-[var(--text-sub)] group-hover:text-[var(--amber)] transition-colors" />
+              <span className="text-[11px]">Search servers, actions, routes...</span>
+            </div>
+            <kbd className="hidden sm:inline-flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-mono text-[var(--text-sub)] bg-[var(--bg-surface)] border border-[var(--border-c)] rounded-full group-hover:border-[var(--amber)]/40">
+              Ctrl K
+            </kbd>
+          </button>
         </div>
         <div className="flex items-center gap-4">
           
@@ -369,6 +386,11 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
         isOpen={showBackendModal} 
         onClose={() => setShowBackendModal(false)} 
         isOnline={backendStatus.online} 
+      />
+
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
       />
     </div>
   );

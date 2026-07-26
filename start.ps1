@@ -47,17 +47,22 @@ function Start-App {
         Pop-Location
     }
 
-    Write-Host "Starting Backend..." -ForegroundColor Cyan
-    Start-Process dotnet -ArgumentList "run" -WorkingDirectory "$rootDir\src\Nexus.Gateway" -WindowStyle Normal
+    Write-Host "Building Launcher..." -ForegroundColor Cyan
+    dotnet build "$rootDir\src\Nexus.Launcher\Nexus.Launcher.csproj" --configuration Debug --nologo -v q
 
-    Write-Host "Starting Frontend..." -ForegroundColor Cyan
-    Start-Process npm.cmd -ArgumentList "run", "dev" -WorkingDirectory "$rootDir\src\Nexus.Frontend" -WindowStyle Normal
+    Write-Host "Starting Backend (Nexus.Gateway on http://localhost:5010)..." -ForegroundColor Cyan
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location `"$rootDir\src\Nexus.Gateway`"; `$env:DEV='1'; dotnet run" -WindowStyle Normal
 
-    Write-Host "Servers are booting up in separate windows!" -ForegroundColor Green
-    Write-Host "Waiting 5 seconds before opening the browser..." -ForegroundColor Yellow
-    Start-Sleep -Seconds 5
+    Write-Host "Starting Frontend (Nexus.Frontend on http://localhost:5173)..." -ForegroundColor Cyan
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location `"$rootDir\src\Nexus.Frontend`"; npm run dev" -WindowStyle Normal
 
-    Start-Process "http://localhost:5173"
+    Write-Host "Waiting 4 seconds for services to boot..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 4
+
+    Write-Host "Executing Nexus.Launcher..." -ForegroundColor Cyan
+    Start-Process dotnet -ArgumentList "run --project `"$rootDir\src\Nexus.Launcher\Nexus.Launcher.csproj`"" -WorkingDirectory "$rootDir\src\Nexus.Launcher" -WindowStyle Hidden
+
+    Write-Host "NEXUS Environment launched successfully!" -ForegroundColor Green
 }
 
 Check-And-Install

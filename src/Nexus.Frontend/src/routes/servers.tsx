@@ -34,7 +34,7 @@ function ServersPage() {
 
   const [servers, setServers] = useState<Server[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [osFilters, setOsFilters] = useState<string[]>([]);
+  const [hiddenOs, setHiddenOs] = useState<string[]>([]);
   const [q, setQ] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState("");
@@ -69,7 +69,7 @@ function ServersPage() {
   };
 
   const toggleOs = (os: string) => {
-    setOsFilters(prev =>
+    setHiddenOs(prev =>
       prev.includes(os) ? prev.filter(x => x !== os) : [...prev, os]
     );
   };
@@ -77,7 +77,7 @@ function ServersPage() {
   const osList = ["Windows Server 2016", "Windows Server 2019", "Windows Server 2022"];
   const filtered = servers.filter((s) =>
     (statusFilter === "all" || s.status === statusFilter) &&
-    (osFilters.length === 0 || osFilters.includes(s.os)) &&
+    !hiddenOs.includes(s.os) &&
     (q === "" || s.name.toLowerCase().includes(q.toLowerCase()) || s.ip.includes(q) || s.role.toLowerCase().includes(q.toLowerCase()))
   );
 
@@ -116,9 +116,14 @@ function ServersPage() {
           </div>
           <div className="eyebrow pb-2 pt-5">OS</div>
           <div className="space-y-1 text-[12px] text-[var(--text-sub)]">
-            {["Windows Server 2016","Windows Server 2019","Windows Server 2022"].map((os) => (
-              <label key={os} className="flex items-center gap-2 px-2.5 py-1">
-                <input type="checkbox" defaultChecked className="accent-[var(--amber)]" />
+            {osList.map((os) => (
+              <label key={os} className="flex items-center gap-2 px-2.5 py-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!hiddenOs.includes(os)}
+                  onChange={() => toggleOs(os)}
+                  className="accent-[var(--amber)]"
+                />
                 <span>{os.replace("Windows Server ","WS ")}</span>
               </label>
             ))}
@@ -209,7 +214,7 @@ function ServerCard({ s, onAction }: { s: Server; onAction: () => void }) {
         <div className="mt-5 flex items-center justify-between">
           <span className="mono text-[10px] uppercase tracking-[0.2em] text-[var(--text-sub)]">Uptime · <span className="text-[var(--teal)]">{s.uptime}</span></span>
           <div className="flex gap-1.5">
-            <IconAction icon={Monitor} label="Connect" onClick={() => navigate({ to: `/server/$serverId`, params: { serverId: s.ip } })} />
+            <IconAction icon={Monitor} label="Connect" onClick={() => navigate({ to: "/remote-desktop" })} />
             <IconAction icon={Terminal} label="PowerShell" onClick={() => navigate({ to: "/powershell", search: { serverIp: s.ip } as any })} />
             
             <DropdownMenu>

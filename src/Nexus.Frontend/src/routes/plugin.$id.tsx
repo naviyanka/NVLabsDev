@@ -3,6 +3,7 @@ import { useEffect, useState, useContext } from "react";
 import { Play, Terminal as TerminalIcon, CheckSquare, Square, StopCircle, Server as ServerIcon } from "lucide-react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { getServersClient as getServers, type Server } from "@/api/client";
+import { getApiUrl } from "@/lib/backend";
 import { toast } from "sonner";
 import { PluginEntity } from "./plugins";
 
@@ -92,7 +93,7 @@ function PluginRunnerPage() {
   const [selectedTabIp, setSelectedTabIp] = useState<string>("");
 
   useEffect(() => {
-    fetch(`/api/plugins`)
+    fetch(getApiUrl(`/plugins`))
       .then(r => {
         if (!r.ok) throw new Error("Backend offline");
         return r.json();
@@ -113,7 +114,7 @@ function PluginRunnerPage() {
   }, [id]);
 
   function fetchJobs() {
-    fetch(`/api/plugins/${id}/jobs`)
+    fetch(getApiUrl(`/plugins/${id}/jobs`))
       .then(r => r.json())
       .then(data => {
         setJobs(data);
@@ -135,7 +136,7 @@ function PluginRunnerPage() {
 
     const queryParams = serverIps.map(ip => `serverIps=${encodeURIComponent(ip)}`).join("&");
 
-    fetch(`/api/plugins/${id}/run?${queryParams}`, {
+    fetch(getApiUrl(`/plugins/${id}/run?${queryParams}`), {
       method: "POST"
     })
       .then(r => r.json())
@@ -148,7 +149,7 @@ function PluginRunnerPage() {
   }
 
   function stopAll() {
-    fetch(`/api/plugins/${id}/stop`, { method: "POST" })
+    fetch(getApiUrl(`/plugins/${id}/stop`), { method: "POST" })
       .then(r => r.json())
       .then(() => {
         toast.success("Stop command issued to all running jobs");
@@ -158,7 +159,7 @@ function PluginRunnerPage() {
   }
 
   function stopOne(ip: string) {
-    fetch(`/api/plugins/${id}/stop?serverIp=${encodeURIComponent(ip)}`, { method: "POST" })
+    fetch(getApiUrl(`/plugins/${id}/stop?serverIp=${encodeURIComponent(ip)}`), { method: "POST" })
       .then(r => r.json())
       .then(() => {
         toast.success(`Stop command issued for ${ip}`);

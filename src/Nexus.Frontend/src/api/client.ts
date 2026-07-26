@@ -1,5 +1,5 @@
-import { type Server, type PerfSample, type Process, type Service, type Disk, type Volume, type ScheduledTask, type InstalledApp } from "./mock";
-export type { Server, PerfSample, Process, Service, Disk, Volume, ScheduledTask, InstalledApp };
+import { type Server, type PerfSample, type Process, type Service, type Disk, type Volume, type ScheduledTask, type InstalledApp, type FirewallRule, type EventEntry, type EventLevel, type HyperVVM, type Device, type VirtualSwitch, type ReplicaPartnership } from "./mock";
+export type { Server, PerfSample, Process, Service, Disk, Volume, ScheduledTask, InstalledApp, FirewallRule, EventEntry, EventLevel, HyperVVM, Device, VirtualSwitch, ReplicaPartnership };
 
 import { getApiUrl } from "@/lib/backend";
 
@@ -617,6 +617,45 @@ export async function controlNetworkClient(serverIp: string, adapterName: string
   }
 }
 
+export interface OpenPort {
+  localPort: number;
+  protocol: string;
+  processName: string;
+  state: string;
+}
+
+export interface LocalAdmin {
+  name: string;
+  principalSource: string;
+  expected: boolean;
+}
+
+export interface SecurityEvent {
+  id: string;
+  eventId: number;
+  level: string;
+  timeCreated: string;
+  message: string;
+}
+
+export interface SecurityData {
+  events: SecurityEvent[];
+  openPorts: OpenPort[];
+  localAdmins: LocalAdmin[];
+  failedLogins24h: number;
+  lastUpdated: string;
+}
+
+export async function getSecurityClient(serverIp: string, refresh = false): Promise<SecurityData | null> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/security?refresh=${refresh}`));
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.error("Failed to fetch security data", e);
+  }
+  return null;
+}
+
 export interface RegistryValue {
   name: string;
   type: string;
@@ -642,4 +681,322 @@ export async function getRegistryContentClient(serverIp: string, path: string): 
     console.error("Failed to fetch registry", e);
   }
   return { subKeys: [], values: [] };
+}
+
+// --- Firewall Client Endpoints
+export async function getFirewallRulesClient(serverId: string): Promise<FirewallRule[]> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/firewall/rules`));
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.error("Failed to fetch firewall rules", e);
+  }
+  return [];
+}
+
+export async function toggleFirewallRuleClient(serverId: string, ruleId: string, enabled: boolean): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/firewall/rules/${encodeURIComponent(ruleId)}/toggle`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled })
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to toggle firewall rule", e);
+    return false;
+  }
+}
+
+// --- Events Client Endpoints
+export async function getEventsClient(serverId: string, log: string = "System", limit: number = 60): Promise<EventEntry[]> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/events?log=${encodeURIComponent(log)}&limit=${limit}`));
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.error("Failed to fetch events", e);
+  }
+  return [];
+}
+
+// --- Hyper-V Virtual Machines Client Endpoints
+export async function getVMsClient(serverId: string): Promise<HyperVVM[]> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/vms`));
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.error("Failed to fetch VMs", e);
+  }
+  return [];
+}
+
+export async function controlVMClient(serverId: string, vmId: string, action: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/vms/${encodeURIComponent(vmId)}/${action}`), {
+      method: "POST"
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to control VM", e);
+    return false;
+  }
+}
+
+// --- Devices Client Endpoints
+export async function getDevicesClient(serverId: string): Promise<Device[]> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/devices`));
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.error("Failed to fetch devices", e);
+  }
+  return [];
+}
+
+// --- Virtual Switches Client Endpoints
+export async function getVirtualSwitchesClient(serverId: string): Promise<VirtualSwitch[]> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/vswitches`));
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.error("Failed to fetch virtual switches", e);
+  }
+  return [];
+}
+
+export async function renameVirtualSwitchClient(serverId: string, switchId: string, name: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/vswitches/${encodeURIComponent(switchId)}/rename`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name })
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to rename virtual switch", e);
+    return false;
+  }
+}
+
+export async function deleteVirtualSwitchClient(serverId: string, switchId: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/vswitches/${encodeURIComponent(switchId)}`), {
+      method: "DELETE"
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to delete virtual switch", e);
+    return false;
+  }
+}
+
+// --- Storage Replica Client Endpoints
+export async function getReplicaPartnershipsClient(serverId: string): Promise<ReplicaPartnership[]> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/storage-replica`));
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.error("Failed to fetch replica partnerships", e);
+  }
+  return [];
+}
+
+export async function swapReplicaDirectionClient(serverId: string, partnershipId: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/storage-replica/${encodeURIComponent(partnershipId)}/swap`), {
+      method: "POST"
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to swap replica direction", e);
+    return false;
+  }
+}
+
+export async function failoverReplicaClient(serverId: string, partnershipId: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/storage-replica/${encodeURIComponent(partnershipId)}/failover`), {
+      method: "POST"
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to failover replica", e);
+    return false;
+  }
+}
+
+export async function importCertificateClient(serverIp: string, certData: string, password?: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/certificates/import`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ certData, password })
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to import certificate", e);
+    return false;
+  }
+}
+
+export async function deleteCertificateClient(serverIp: string, thumbprint: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/certificates/${encodeURIComponent(thumbprint)}`), {
+      method: "DELETE"
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to delete certificate", e);
+    return false;
+  }
+}
+
+export async function createUserClient(serverIp: string, user: { name: string; fullName: string; password?: string; groups?: string[] }): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/users`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(user)
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to create user", e);
+    return false;
+  }
+}
+
+export async function deleteUserClient(serverIp: string, username: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/users/${encodeURIComponent(username)}`), {
+      method: "DELETE"
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to delete user", e);
+    return false;
+  }
+}
+
+export async function createRegistryKeyClient(serverIp: string, path: string, keyName: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/registry/new-key`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path, keyName })
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to create registry key", e);
+    return false;
+  }
+}
+
+export async function createRegistryValueClient(serverIp: string, path: string, name: string, type: string, data: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/registry/value`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path, name, type, data })
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to create registry value", e);
+    return false;
+  }
+}
+
+export async function deleteRegistryValueClient(serverIp: string, path: string, name: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverIp}/registry/value?path=${encodeURIComponent(path)}&name=${encodeURIComponent(name)}`), {
+      method: "DELETE"
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to delete registry value", e);
+    return false;
+  }
+}
+
+export async function toggleTaskClient(serverId: string, taskPath: string, enable: boolean): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/tasks/toggle`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskPath, enable })
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to toggle task", e);
+    return false;
+  }
+}
+
+export async function deleteTaskClient(serverId: string, taskPath: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/tasks/delete`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskPath })
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to delete task", e);
+    return false;
+  }
+}
+
+export async function createVMClient(serverId: string, config: { name: string; memoryMb: number; vcpu: number; vswitch: string; vhdxSizeGb: number; isoPath?: string }): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/vms`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(config)
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to create VM", e);
+    return false;
+  }
+}
+
+export async function checkpointVMClient(serverId: string, vmId: string, action: "create" | "apply" | "delete", snapshotName?: string): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/vms/${encodeURIComponent(vmId)}/checkpoint`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, snapshotName })
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to execute VM checkpoint action", e);
+    return false;
+  }
+}
+
+export async function createVirtualSwitchClient(serverId: string, config: { name: string; type: string; adapterName?: string }): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/vswitches`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(config)
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to create virtual switch", e);
+    return false;
+  }
+}
+
+export async function createReplicaPartnershipClient(sourceServer: string, config: { destServer: string; sourceVol: string; destVol: string; mode: string }): Promise<boolean> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${sourceServer}/storage-replica`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(config)
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("Failed to create storage replica partnership", e);
+    return false;
+  }
 }

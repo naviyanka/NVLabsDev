@@ -102,13 +102,34 @@ export function HorizonPowerShell() {
             <Plus size={12} />
           </button>
           <div className="ml-auto flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1 border-r border-[var(--border-c)] pr-2 mr-1">
+              <span className="text-[10px] uppercase font-semibold text-[var(--text-sub)] mr-1">Snippets:</span>
+              {[
+                { label: "Services", cmd: "Get-Service | Where-Object Status -eq 'Running' | Select-Object -First 10\r" },
+                { label: "Processes", cmd: "Get-Process | Sort-Object CPU -Descending | Select-Object -First 10\r" },
+                { label: "Disks", cmd: "Get-Volume\r" },
+                { label: "Network", cmd: "Get-NetIPAddress -AddressFamily IPv4\r" }
+              ].map(s => (
+                <button
+                  key={s.label}
+                  onClick={() => {
+                    if (active?.ws && active.ws.readyState === WebSocket.OPEN) {
+                      active.ws.send(s.cmd);
+                    }
+                  }}
+                  className="mono text-[10px] px-2 py-0.5 rounded border border-[var(--border-dim)] bg-[var(--bg-card)] text-[var(--text-sub)] hover:text-[var(--amber)] hover:border-[var(--amber)] transition-colors"
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
             <select
               value={active?.serverId || ""}
               onChange={(e) => {
                 const newServerId = e.target.value;
                 const newId = "s" + Date.now();
                 setSessions((sl) => sl.map((s) => s.id === activeId ? { id: newId, serverId: newServerId } : s));
-                setActiveId(newId); // trigger remount
+                setActiveId(newId);
               }}
               className="mono rounded border border-[var(--border-c)] bg-[var(--bg-card)] px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-[var(--amber)]"
             >
@@ -117,6 +138,7 @@ export function HorizonPowerShell() {
             <button
               onClick={() => active?.xterm?.clear()}
               className="grid h-6 w-6 place-items-center rounded text-[var(--text-sub)] hover:text-[var(--crit)]"
+              title="Clear terminal"
             >
               <Trash2 size={12} />
             </button>

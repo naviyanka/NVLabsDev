@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { ChevronRight, ChevronDown, Folder, FolderOpen, Database, Type, FileCode, Hash, RefreshCw, Loader2, Search } from "lucide-react";
+import { ChevronRight, ChevronDown, Folder, FolderOpen, Database, Type, FileCode, Hash, RefreshCw, Loader2, Search, Plus, Trash2, X } from "lucide-react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
-import { getRegistryContentClient, type RegistryContent, type RegistryNode } from "@/api/client";
+import { getRegistryContentClient, createRegistryKeyClient, createRegistryValueClient, deleteRegistryValueClient, type RegistryContent, type RegistryNode } from "@/api/client";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/registry")({
   head: () => ({ meta: [{ title: "Registry — NEXUS" }, { name: "description", content: "Read and explore Windows registry hives." }] }),
@@ -35,6 +36,9 @@ function RegistryPage() {
   const [content, setContent] = useState<RegistryContent>({ subKeys: [], values: [] });
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  
+  const [isNewKeyOpen, setIsNewKeyOpen] = useState(false);
+  const [isNewValueOpen, setIsNewValueOpen] = useState(false);
 
   const fetchContent = useCallback(async (targetPath: string) => {
     setLoading(true);
@@ -50,7 +54,22 @@ function RegistryPage() {
 
   useEffect(() => {
     fetchContent(path);
-  }, [fetchContent]); // path is handled manually now
+  }, [fetchContent]);
+
+  const handleDeleteValue = async (name: string) => {
+    if (!confirm(`Delete registry value "${name}"?`)) return;
+    try {
+      const ok = await deleteRegistryValueClient(server, path, name);
+      if (ok) {
+        toast.success(`Value "${name}" deleted`);
+        fetchContent(path);
+      } else {
+        toast.error("Failed to delete value");
+      }
+    } catch (e) {
+      toast.error("Delete failed");
+    }
+  }; // path is handled manually now
 
   const handlePathSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,15 +129,29 @@ function RegistryPage() {
               <span className="text-[12px] text-[var(--text-sub)] font-mono truncate max-w-[400px]" title={path}>{path}</span>
             </div>
             
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-sub)]" />
-              <input
-                type="text"
-                placeholder="Filter values..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-48 bg-[var(--bg-surface)] border border-[var(--border-dim)] rounded-md pl-8 pr-3 py-1.5 text-[12px] focus:outline-none focus:border-[var(--amber)] transition-colors text-[var(--text)] placeholder:text-[var(--text-sub)]"
-              />
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-sub)]" />
+                <input
+                  type="text"
+                  placeholder="Filter values..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-44 bg-[var(--bg-surface)] border border-[var(--border-dim)] rounded-md pl-8 pr-3 py-1.5 text-[12px] focus:outline-none focus:border-[var(--amber)] transition-colors text-[var(--text)] placeholder:text-[var(--text-sub)]"
+                />
+              </div>
+              <button
+                onClick={() => setIsNewKeyOpen(true)}
+                className="flex items-center gap-1 bg-[var(--bg-surface)] border border-[var(--border-dim)] text-[var(--text)] px-2.5 py-1.5 rounded-md text-[11px] font-semibold hover:border-[var(--amber)] transition-colors"
+              >
+                <Plus size={12} /> New Key
+              </button>
+              <button
+                onClick={() => setIsNewValueOpen(true)}
+                className="flex items-center gap-1 bg-[var(--amber)] text-black px-2.5 py-1.5 rounded-md text-[11px] font-semibold hover:bg-[var(--amber-hover)] transition-colors"
+              >
+                <Plus size={12} /> New Value
+              </button>
             </div>
           </div>
 
@@ -128,16 +161,17 @@ function RegistryPage() {
                 <tr className="eyebrow text-left">
                   <th className="px-5 py-3 border-b border-[var(--border-dim)] w-[30%]">Name</th>
                   <th className="px-5 py-3 border-b border-[var(--border-dim)] w-[20%]">Type</th>
-                  <th className="px-5 py-3 border-b border-[var(--border-dim)] w-[50%]">Data</th>
+                  <th className="px-5 py-3 border-b border-[var(--border-dim)] w-[40%]">Data</th>
+                  <th className="px-5 py-3 border-b border-[var(--border-dim)] w-[10%] text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="mono">
                 {loading ? (
-                  <tr><td colSpan={3} className="px-5 py-12 text-center text-[var(--text-sub)]"><Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-[var(--amber)]" />Reading registry...</td></tr>
+                  <tr><td colSpan={4} className="px-5 py-12 text-center text-[var(--text-sub)]"><Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-[var(--amber)]" />Reading registry...</td></tr>
                 ) : content.values.length === 0 ? (
-                  <tr><td colSpan={3} className="px-5 py-12 text-center text-[var(--text-sub)]">No values in this key.</td></tr>
+                  <tr><td colSpan={4} className="px-5 py-12 text-center text-[var(--text-sub)]">No values in this key.</td></tr>
                 ) : filteredValues.length === 0 ? (
-                  <tr><td colSpan={3} className="px-5 py-12 text-center text-[var(--text-sub)]">No values match filter.</td></tr>
+                  <tr><td colSpan={4} className="px-5 py-12 text-center text-[var(--text-sub)]">No values match filter.</td></tr>
                 ) : (
                   filteredValues.map((v) => (
                     <tr key={v.name} className="border-b border-[var(--border-dim)] hover:bg-[var(--bg-surface)] transition-colors">
@@ -149,6 +183,17 @@ function RegistryPage() {
                       <td className="px-5 py-2.5 text-[var(--text-sub)] break-words max-w-[300px]">
                         {v.data === "" ? <span className="opacity-40 italic">(value not set)</span> : v.data}
                       </td>
+                      <td className="px-5 py-2.5 text-right">
+                        {v.name !== "(Default)" && (
+                          <button
+                            onClick={() => handleDeleteValue(v.name)}
+                            className="p-1 rounded text-[var(--text-sub)] hover:text-[var(--crit)] hover:bg-[var(--crit)]/10 transition-colors"
+                            title="Delete value"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))
                 )}
@@ -157,7 +202,180 @@ function RegistryPage() {
           </div>
         </div>
       </div>
+
+      {isNewKeyOpen && (
+        <NewKeyModal
+          server={server}
+          path={path}
+          onClose={() => setIsNewKeyOpen(false)}
+          onCreated={() => {
+            setIsNewKeyOpen(false);
+            fetchContent(path);
+          }}
+        />
+      )}
+
+      {isNewValueOpen && (
+        <NewValueModal
+          server={server}
+          path={path}
+          onClose={() => setIsNewValueOpen(false)}
+          onCreated={() => {
+            setIsNewValueOpen(false);
+            fetchContent(path);
+          }}
+        />
+      )}
     </PageWrapper>
+  );
+}
+
+function NewKeyModal({ server, path, onClose, onCreated }: { server: string; path: string; onClose: () => void; onCreated: () => void }) {
+  const [keyName, setKeyName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const ok = await createRegistryKeyClient(server, path, keyName);
+      if (ok) {
+        toast.success(`Key "${keyName}" created`);
+        onCreated();
+      } else {
+        toast.error("Failed to create registry key");
+      }
+    } catch (e) {
+      toast.error("Creation error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <form onSubmit={handleSubmit} className="bg-[var(--bg-card)] border border-[var(--border-c)] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between p-5 border-b border-[var(--border-c)] bg-[var(--bg-surface)]">
+          <h3 className="text-base font-bold text-[var(--text)]">Create Registry Key</h3>
+          <button type="button" onClick={onClose} className="text-[var(--text-sub)] hover:text-[var(--text)] p-1 rounded-full hover:bg-[var(--bg-void)]">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">Parent Path</label>
+            <input disabled value={path} className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-xs text-[var(--text-sub)] font-mono" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">New Key Name</label>
+            <input
+              required
+              value={keyName}
+              onChange={(e) => setKeyName(e.target.value)}
+              placeholder="e.g. MyConfig"
+              className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-xs text-[var(--text)] font-mono focus:border-[var(--amber)] focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="p-5 border-t border-[var(--border-c)] flex justify-end gap-3 bg-[var(--bg-surface)]">
+          <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-sub)] hover:text-[var(--text)]">
+            Cancel
+          </button>
+          <button disabled={submitting} type="submit" className="px-5 py-2 rounded-xl text-xs font-bold bg-[var(--amber)] text-black hover:bg-[var(--amber-hover)] disabled:opacity-50">
+            {submitting ? "Creating..." : "Create Key"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function NewValueModal({ server, path, onClose, onCreated }: { server: string; path: string; onClose: () => void; onCreated: () => void }) {
+  const [name, setName] = useState("");
+  const [type, setType] = useState("REG_SZ");
+  const [data, setData] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const ok = await createRegistryValueClient(server, path, name, type, data);
+      if (ok) {
+        toast.success(`Value "${name}" created`);
+        onCreated();
+      } else {
+        toast.error("Failed to create registry value");
+      }
+    } catch (e) {
+      toast.error("Creation error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <form onSubmit={handleSubmit} className="bg-[var(--bg-card)] border border-[var(--border-c)] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between p-5 border-b border-[var(--border-c)] bg-[var(--bg-surface)]">
+          <h3 className="text-base font-bold text-[var(--text)]">Create Registry Value</h3>
+          <button type="button" onClick={onClose} className="text-[var(--text-sub)] hover:text-[var(--text)] p-1 rounded-full hover:bg-[var(--bg-void)]">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">Value Name</label>
+            <input
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. MaxConnections"
+              className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-xs text-[var(--text)] font-mono focus:border-[var(--amber)] focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">Type</label>
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-xs text-[var(--text)] font-mono focus:border-[var(--amber)] focus:outline-none"
+            >
+              <option value="REG_SZ">REG_SZ (String)</option>
+              <option value="REG_DWORD">REG_DWORD (32-bit Number)</option>
+              <option value="REG_BINARY">REG_BINARY (Binary Data)</option>
+              <option value="REG_MULTI_SZ">REG_MULTI_SZ (Multi-String)</option>
+              <option value="REG_EXPAND_SZ">REG_EXPAND_SZ (Expandable String)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">Value Data</label>
+            <input
+              required
+              value={data}
+              onChange={(e) => setData(e.target.value)}
+              placeholder="Enter value content..."
+              className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-xs text-[var(--text)] font-mono focus:border-[var(--amber)] focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="p-5 border-t border-[var(--border-c)] flex justify-end gap-3 bg-[var(--bg-surface)]">
+          <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-sub)] hover:text-[var(--text)]">
+            Cancel
+          </button>
+          <button disabled={submitting} type="submit" className="px-5 py-2 rounded-xl text-xs font-bold bg-[var(--amber)] text-black hover:bg-[var(--amber-hover)] disabled:opacity-50">
+            {submitting ? "Creating..." : "Create Value"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 

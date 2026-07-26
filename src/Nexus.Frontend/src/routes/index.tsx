@@ -125,10 +125,10 @@ function Dashboard() {
               </div>
 
               <div className="mt-5 grid grid-cols-2 gap-2">
-                <QuickAction icon={Monitor} label="Remote Desktop" onClick={() => navigate({ to: `/server/$serverId`, params: { serverId: server.ip } })} />
+                <QuickAction icon={Monitor} label="Remote Desktop" onClick={() => navigate({ to: "/remote-desktop" })} />
                 <QuickAction icon={Terminal} label="PowerShell" onClick={() => navigate({ to: "/powershell", search: { serverIp: server.ip } as any })} />
-                <QuickAction icon={RefreshCw} label="Restart Services" />
-                <QuickAction icon={ScrollText} label="Event Viewer" onClick={() => navigate({ to: `/server/$serverId`, params: { serverId: server.ip } })} />
+                <QuickAction icon={RefreshCw} label="Restart Services" onClick={() => navigate({ to: "/services" })} />
+                <QuickAction icon={ScrollText} label="Event Viewer" onClick={() => navigate({ to: "/events" })} />
               </div>
             </div>
           )}

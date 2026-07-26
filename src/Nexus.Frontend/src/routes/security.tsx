@@ -1,39 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, useMemo } from "react";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { useEffect, useState } from "react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
 import { NxCard } from "@/components/ui/NxCard";
-import { getEvents, type EventEntry } from "@/api/mock";
-
-interface OpenPort {
-  localPort: number;
-  protocol: string;
-  processName: string;
-  state: string;
-}
-
-interface LocalAdmin {
-  name: string;
-  principalSource: string;
-  expected: boolean;
-}
-
-interface SecurityEvent {
-  id: string;
-  eventId: number;
-  level: string;
-  timeCreated: string;
-  message: string;
-}
-
-interface SecurityData {
-  events: SecurityEvent[];
-  openPorts: OpenPort[];
-  localAdmins: LocalAdmin[];
-  failedLogins24h: number;
-  lastUpdated: string;
-}
+import { getSecurityClient, type SecurityData } from "@/api/client";
 
 export const Route = createFileRoute("/security")({
   head: () => ({ meta: [{ title: "Security Events — NEXUS" }, { name: "description", content: "Security posture, failed logins, and open ports." }] }),
@@ -47,15 +17,8 @@ function SecurityPage() {
 
   const fetchData = async (refresh = false) => {
     setLoading(true);
-    try {
-      const res = await fetch(`/api/servers/${server}/security?refresh=${refresh}`);
-      if (res.ok) {
-        const d = await res.json();
-        setData(d);
-      }
-    } catch (err) {
-      console.error(err);
-    }
+    const d = await getSecurityClient(server, refresh);
+    if (d) setData(d);
     setLoading(false);
   };
 
@@ -64,15 +27,6 @@ function SecurityPage() {
   }, [server]);
 
   const score = data ? Math.max(0, 100 - (data.failedLogins24h / 10) - (data.openPorts.length / 2)) : 100;
-  // We mock the hour-by-hour chart based on total failed logins — memoized so it doesn't
-  // regenerate (and flicker) on every re-render
-  const loginHist = useMemo(
-    () => Array.from({ length: 24 }, (_, h) => ({
-      hour: `${h}:00`,
-      fails: data ? Math.floor(Math.random() * (data.failedLogins24h / 10)) : 0
-    })),
-    [data]
-  );
 
   return (
     <PageWrapper>
@@ -124,15 +78,10 @@ function SecurityPage() {
         </NxCard>
 
         <NxCard eyebrow="Failed Logins" title="Last 24 hours">
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={loginHist}>
-              <CartesianGrid stroke="var(--border-dim)" strokeDasharray="2 4" />
-              <XAxis dataKey="hour" stroke="var(--text-sub)" fontSize={9} />
-              <YAxis stroke="var(--text-sub)" fontSize={9} />
-              <Tooltip contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border-c)", fontSize: 11 }} />
-              <Bar dataKey="fails" fill="var(--crit)" />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="flex h-[240px] flex-col items-center justify-center gap-2">
+            <div className="display text-[56px] font-bold text-[var(--crit)]">{data?.failedLogins24h ?? 0}</div>
+            <div className="eyebrow text-[var(--text-sub)]">failed sign-in attempts</div>
+          </div>
         </NxCard>
 
         <NxCard eyebrow="Open Ports">

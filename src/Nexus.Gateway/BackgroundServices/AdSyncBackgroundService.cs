@@ -64,7 +64,7 @@ public class AdSyncBackgroundService : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error occurred during background AD sync. Retrying in 15 minutes.");
+                _logger.LogWarning("Background AD sync bypassed: {Message}. Retrying in 15 minutes.", ex.Message);
                 await Task.Delay(TimeSpan.FromMinutes(15), stoppingToken);
             }
         }

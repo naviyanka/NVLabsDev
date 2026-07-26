@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
-import { getFirewallRules, toggleFirewallRule, type FirewallRule } from "@/api/mock";
+import { getFirewallRulesClient, toggleFirewallRuleClient, type FirewallRule } from "@/api/client";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/firewall")({
   head: () => ({ meta: [{ title: "Firewall — NEXUS" }, { name: "description", content: "Firewall profiles and inbound/outbound rules." }] }),
@@ -14,7 +15,16 @@ function FirewallPage() {
   const [rules, setRules] = useState<FirewallRule[]>([]);
   const [tab, setTab] = useState<"Inbound"|"Outbound"|"Security">("Inbound");
 
-  useEffect(() => { getFirewallRules(server).then(setRules); }, [server]);
+  useEffect(() => { 
+    getFirewallRulesClient(server).then(setRules); 
+  }, [server]);
+
+  const handleToggle = async (ruleId: string, enabled: boolean) => {
+    setRules(prev => prev.map(r => r.id === ruleId ? { ...r, enabled } : r));
+    const ok = await toggleFirewallRuleClient(server, ruleId, enabled);
+    if (ok) toast.success("Firewall rule updated");
+    else toast.error("Failed to update firewall rule");
+  };
 
   return (
     <PageWrapper>
@@ -48,10 +58,10 @@ function FirewallPage() {
             <th className="px-3 py-2">Enabled</th><th>Name</th><th>Profile</th><th>Protocol</th><th>Local Port</th><th>Remote IP</th><th>Action</th><th>Direction</th>
           </tr></thead>
           <tbody className="mono">
-            {rules.filter((r) => tab === "Security" ? false : r.direction === tab).map((r) => (
+            {rules.filter((r) => tab === "Security" ? r.action === "Block" : r.direction === tab).map((r) => (
               <tr key={r.id} className={"border-b border-[var(--border-dim)] " + (r.action === "Allow" ? "bg-[var(--ok)]/[0.03]" : "bg-[var(--crit)]/[0.04]")}>
                 <td className="px-3 py-1.5">
-                  <input type="checkbox" defaultChecked={r.enabled} onChange={(e) => toggleFirewallRule(server, r.id, e.target.checked)} className="accent-[var(--amber)]" />
+                  <input type="checkbox" checked={r.enabled} onChange={(e) => handleToggle(r.id, e.target.checked)} className="accent-[var(--amber)]" />
                 </td>
                 <td className="text-[var(--text)]">{r.name}</td>
                 <td className="text-[var(--text-sub)]">{r.profile}</td>

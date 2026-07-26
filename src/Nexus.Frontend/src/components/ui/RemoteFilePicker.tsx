@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Folder, File, HardDrive, ChevronRight, CornerLeftUp, UploadCloud, Server } from "lucide-react";
 import { getFilesSourcesClient, getFilesListClient, uploadInstallerClient, type FileSource, type FileItem } from "@/api/client";
+import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./tabs";
 import { ServerSelector } from "./ServerSelector";
@@ -74,10 +75,10 @@ export function RemoteFilePicker({ targetServer, isOpen, onOpenChange, onSelect 
       if (remoteTempPath) {
         onSelect(remoteTempPath, targetServer);
       } else {
-        alert("Failed to upload installer.");
+        toast.error("Failed to upload installer.");
       }
     } catch (err) {
-      alert("Failed to upload installer.");
+      toast.error("Failed to upload installer.");
     } finally {
       setIsUploading(false);
       if (localInputRef.current) localInputRef.current.value = "";

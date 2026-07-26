@@ -3,8 +3,7 @@ import { useEffect, useMemo, useState, useCallback, useContext } from "react";
 import { AlertCircle, Info, AlertTriangle, XCircle, Search, Download, Loader2, RefreshCw, X, Radio } from "lucide-react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
-import { getEvents, type EventEntry, type EventLevel } from "@/api/mock";
-import { getServersClient, type Server } from "@/api/client";
+import { getEventsClient as getEvents, getServersClient, type EventEntry, type EventLevel, type Server } from "@/api/client";
 import { ThemeContext } from "./__root";
 
 export const Route = createFileRoute("/events")({

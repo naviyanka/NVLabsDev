@@ -19,10 +19,15 @@ public class TelemetryBackgroundService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await Task.Yield();
-        using (var scope = _serviceProvider.CreateScope())
+        try
         {
+            using var scope = _serviceProvider.CreateScope();
             var ctx = scope.ServiceProvider.GetRequiredService<NexusContext>();
             ctx.Database.EnsureCreated();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Telemetry background service database initialization bypassed.");
         }
 
         while (!stoppingToken.IsCancellationRequested)

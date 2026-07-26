@@ -284,7 +284,7 @@ export function HorizonServers() {
                     <td className="px-3 md:px-6 py-3 md:py-4">
                       <div className="flex items-center gap-1.5">
                         <button
-                          onClick={(e) => { e.stopPropagation(); navigate({ to: `/server/$serverId`, params: { serverId: srv.ip } }); }}
+                          onClick={(e) => { e.stopPropagation(); navigate({ to: "/remote-desktop" }); }}
                           className="p-2 rounded-lg border border-[var(--border-c)] bg-[var(--bg-void)] hover:bg-[var(--amber-low)] hover:text-[var(--amber)] transition-all text-[var(--text-sub)]"
                           title="Remote Desktop"
                         >

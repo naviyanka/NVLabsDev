@@ -5,6 +5,7 @@ import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
 import { getAppsClient, installAppClient, uninstallAppClient, getServersClient, uploadInstallerClient, type InstalledApp } from "@/api/client";
 import { RemoteFilePicker } from "@/components/ui/RemoteFilePicker";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/apps")({
   head: () => ({ meta: [{ title: "Installed Apps — NEXUS" }, { name: "description", content: "Installed software inventory." }] }),
@@ -54,10 +55,10 @@ function AppsPage() {
     if (!confirm(`Are you sure you want to uninstall ${app.name}?`)) return;
     const success = await uninstallAppClient(server, app.uninstallString);
     if (success) {
-      alert("Uninstall completed.");
+      toast.success(`${app.name} uninstalled.`);
       fetchApps(true);
     } else {
-      alert("Failed to uninstall. The process might require interactive input or failed silently.");
+      toast.error("Failed to uninstall. The process might require interactive input or failed silently.");
     }
   };
 
@@ -81,10 +82,10 @@ function AppsPage() {
         setInstallingPath(path);
         setSourceServerIp(server); // uploaded directly to target
       } else {
-        alert("Failed to upload installer.");
+        toast.error("Failed to upload installer.");
       }
     } catch (err) {
-      alert("Failed to upload installer.");
+      toast.error("Failed to upload installer.");
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
     setIsLoading(false);
@@ -99,13 +100,17 @@ function AppsPage() {
       const promises = servers.map(s => installAppClient(s.ip, installingPath, installArgs, sourceServerIp));
       const results = await Promise.allSettled(promises);
       const successCount = results.filter(r => r.status === "fulfilled" && r.value === true).length;
-      alert(`Install completed on ${successCount} out of ${servers.length} servers.`);
+      if (successCount === servers.length) {
+        toast.success(`Install completed on all ${servers.length} servers.`);
+      } else {
+        toast.warning(`Install completed on ${successCount} out of ${servers.length} servers.`);
+      }
     } else {
       const success = await installAppClient(server, installingPath, installArgs, sourceServerIp);
       if (success) {
-        alert("Install completed.");
+        toast.success("Install completed.");
       } else {
-        alert("Failed to install. Ensure the installer can run silently.");
+        toast.error("Failed to install. Ensure the installer can run silently.");
       }
     }
 

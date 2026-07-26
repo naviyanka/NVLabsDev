@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, AlertTriangle, Cpu } from "lucide-react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
-import { getDevices, type Device } from "@/api/mock";
+import { getDevicesClient as getDevices, type Device } from "@/api/client";
 
 export const Route = createFileRoute("/devices")({
   head: () => ({ meta: [{ title: "Devices — NEXUS" }, { name: "description", content: "Device Manager view." }] }),

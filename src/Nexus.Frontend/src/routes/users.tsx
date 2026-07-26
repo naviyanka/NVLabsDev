@@ -2,8 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Fragment, useEffect, useState, useMemo } from "react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
-import { getUsersClient, getGroupsClient, type LocalUser, type LocalGroup } from "@/api/client";
-import { Loader2, Search, ArrowDownAZ, ArrowUpZA, UserCheck, UserX, Users, Shield } from "lucide-react";
+import { getUsersClient, getGroupsClient, createUserClient, deleteUserClient, type LocalUser, type LocalGroup } from "@/api/client";
+import { Loader2, Search, ArrowDownAZ, ArrowUpZA, UserCheck, UserX, Users, Shield, Plus, Trash2, UserPlus, X } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/users")({
   head: () => ({ meta: [{ title: "Users & Groups — NEXUS" }, { name: "description", content: "Local users and groups." }] }),
@@ -16,13 +17,14 @@ function UsersPage() {
   const [groups, setGroups] = useState<LocalGroup[]>([]);
   const [tab, setTab] = useState<"Users"|"Groups">("Users");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [sortCol, setSortCol] = useState<string>("name");
   const [sortAsc, setSortAsc] = useState(true);
 
-  useEffect(() => {
+  const loadData = () => {
     setLoading(true);
     Promise.all([
       getUsersClient(server),
@@ -35,7 +37,26 @@ function UsersPage() {
     }).finally(() => {
       setLoading(false);
     });
+  };
+
+  useEffect(() => {
+    loadData();
   }, [server]);
+
+  const handleDeleteUser = async (username: string) => {
+    if (!confirm(`Are you sure you want to delete user "${username}"?`)) return;
+    try {
+      const ok = await deleteUserClient(server, username);
+      if (ok) {
+        toast.success(`User "${username}" deleted`);
+        loadData();
+      } else {
+        toast.error(`Failed to delete user "${username}"`);
+      }
+    } catch (e) {
+      toast.error("Delete failed");
+    }
+  };
 
   const toggleSort = (col: string) => {
     if (sortCol === col) setSortAsc(!sortAsc);
@@ -96,15 +117,25 @@ function UsersPage() {
             </button>
           ))}
         </div>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-sub)]" />
-          <input
-            type="text"
-            placeholder={`Search ${tab.toLowerCase()}...`}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-64 bg-[var(--bg-card)] border border-[var(--border-dim)] rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-[var(--amber)] transition-colors text-[var(--text)] placeholder:text-[var(--text-sub)]"
-          />
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-sub)]" />
+            <input
+              type="text"
+              placeholder={`Search ${tab.toLowerCase()}...`}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-64 bg-[var(--bg-card)] border border-[var(--border-dim)] rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-[var(--amber)] transition-colors text-[var(--text)] placeholder:text-[var(--text-sub)]"
+            />
+          </div>
+          {tab === "Users" && (
+            <button
+              onClick={() => setIsAddUserOpen(true)}
+              className="flex items-center gap-2 rounded-lg bg-[var(--amber)] text-black px-4 py-2 text-sm font-semibold hover:bg-[var(--amber-hover)] transition-colors shadow-sm"
+            >
+              <UserPlus size={16} /> Add User
+            </button>
+          )}
         </div>
       </div>
 
@@ -128,13 +159,14 @@ function UsersPage() {
                   </th>
                   <th className="px-5 py-3">Password</th>
                   <th className="px-5 py-3">Groups</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="mono">
                 {loading ? (
-                  <tr><td colSpan={6} className="px-5 py-12 text-center text-[var(--text-sub)]"><Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-[var(--amber)]" />Fetching users...</td></tr>
+                  <tr><td colSpan={7} className="px-5 py-12 text-center text-[var(--text-sub)]"><Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-[var(--amber)]" />Fetching users...</td></tr>
                 ) : filteredUsers.length === 0 ? (
-                  <tr><td colSpan={6} className="px-5 py-12 text-center text-[var(--text-sub)]">No users found.</td></tr>
+                  <tr><td colSpan={7} className="px-5 py-12 text-center text-[var(--text-sub)]">No users found.</td></tr>
                 ) : (
                   filteredUsers.map((u) => (
                     <tr key={u.name} className="border-b border-[var(--border-dim)] hover:bg-[var(--bg-surface)] transition-colors duration-200">
@@ -151,6 +183,15 @@ function UsersPage() {
                       </td>
                       <td className="px-5 py-4 text-[var(--text-sub)]">{u.passwordNeverExpires ? "Never expires" : "Standard"}</td>
                       <td className="px-5 py-4 text-[var(--text-sub)] truncate max-w-[200px]" title={u.groups.join(", ")}>{u.groups.join(", ")}</td>
+                      <td className="px-5 py-4 text-right">
+                        <button
+                          onClick={() => handleDeleteUser(u.name)}
+                          className="p-1.5 rounded-lg border border-[var(--border-dim)] bg-[var(--bg-void)] text-[var(--text-sub)] hover:border-[var(--crit)]/50 hover:bg-[var(--crit)]/10 hover:text-[var(--crit)] transition-colors"
+                          title="Delete user"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -229,6 +270,118 @@ function UsersPage() {
           </div>
         </div>
       )}
+
+      {isAddUserOpen && (
+        <CreateUserModal
+          server={server}
+          onClose={() => setIsAddUserOpen(false)}
+          onCreated={() => {
+            setIsAddUserOpen(false);
+            loadData();
+          }}
+        />
+      )}
     </PageWrapper>
+  );
+}
+
+function CreateUserModal({ server, onClose, onCreated }: { server: string; onClose: () => void; onCreated: () => void }) {
+  const [username, setUsername] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [password, setPassword] = useState("");
+  const [group, setGroup] = useState("Users");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const ok = await createUserClient(server, { name: username, fullName, password, groups: [group] });
+      if (ok) {
+        toast.success(`User "${username}" created successfully`);
+        onCreated();
+      } else {
+        toast.error("Failed to create user");
+      }
+    } catch (e) {
+      toast.error("User creation failed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <form onSubmit={handleSubmit} className="bg-[var(--bg-card)] border border-[var(--border-c)] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between p-5 border-b border-[var(--border-c)] bg-[var(--bg-surface)]">
+          <div className="flex items-center gap-2">
+            <UserPlus size={18} className="text-[var(--amber)]" />
+            <h3 className="text-lg font-bold text-[var(--text)]">Create Local User</h3>
+          </div>
+          <button type="button" onClick={onClose} className="text-[var(--text-sub)] hover:text-[var(--text)] p-1 rounded-full hover:bg-[var(--bg-void)]">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">Username</label>
+            <input
+              required
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="e.g. jdoe"
+              className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-xs text-[var(--text)] focus:border-[var(--amber)] focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">Full Name</label>
+            <input
+              required
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="e.g. John Doe"
+              className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-xs text-[var(--text)] focus:border-[var(--amber)] focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">Password</label>
+            <input
+              required
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Set initial password"
+              className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-xs text-[var(--text)] focus:border-[var(--amber)] focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">Primary Group</label>
+            <select
+              value={group}
+              onChange={(e) => setGroup(e.target.value)}
+              className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-void)] px-4 py-2.5 text-xs text-[var(--text)] focus:border-[var(--amber)] focus:outline-none"
+            >
+              <option value="Users">Users</option>
+              <option value="Administrators">Administrators</option>
+              <option value="Remote Management Users">Remote Management Users</option>
+              <option value="Backup Operators">Backup Operators</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="p-5 border-t border-[var(--border-c)] flex justify-end gap-3 bg-[var(--bg-surface)]">
+          <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-sub)] hover:text-[var(--text)]">
+            Cancel
+          </button>
+          <button disabled={submitting} type="submit" className="px-5 py-2 rounded-xl text-xs font-bold bg-[var(--amber)] text-black hover:bg-[var(--amber-hover)] disabled:opacity-50">
+            {submitting ? "Creating..." : "Create User"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
