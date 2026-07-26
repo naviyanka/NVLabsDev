@@ -1,0 +1,6 @@
+{
+  "name": "NVLabs Dev",
+  "description": "NVLabs Dev administration portal and gateway",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,22 @@
+{
+  "name": "nvlabs",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "workspaces": [
+    "src/Nexus.Frontend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=src/Nexus.Frontend",
+    "build": "npm run build --workspace=src/Nexus.Frontend",
+    "start": "npm run preview --workspace=src/Nexus.Frontend",
+    "lint": "npm run lint --workspace=src/Nexus.Frontend"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.0",
+    "@types/node": "^25.9.3"
+  },
+  "dependencies": {
+    "@google/genai": "^2.13.0"
+  }
+}

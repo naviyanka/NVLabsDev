@@ -1,0 +1,28 @@
+// Backed up mock plugin data from api/mock.ts
+
+const PLUGIN_DEFS: [string, Plugin["category"], string][] = [
+    ["Active Directory Explorer","Management","Browse and edit AD objects, OUs, and policies."],
+    ["Group Policy Analyzer","Management","Visualize applied GPOs and conflicts."],
+    ["SQL Server Monitor","Monitoring","Performance counters and query stats for SQL Server."],
+    ["IIS Manager","Management","Manage sites, app pools and bindings."],
+    ["Hyper-V Console","Management","Manage virtual machines and switches."],
+    ["DNS Manager","Network","Manage zones, records and forwarders."],
+    ["DHCP Manager","Network","Manage scopes and reservations."],
+    ["Firewall Designer","Security","Visualize and craft firewall rules."],
+    ["WSUS Console","Management","Approve and schedule Windows updates."],
+    ["Failover Cluster Manager","Management","Manage clusters and roles."],
+    ["Storage Spaces Manager","Storage","Create and manage storage pools."],
+    ["BitLocker Manager","Security","Manage encrypted volumes and recovery."],
+    ["Defender ATP Bridge","Security","Forward EDR alerts to NEXUS."],
+    ["AppLocker Manager","Security","Manage application whitelisting policies."],
+    ["Audit Policy Editor","Security","Configure system audit policies."],
+    ["Certificate Authority","Security","Issue and revoke internal certificates."],
+    ["Kerberos Inspector","Security","Inspect Kerberos tickets and SPNs."],
+    ["NTFS Permissions","Storage","Inspect and edit ACLs at scale."],
+    ["File Server Resource Manager","Storage","Quotas, screens and classification."],
+    ["DFS Replication","Storage","Manage DFS-R replication groups."],
+    ["PagerDuty Integration","Custom","Route critical alerts to PagerDuty."],
+    ["ServiceNow Integration","Custom","Auto-open tickets from alerts."],
+    ["Datadog Bridge","Monitoring","Forward metrics to Datadog."],
+    ["Grafana Provisioner","Monitoring","Auto-provision NEXUS dashboards."],
+];
