@@ -237,11 +237,14 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
-        {/* Anti-FOUC: apply cached theme BEFORE first paint so there is zero flash */}
         <script dangerouslySetInnerHTML={{ __html: `
           (function() {
             try {
               var t = localStorage.getItem('nexus-theme');
+              if (t === 'dark') {
+                 t = 'horizon';
+                 localStorage.setItem('nexus-theme', 'horizon');
+              }
               if (t) document.documentElement.setAttribute('data-theme', t);
               else document.documentElement.setAttribute('data-theme', 'horizon');
               
@@ -264,7 +267,12 @@ function RootComponent() {
   const isLoginPage = useRouterState({ select: (s) => s.location.pathname === "/login" });
   const [theme, setTheme] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem('nexus-theme') || 'horizon';
+      let t = localStorage.getItem('nexus-theme');
+      if (t === 'dark') {
+         t = 'horizon';
+         localStorage.setItem('nexus-theme', 'horizon');
+      }
+      return t || 'horizon';
     }
     return 'horizon';
   });

@@ -4,6 +4,8 @@ import { Palette, SlidersHorizontal, Terminal, FileCode, RefreshCw, Download, Ke
 import { getApiUrl, getFullUrl, BackendHost, getBackendHosts, setBackendHosts, isBackendEnabledGlobally, setBackendEnabledGlobally, testBackendConnection, BackendPingResult } from "@/lib/backend";
 import { getFrontendSettings, saveFrontendSettings, type FrontendSettings } from "@/lib/frontendSettings";
 import { BackgroundJobsView } from "./BackgroundJobsView";
+import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
+
 import { TerminalThemePreview } from "@/components/settings/TerminalThemePreview";
 import { SettingsImportExport } from "@/components/settings/SettingsImportExport";
 import { SoftwareRepoManager } from "@/components/apps/SoftwareRepoManager";
@@ -728,12 +730,7 @@ export function HorizonSettings() {
                       <div className="text-xs font-bold text-[var(--text)]">BitLocker TPM Key Escrow</div>
                       <div className="text-[10px] text-[var(--text-sub)]">Auto-backup recovery keys to Active Directory / Key Vault.</div>
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={s.bitlockerAutoEscrow ?? true}
-                      onChange={(e) => patch({ bitlockerAutoEscrow: e.target.checked })}
-                      className="accent-[var(--amber)] h-4 w-4"
-                    />
+                    <ToggleSwitch checked={s.bitlockerAutoEscrow ?? true} onChange={(val) => patch({ bitlockerAutoEscrow: val })} />
                   </div>
                 </div>
               </section>
