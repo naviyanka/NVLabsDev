@@ -84,6 +84,7 @@ builder.Services.AddTransient<IPowerShellExecutionService, PowerShellExecutionSe
 builder.Services.AddHostedService<TelemetryBackgroundService>();
 builder.Services.AddHostedService<LogPersistenceService>();
 builder.Services.AddHostedService<AdSyncBackgroundService>();
+builder.Services.AddHostedService<PerformanceStreamService>();
 builder.Services.AddSignalR();
 builder.Services.AddHttpClient();
 
