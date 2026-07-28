@@ -20,7 +20,7 @@ export const Route = createFileRoute("/services")({
 type ViewMode = "table" | "grouped";
 type CategoryFilter = "all" | "Running" | "Stopped" | "Automatic" | "Manual" | "Disabled" | "Core Infrastructure" | "Security" | "Networking" | "Database / App" | "Management";
 
-export function ServicesPage() {
+function ServicesPage() {
   const [server, setServer] = useState("nexus01");
   const [services, setServices] = useState<Service[]>([]);
   const [selected, setSelected] = useState<Service | null>(null);

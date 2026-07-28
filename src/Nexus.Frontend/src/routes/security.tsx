@@ -56,7 +56,7 @@ export const Route = createFileRoute("/security")({
 type TabType = "Overview" | "Events" | "Ports" | "Admins" | "Compliance";
 type LevelFilter = "All" | "Critical" | "Error" | "Warning" | "Information";
 
-export function SecurityPage() {
+function SecurityPage() {
   const [server, setServer] = useState("dc01");
   const [data, setData] = useState<SecurityData | null>(null);
   const [loading, setLoading] = useState(false);

@@ -970,4 +970,3 @@ Write-Host "Windows Update cycle completed." -ForegroundColor Green
   );
 }
 
-export default UpdatesPage;

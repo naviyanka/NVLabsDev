@@ -248,7 +248,7 @@ function MapShareDialog({ isOpen, onConfirm, onCancel }: { isOpen: boolean; onCo
   );
 }
 
-export function FilesPage() {
+function FilesPage() {
   const { path: queryPath } = Route.useSearch();
   const [server, setServer] = useState("dc01");
   const [sources, setSources] = useState<FileSource[]>([]);

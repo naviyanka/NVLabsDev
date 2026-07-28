@@ -327,4 +327,3 @@ function EventDetail({ selected }: { selected: EventEntry | null }) {
   );
 }
 
-export default EventsPage;

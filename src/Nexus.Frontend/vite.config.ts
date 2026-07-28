@@ -10,6 +10,9 @@ import fs from 'fs';
 
 export default defineConfig({
   vite: {
+    optimizeDeps: {
+      exclude: ["@google/genai"],
+    },
     server: {
       allowedHosts: "all",
       port: 3000,

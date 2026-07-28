@@ -28,7 +28,7 @@ function formatBytes(bytes: number, decimals = 1) {
 type ViewMode = "table" | "grouped" | "heatmap";
 type CategoryFilter = "all" | "high_cpu" | "high_mem" | "System" | "Service" | "Application" | "Database";
 
-export function ProcessesPage() {
+function ProcessesPage() {
   const [server, setServer] = useState("dc01");
   const [procs, setProcs] = useState<Process[]>([]);
   const [sysCpu, setSysCpu] = useState<number>(0);

@@ -54,7 +54,7 @@ export const Route = createFileRoute("/users")({
 
 type FilterStatus = "all" | "enabled" | "disabled" | "admins" | "locked";
 
-export function UsersPage() {
+function UsersPage() {
   const [server, setServer] = useState("dc01");
   const [users, setUsers] = useState<LocalUser[]>([]);
   const [groups, setGroups] = useState<LocalGroup[]>([]);

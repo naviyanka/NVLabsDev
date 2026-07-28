@@ -28,7 +28,7 @@ const PART_COLOR: Record<string, string> = {
   Unallocated: "var(--text-ghost)",
 };
 
-export function StoragePage() {
+function StoragePage() {
   const [server, setServer] = useState("nexus01");
   const [disks, setDisks] = useState<Disk[]>([]);
   const [volumes, setVolumes] = useState<Volume[]>([]);

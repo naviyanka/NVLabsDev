@@ -35,7 +35,7 @@ export const Route = createFileRoute("/defender")({
   component: DefenderPage,
 });
 
-export function DefenderPage() {
+function DefenderPage() {
   const [server, setServer] = useState("dc01");
   const [status, setStatus] = useState<DefenderStatus | null>(null);
   const [threats, setThreats] = useState<DefenderThreat[]>([]);

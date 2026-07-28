@@ -1452,4 +1452,3 @@ function relativeTime(iso: string): string {
   return `${days}d ago`;
 }
 
-export default RDPPage;
