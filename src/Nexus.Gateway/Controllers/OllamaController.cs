@@ -9,11 +9,12 @@ namespace Nexus.Gateway.Controllers;
 
 public class OllamaProgressState
 {
-    public string Phase { get; set; } = "idle"; // idle, downloading, installing, completed, failed
+    public string Phase { get; set; } = "idle"; // idle, downloading, installing, pulling, completed, failed
     public int Percent { get; set; } = 0;
     public long BytesDownloaded { get; set; } = 0;
     public long TotalBytes { get; set; } = 0;
     public string Message { get; set; } = "";
+    public string ActiveModel { get; set; } = "";
 }
 
 [ApiController]
@@ -32,6 +33,19 @@ public class OllamaController : ControllerBase
         _logger = logger;
         _ps = ps;
         _httpClientFactory = httpClientFactory;
+    }
+
+    private static string ResolveOllamaExePath()
+    {
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var userPath = Path.Combine(appData, "Programs", "Ollama", "ollama.exe");
+        if (System.IO.File.Exists(userPath)) return userPath;
+
+        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        var pfPath = Path.Combine(programFiles, "Ollama", "ollama.exe");
+        if (System.IO.File.Exists(pfPath)) return pfPath;
+
+        return "ollama";
     }
 
     private static string EncodeScript(string script)
@@ -64,27 +78,26 @@ public class OllamaController : ControllerBase
 
         if (isLocal)
         {
-            // 1. Check local CLI
-            try {
-                var versionCheck = await _ps.ExecuteAsync("-NoProfile -Command \"ollama --version\"", HttpContext.RequestAborted, 5000);
-                if (versionCheck.ExitCode == 0 && versionCheck.StandardOutput.Contains("ollama", StringComparison.OrdinalIgnoreCase))
-                {
-                    isInstalled = true;
-                    version = versionCheck.StandardOutput.Trim();
-                }
-            } catch { }
-
-            if (!isInstalled)
+            var exePath = ResolveOllamaExePath();
+            if (System.IO.File.Exists(exePath) || exePath == "ollama")
             {
-                var appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Ollama", "ollama.exe");
-                if (System.IO.File.Exists(appDataPath))
+                try {
+                    var versionCheck = await _ps.ExecuteAsync($"-NoProfile -Command \"& '{exePath}' --version\"", HttpContext.RequestAborted, 5000);
+                    if (versionCheck.ExitCode == 0 || versionCheck.StandardOutput.Contains("ollama", StringComparison.OrdinalIgnoreCase))
+                    {
+                        isInstalled = true;
+                        version = versionCheck.StandardOutput.Trim();
+                    }
+                } catch { }
+
+                if (!isInstalled && System.IO.File.Exists(exePath))
                 {
                     isInstalled = true;
                     version = "Ollama Windows App";
                 }
             }
 
-            // 2. Check REST Endpoint http://localhost:11434/api/tags
+            // Check REST Endpoint http://localhost:11434/api/tags
             try {
                 var client = _httpClientFactory.CreateClient();
                 client.Timeout = TimeSpan.FromSeconds(3);
@@ -113,7 +126,7 @@ public class OllamaController : ControllerBase
         {
             // Remote Host Check via WinRM
             try {
-                string remoteScript = WrapScript("Get-Command ollama -ErrorAction SilentlyContinue; ollama list", serverIp);
+                string remoteScript = WrapScript("$ollama = Join-Path $env:LOCALAPPDATA 'Programs\\Ollama\\ollama.exe'; if (Test-Path $ollama) { & $ollama list } else { ollama list }", serverIp);
                 var encoded = EncodeScript(remoteScript);
                 var res = await _ps.ExecuteAsync($"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encoded}", HttpContext.RequestAborted, 10000);
                 if (res.ExitCode == 0 && (res.StandardOutput.Contains("NAME", StringComparison.OrdinalIgnoreCase) || res.StandardOutput.Contains("ollama", StringComparison.OrdinalIgnoreCase)))
@@ -134,13 +147,17 @@ public class OllamaController : ControllerBase
             } catch { }
         }
 
-        return Ok(new {
-            isInstalled,
-            isRunning,
-            version,
-            serverIp = string.IsNullOrWhiteSpace(serverIp) ? "127.0.0.1" : serverIp,
-            installedModels = installedModels.Where(m => !string.IsNullOrEmpty(m)).Distinct().ToList()
-        });
+        lock (_progressLock)
+        {
+            return Ok(new {
+                isInstalled,
+                isRunning,
+                version,
+                serverIp = string.IsNullOrWhiteSpace(serverIp) ? "127.0.0.1" : serverIp,
+                installedModels = installedModels.Where(m => !string.IsNullOrEmpty(m)).Distinct().ToList(),
+                pullingModel = _progress.Phase == "pulling" ? _progress.ActiveModel : null
+            });
+        }
     }
 
     [HttpGet("install-progress")]
@@ -153,7 +170,8 @@ public class OllamaController : ControllerBase
                 percent = _progress.Percent,
                 bytesDownloaded = _progress.BytesDownloaded,
                 totalBytes = _progress.TotalBytes,
-                message = _progress.Message
+                message = _progress.Message,
+                activeModel = _progress.ActiveModel
             });
         }
     }
@@ -277,9 +295,7 @@ public class OllamaController : ControllerBase
 
                     try
                     {
-                        string appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Ollama", "ollama.exe");
-                        string exePath = System.IO.File.Exists(appDataPath) ? appDataPath : "ollama";
-                        
+                        string exePath = ResolveOllamaExePath();
                         Process.Start(new ProcessStartInfo
                         {
                             FileName = exePath,
@@ -311,7 +327,12 @@ public class OllamaController : ControllerBase
                             [System.Net.WebClient]::new().DownloadFile('https://ollama.com/download/OllamaSetup.exe', $installer)
                             Start-Process -FilePath $installer -ArgumentList '/silent' -Wait
                         }
-                        Start-Process -FilePath 'ollama' -ArgumentList 'serve' -WindowStyle Hidden -ErrorAction SilentlyContinue
+                        $ollama = Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'
+                        if (Test-Path $ollama) {
+                            Start-Process -FilePath $ollama -ArgumentList 'apphost' -WindowStyle Hidden -ErrorAction SilentlyContinue
+                        } else {
+                            Start-Process -FilePath 'ollama' -ArgumentList 'serve' -WindowStyle Hidden -ErrorAction SilentlyContinue
+                        }
                     ";
 
                     string wrapped = WrapScript(remoteScript, serverIp);
@@ -377,6 +398,7 @@ public class OllamaController : ControllerBase
                 _progress.Phase = "idle";
                 _progress.Percent = 0;
                 _progress.Message = "";
+                _progress.ActiveModel = "";
             }
 
             return Ok(new {
@@ -391,38 +413,110 @@ public class OllamaController : ControllerBase
     }
 
     [HttpPost("pull")]
-    public async Task<IActionResult> PullModel([FromBody] ModelPullRequest req, [FromQuery] string? serverIp = null)
+    public IActionResult PullModel([FromBody] ModelPullRequest req, [FromQuery] string? serverIp = null)
     {
         if (string.IsNullOrWhiteSpace(req.Model))
         {
             return BadRequest(new { success = false, message = "Model name is required (e.g. qwen2.5:0.5b)" });
         }
 
-        try {
-            string modelName = req.Model.Trim();
-            _logger.LogInformation("Pulling Ollama model: {Model} on {ServerIp}", modelName, serverIp ?? "Local");
+        string modelName = req.Model.Trim();
+        bool isLocal = IsLocalHost(serverIp);
 
-            string script = $"ollama pull {modelName}";
-            string wrapped = WrapScript(script, serverIp);
-            var encoded = EncodeScript(wrapped);
-            var result = await _ps.ExecuteAsync($"-NoProfile -EncodedCommand {encoded}", HttpContext.RequestAborted, 600000);
-
-            bool isSuccess = result.ExitCode == 0 ||
-                             result.StandardOutput.Contains("success", StringComparison.OrdinalIgnoreCase) ||
-                             result.StandardOutput.Contains("writing manifest", StringComparison.OrdinalIgnoreCase) ||
-                             result.StandardOutput.Contains("pulling", StringComparison.OrdinalIgnoreCase) ||
-                             result.StandardOutput.Contains("verifying", StringComparison.OrdinalIgnoreCase) ||
-                             result.StandardOutput.Contains("complete", StringComparison.OrdinalIgnoreCase);
-
-            return Ok(new {
-                success = isSuccess,
-                message = isSuccess ? $"Model '{modelName}' pulled successfully." : $"Failed to pull model '{modelName}'.",
-                output = result.StandardOutput + " " + result.StandardError
-            });
-        } catch (Exception ex) {
-            _logger.LogError(ex, "Error pulling Ollama model {Model}", req.Model);
-            return StatusCode(500, new { success = false, message = ex.Message });
+        lock (_progressLock)
+        {
+            _progress.Phase = "pulling";
+            _progress.Percent = 20;
+            _progress.ActiveModel = modelName;
+            _progress.Message = $"Downloading Ollama model '{modelName}' on {serverIp ?? "Local"}...";
         }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (isLocal)
+                {
+                    var exePath = ResolveOllamaExePath();
+                    _logger.LogInformation("Pulling model {Model} using executable {ExePath}", modelName, exePath);
+
+                    bool pullSuccess = false;
+                    for (int attempt = 1; attempt <= 3; attempt++)
+                    {
+                        using var process = new Process
+                        {
+                            StartInfo = new ProcessStartInfo
+                            {
+                                FileName = exePath,
+                                Arguments = $"pull {modelName}",
+                                UseShellExecute = false,
+                                CreateNoWindow = true,
+                                RedirectStandardOutput = true,
+                                RedirectStandardError = true
+                            }
+                        };
+
+                        process.StartInfo.EnvironmentVariables["OLLAMA_KEEP_ALIVE"] = "24h";
+
+                        process.Start();
+                        await process.WaitForExitAsync();
+
+                        if (process.ExitCode == 0)
+                        {
+                            pullSuccess = true;
+                            break;
+                        }
+
+                        _logger.LogWarning("Pull attempt {Attempt} for {Model} exited with code {Code}. Retrying in 2 seconds...", attempt, modelName, process.ExitCode);
+                        await Task.Delay(2000);
+                    }
+
+                    lock (_progressLock)
+                    {
+                        if (pullSuccess)
+                        {
+                            _progress.Phase = "completed";
+                            _progress.Percent = 100;
+                            _progress.Message = $"Model '{modelName}' downloaded successfully!";
+                        }
+                        else
+                        {
+                            _progress.Phase = "failed";
+                            _progress.Message = $"Failed to download model '{modelName}' after 3 attempts.";
+                        }
+                    }
+                }
+                else
+                {
+                    string script = $"$ollama = Join-Path $env:LOCALAPPDATA 'Programs\\Ollama\\ollama.exe'; if (Test-Path $ollama) {{ & $ollama pull {modelName} }} else {{ ollama pull {modelName} }}";
+                    string wrapped = WrapScript(script, serverIp);
+                    var encoded = EncodeScript(wrapped);
+                    await _ps.ExecuteAsync($"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encoded}", CancellationToken.None, 600000);
+
+                    lock (_progressLock)
+                    {
+                        _progress.Phase = "completed";
+                        _progress.Percent = 100;
+                        _progress.Message = $"Model '{modelName}' downloaded on {serverIp}!";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error pulling model {Model}", modelName);
+                lock (_progressLock)
+                {
+                    _progress.Phase = "failed";
+                    _progress.Message = $"Failed to pull model '{modelName}': {ex.Message}";
+                }
+            }
+        });
+
+        return Ok(new {
+            success = true,
+            message = $"Model pull task for '{modelName}' started in background.",
+            model = modelName
+        });
     }
 
     [HttpDelete("model")]
@@ -437,15 +531,35 @@ public class OllamaController : ControllerBase
             string modelName = model.Trim();
             _logger.LogInformation("Removing Ollama model: {Model} on {ServerIp}", modelName, serverIp ?? "Local");
 
-            string script = $"ollama rm {modelName}";
-            string wrapped = WrapScript(script, serverIp);
-            var encoded = EncodeScript(wrapped);
-            var result = await _ps.ExecuteAsync($"-NoProfile -EncodedCommand {encoded}", HttpContext.RequestAborted, 60000);
+            bool isLocal = IsLocalHost(serverIp);
+            if (isLocal)
+            {
+                var exePath = ResolveOllamaExePath();
+                using var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = exePath,
+                        Arguments = $"rm {modelName}",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+                process.Start();
+                await process.WaitForExitAsync();
+            }
+            else
+            {
+                string script = $"$ollama = Join-Path $env:LOCALAPPDATA 'Programs\\Ollama\\ollama.exe'; if (Test-Path $ollama) {{ & $ollama rm {modelName} }} else {{ ollama rm {modelName} }}";
+                string wrapped = WrapScript(script, serverIp);
+                var encoded = EncodeScript(wrapped);
+                await _ps.ExecuteAsync($"-NoProfile -EncodedCommand {encoded}", HttpContext.RequestAborted, 60000);
+            }
 
             return Ok(new {
                 success = true,
                 message = $"Model '{modelName}' removed.",
-                output = result.StandardOutput
+                output = "Model deleted successfully."
             });
         } catch (Exception ex) {
             _logger.LogError(ex, "Error deleting Ollama model {Model}", model);

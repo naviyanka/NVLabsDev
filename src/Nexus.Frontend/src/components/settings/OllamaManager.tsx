@@ -10,6 +10,7 @@ interface OllamaStatus {
   version: string;
   serverIp: string;
   installedModels: string[];
+  pullingModel?: string | null;
 }
 
 interface ServerItem {
@@ -20,11 +21,12 @@ interface ServerItem {
 }
 
 interface InstallProgress {
-  phase: "idle" | "downloading" | "installing" | "completed" | "failed";
+  phase: "idle" | "downloading" | "installing" | "pulling" | "completed" | "failed";
   percent: number;
   bytesDownloaded: number;
   totalBytes: number;
   message: string;
+  activeModel?: string;
 }
 
 interface CuratedModel {
@@ -77,11 +79,11 @@ const RECOMMENDED_MODELS: CuratedModel[] = [
 ];
 
 const POPULAR_CUSTOM_PRESETS = [
-  { tag: "deepseek-r1:1.5b", label: "DeepSeek R1 (1.5B)", desc: "Reasoning Model" },
-  { tag: "qwen2.5-coder:1.5b", label: "Qwen 2.5 Coder (1.5B)", desc: "Code Generation" },
-  { tag: "nomic-embed-text", label: "Nomic Embed Text", desc: "Vector Embeddings" },
-  { tag: "mistral:7b-instruct-q4_K_M", label: "Mistral 7B (Quantized)", desc: "General Purpose" },
-  { tag: "codellama:7b", label: "CodeLlama 7B", desc: "PowerShell & Scripting" },
+  { tag: "deepseek-r1:1.5b", label: "DeepSeek R1 (1.5B)" },
+  { tag: "qwen2.5-coder:1.5b", label: "Qwen 2.5 Coder (1.5B)" },
+  { tag: "nomic-embed-text", label: "Nomic Embed Text" },
+  { tag: "mistral:7b-instruct-q4_K_M", label: "Mistral 7B" },
+  { tag: "codellama:7b", label: "CodeLlama 7B" },
 ];
 
 export const OllamaManager: React.FC = () => {
@@ -126,8 +128,14 @@ export const OllamaManager: React.FC = () => {
     try {
       const res = await fetch(getApiUrl(`/ollama/status?serverIp=${encodeURIComponent(selectedServerIp)}`));
       if (res.ok) {
-        const data = await res.json();
+        const data: OllamaStatus = await res.json();
         setStatus(data);
+        if (data.pullingModel) {
+          setPullingModel(data.pullingModel);
+        } else if (pullingModel && data.installedModels.some((m) => m.includes(pullingModel))) {
+          setPullingModel(null);
+          toast.success(`Model '${pullingModel}' download complete!`);
+        }
       } else {
         setStatus({ isInstalled: false, isRunning: false, version: "", serverIp: selectedServerIp, installedModels: [] });
       }
@@ -142,32 +150,37 @@ export const OllamaManager: React.FC = () => {
     fetchStatus();
   }, [selectedServerIp]);
 
-  // Poll install progress while installing
+  // Poll status & install progress while active task is running
   useEffect(() => {
-    let intervalId: any = null;
-    if (installing || installProgress.phase === "downloading" || installProgress.phase === "installing") {
-      intervalId = setInterval(async () => {
+    let intervalId: any = setInterval(async () => {
+      if (installing || pullingModel || installProgress.phase === "downloading" || installProgress.phase === "installing" || installProgress.phase === "pulling") {
         try {
           const res = await fetch(getApiUrl("/ollama/install-progress"));
           if (res.ok) {
             const data: InstallProgress = await res.json();
             setInstallProgress(data);
             if (data.phase === "completed") {
-              setInstalling(false);
-              toast.success(`Ollama setup completed on target ${selectedServerIp}!`);
+              if (installing) {
+                setInstalling(false);
+                toast.success(`Ollama setup completed on target ${selectedServerIp}!`);
+              }
+              if (pullingModel) {
+                setPullingModel(null);
+                toast.success(`Model '${data.activeModel || pullingModel}' downloaded successfully!`);
+              }
               fetchStatus();
             } else if (data.phase === "failed") {
               setInstalling(false);
-              toast.error(`Installation failed: ${data.message}`);
+              setPullingModel(null);
+              toast.error(`Operation error: ${data.message}`);
             }
           }
         } catch { }
-      }, 1000);
-    }
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [installing, installProgress.phase, selectedServerIp]);
+      }
+    }, 2000);
+
+    return () => clearInterval(intervalId);
+  }, [installing, pullingModel, installProgress.phase, selectedServerIp]);
 
   const handleInstallOllama = async () => {
     setInstalling(true);
@@ -225,8 +238,32 @@ export const OllamaManager: React.FC = () => {
       toast.error("Please enter a valid model tag.");
       return;
     }
+
+    // Check if already installed
+    if (status.installedModels.some((m) => m === targetModel || m.startsWith(targetModel))) {
+      toast.info(`Model '${targetModel}' is already installed! Setting as active AI model.`);
+      const settings = getFrontendSettings();
+      saveFrontendSettings({
+        ...settings,
+        aiProvider: "ollama",
+        aiBaseUrl: selectedServerIp === "127.0.0.1" ? "http://localhost:11434/v1" : `http://${selectedServerIp}:11434/v1`,
+        aiModel: targetModel,
+      });
+      toast.success(`NEXUS Copilot active model set to '${targetModel}'!`);
+      return;
+    }
+
     setPullingModel(targetModel);
-    toast.info(`Pulling model '${targetModel}' on target server ${selectedServerIp}... Please wait.`);
+    setInstallProgress({
+      phase: "pulling",
+      percent: 15,
+      bytesDownloaded: 0,
+      totalBytes: 0,
+      activeModel: targetModel,
+      message: `Downloading model weights for '${targetModel}'...`,
+    });
+
+    toast.info(`Started background download for model '${targetModel}' on ${selectedServerIp}.`);
     try {
       const res = await fetch(getApiUrl(`/ollama/pull?serverIp=${encodeURIComponent(selectedServerIp)}`), {
         method: "POST",
@@ -235,9 +272,6 @@ export const OllamaManager: React.FC = () => {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(`Model '${targetModel}' pulled successfully!`);
-        
-        // Auto-configure Ollama as active AI provider in settings
         const settings = getFrontendSettings();
         saveFrontendSettings({
           ...settings,
@@ -245,15 +279,13 @@ export const OllamaManager: React.FC = () => {
           aiBaseUrl: selectedServerIp === "127.0.0.1" ? "http://localhost:11434/v1" : `http://${selectedServerIp}:11434/v1`,
           aiModel: targetModel,
         });
-        toast.success(`NEXUS Copilot configured to run locally using '${targetModel}'!`);
         setCustomModelInput("");
-        fetchStatus();
       } else {
-        toast.error(`Failed to pull model '${targetModel}': ${data.message || "Pull command error"}`);
+        toast.error(`Pull error: ${data.message}`);
+        setPullingModel(null);
       }
     } catch (e: any) {
-      toast.error(`Error pulling model: ${e.message}`);
-    } finally {
+      toast.error(`Error starting model pull: ${e.message}`);
       setPullingModel(null);
     }
   };
@@ -358,8 +390,8 @@ export const OllamaManager: React.FC = () => {
         </div>
       </div>
 
-      {/* LIVE PROGRESS BAR SECTION */}
-      {(installing || (installProgress.phase !== "idle" && installProgress.phase !== "completed")) && (
+      {/* LIVE PROGRESS BAR SECTION (BLUE for Download, PURPLE for Install, CYAN for Model Pull) */}
+      {(installing || pullingModel || (installProgress.phase !== "idle" && installProgress.phase !== "completed")) && (
         <div className="p-4 bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl space-y-3 shadow-inner">
           <div className="flex items-center justify-between text-xs font-bold text-[var(--text)]">
             <span className="flex items-center gap-2">
@@ -371,7 +403,14 @@ export const OllamaManager: React.FC = () => {
               ) : installProgress.phase === "installing" ? (
                 <>
                   <Cpu className="w-4 h-4 text-purple-500 animate-spin" />
-                  <span className="text-purple-500 font-bold uppercase tracking-wider">Phase 2: Installing Ollama Windows Service</span>
+                  <span className="text-purple-500 font-bold uppercase tracking-wider">Phase 2: Installing Ollama Service</span>
+                </>
+              ) : installProgress.phase === "pulling" || pullingModel ? (
+                <>
+                  <Download className="w-4 h-4 text-cyan-500 animate-bounce" />
+                  <span className="text-cyan-500 font-bold uppercase tracking-wider">
+                    Downloading Model '{pullingModel || installProgress.activeModel}'
+                  </span>
                 </>
               ) : installProgress.phase === "failed" ? (
                 <>
@@ -381,15 +420,16 @@ export const OllamaManager: React.FC = () => {
               ) : (
                 <>
                   <Check className="w-4 h-4 text-emerald-500" />
-                  <span className="text-emerald-500 font-bold uppercase tracking-wider">Installation Complete</span>
+                  <span className="text-emerald-500 font-bold uppercase tracking-wider">Task Complete</span>
                 </>
               )}
             </span>
 
-            <span className="font-mono text-xs font-bold text-[var(--text)]">{installProgress.percent}%</span>
+            <span className="font-mono text-xs font-bold text-[var(--text)]">
+              {installProgress.phase === "pulling" || pullingModel ? "In Progress" : `${installProgress.percent}%`}
+            </span>
           </div>
 
-          {/* Color-Coded Progress Bar: BLUE for Downloading, PURPLE for Installing */}
           <div className="w-full h-3.5 bg-[var(--bg-surface)] rounded-full overflow-hidden border border-[var(--border-c)] p-0.5">
             <div
               className={`h-full rounded-full transition-all duration-300 ${
@@ -397,16 +437,23 @@ export const OllamaManager: React.FC = () => {
                   ? "bg-gradient-to-r from-blue-500 via-cyan-500 to-blue-600 shadow-md shadow-blue-500/30 animate-pulse"
                   : installProgress.phase === "installing"
                   ? "bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-600 shadow-md shadow-purple-500/30 animate-pulse"
+                  : installProgress.phase === "pulling" || pullingModel
+                  ? "bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 shadow-md shadow-cyan-500/30 animate-pulse"
                   : installProgress.phase === "failed"
                   ? "bg-red-500"
                   : "bg-emerald-500"
               }`}
-              style={{ width: `${Math.max(5, Math.min(100, installProgress.percent))}%` }}
+              style={{
+                width:
+                  installProgress.phase === "pulling" || pullingModel
+                    ? "75%"
+                    : `${Math.max(5, Math.min(100, installProgress.percent))}%`,
+              }}
             />
           </div>
 
           <p className="text-[11px] text-[var(--text-sub)] font-mono flex items-center justify-between">
-            <span>{installProgress.message || "Processing..."}</span>
+            <span>{installProgress.message || "Processing model weights download..."}</span>
             {installProgress.totalBytes > 0 && (
               <span>
                 {Math.round(installProgress.bytesDownloaded / (1024 * 1024))} MB / {Math.round(installProgress.totalBytes / (1024 * 1024))} MB
@@ -431,13 +478,15 @@ export const OllamaManager: React.FC = () => {
                 <div
                   key={m}
                   className={`text-xs px-2.5 py-1 rounded-lg font-mono flex items-center gap-2 border ${
-                    activeModel === m
+                    activeModel === m || activeModel?.startsWith(m.split(":")[0])
                       ? "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/40 font-bold"
                       : "bg-[var(--bg-surface)] text-[var(--text-sub)] border-[var(--border-c)]"
                   }`}
                 >
                   <span>{m}</span>
-                  {activeModel === m && <span className="text-[10px] bg-cyan-500 text-white px-1.5 py-0.2 rounded-full uppercase">Active</span>}
+                  {(activeModel === m || activeModel?.startsWith(m.split(":")[0])) && (
+                    <span className="text-[10px] bg-cyan-500 text-white px-1.5 py-0.2 rounded-full uppercase">Active</span>
+                  )}
                   <button
                     onClick={() => handleDeleteModel(m)}
                     disabled={deletingModel === m}
@@ -530,7 +579,7 @@ export const OllamaManager: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {RECOMMENDED_MODELS.map((model) => {
-            const isInstalled = status.installedModels.some((m) => m.startsWith(model.name.split(":")[0]));
+            const isInstalled = status.installedModels.some((m) => m === model.name || m.startsWith(model.name.split(":")[0]));
             const isActive = activeModel === model.name;
             const isPulling = pullingModel === model.name;
 
