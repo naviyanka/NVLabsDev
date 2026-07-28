@@ -86,6 +86,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 const CATEGORIES = [
+  { id: "api_health", label: "API Health & Latency Dashboard", icon: Activity, desc: "Real-time backend API health, subsystem pings, and telemetry diagnostics" },
   { id: "appearance", label: "Appearance & Customization", icon: Palette, desc: "Themes, terminal colors, and app branding" },
   { id: "system", label: "System & Environment", icon: Server, desc: "Backend infrastructure, web bindings, WinRM" },
   { id: "security", label: "Security & Access", icon: KeyRound, desc: "Authentication, RBAC, API keys, maintenance mode" },
@@ -103,7 +104,7 @@ export function HorizonSettings() {
   const [s, setS] = useState<AppSettings>(() => {
     return { ...DEFAULT_SETTINGS, ...getFrontendSettings() } as AppSettings;
   });
-  const [activeSection, setActiveSection] = useState("appearance");
+  const [activeSection, setActiveSection] = useState("api_health");
   const [searchQuery, setSearchQuery] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
@@ -319,8 +320,14 @@ export function HorizonSettings() {
 
         {/* Content Column */}
         <div className="lg:col-span-8 space-y-6">
+          {/* CATEGORY 0: API HEALTH & LATENCY DASHBOARD */}
+          {activeSection === "api_health" && (
+            <ApiHealthSettingsView />
+          )}
+
           {/* CATEGORY 1: APPEARANCE & CUSTOMIZATION */}
           {activeSection === "appearance" && (
+
             <div className="space-y-6">
               <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 space-y-6 shadow-sm">
                 <div className="border-b border-[var(--border-c)] pb-4">
