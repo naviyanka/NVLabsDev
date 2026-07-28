@@ -8,6 +8,7 @@ import { ServerSelector } from "@/components/ui/ServerSelector";
 import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
 import { getPerformanceHistoryClient, getProcessesClient, type PerfSample, type Process } from "@/api/client";
 import { useSignalR } from "@/lib/signalr";
+import { useServerContext } from "@/lib/serverContext";
 import { AiIntelligenceCard } from "@/components/ai/AiIntelligenceCard";
 
 export const Route = createFileRoute("/performance")({
@@ -16,11 +17,25 @@ export const Route = createFileRoute("/performance")({
 });
 
 function Performance() {
-  const [server, setServer] = useState("");
+  const { server: sharedServer, setServer: setSharedServer } = useServerContext();
+  const [server, setServerLocal] = useState(sharedServer);
   const [data, setData] = useState<PerfSample[]>([]);
   const [procs, setProcs] = useState<Process[]>([]);
   const prevServerRef = useRef<string>("");
   const { connectionState, on, invoke } = useSignalR();
+
+  // Sync from shared context on mount (pick up server selected on another page)
+  useEffect(() => {
+    if (sharedServer && sharedServer !== server) {
+      setServerLocal(sharedServer);
+    }
+  }, [sharedServer]);
+
+  // When user changes server on this page, update both local and shared state
+  const setServer = useCallback((value: string) => {
+    setServerLocal(value);
+    setSharedServer(value);
+  }, [setSharedServer]);
 
   const isLive = connectionState === "connected";
 

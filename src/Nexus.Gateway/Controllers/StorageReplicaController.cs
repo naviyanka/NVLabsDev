@@ -97,7 +97,7 @@ $partnerships | ConvertTo-Json -Depth 3
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching Storage Replica partnerships for server {ServerId}", serverId);
-            return Ok(Array.Empty<ReplicaPartnershipDto>());
+            return StatusCode(500, new { error = "Failed to retrieve Storage Replica partnerships", detail = ex.Message });
         }
     }
 

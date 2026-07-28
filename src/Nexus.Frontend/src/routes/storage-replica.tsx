@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ServerSelector } from "@/components/ui/ServerSelector";
+import { useServerContext } from "@/lib/serverContext";
 import {
   getReplicaPartnershipsClient,
   swapReplicaDirectionClient,
@@ -69,9 +70,10 @@ function formatBytes(bytes: number) {
 }
 
 function SRPage() {
+  const { server: sharedServer, setServer: setSharedServer } = useServerContext();
   const [partnerships, setPartnerships] = useState<ReplicaPartnership[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedServer, setSelectedServer] = useState<string>("");
+  const [selectedServer, setSelectedServerLocal] = useState<string>(sharedServer);
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedMode, setSelectedMode] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -82,9 +84,17 @@ function SRPage() {
   const [inspectPartnership, setInspectPartnership] = useState<ReplicaPartnership | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
+  // Sync from shared context on mount (pick up server selected on another page)
+  useEffect(() => {
+    if (sharedServer && sharedServer !== selectedServer) {
+      setSelectedServerLocal(sharedServer);
+    }
+  }, [sharedServer]);
+
   const handleServerChange = useCallback((server: string) => {
-    setSelectedServer(server);
-  }, []);
+    setSelectedServerLocal(server);
+    setSharedServer(server);
+  }, [setSharedServer]);
 
   const loadData = async () => {
     if (!selectedServer) return;

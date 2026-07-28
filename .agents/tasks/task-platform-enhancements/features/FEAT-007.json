@@ -1,0 +1,26 @@
+{
+  "id": "FEAT-007",
+  "type": "fix",
+  "description": "Address v2 review findings: SharePointSetupController command injection validation, wire useServerContext into route pages, GetPartnerships error handling, and fix SignalR handler accumulation.",
+  "status": "in_progress",
+  "steps": [
+    "Add input validation to SharePointSetupController ExecuteSetup for all user-supplied fields (FileSharePath, FileShareUrl, SqlDownloadUrl, SqlTargetServer, SqlInstanceName, SqlDisk, SpServers) using regex allowlist patterns",
+    "Update performance.tsx to use useServerContext() for initial server value and sync changes back to shared context",
+    "Update storage-replica.tsx to use useServerContext() for initial server value and sync changes back to shared context",
+    "Change StorageReplicaController GetPartnerships catch block from Ok(empty) to StatusCode(500, error message)",
+    "Move SignalR lifecycle handler registration (onreconnecting, onreconnected, onclose) from useSignalR hook to getSignalRConnection so they are registered once per connection",
+    "Verify frontend builds cleanly"
+  ],
+  "acceptance_criteria": [
+    "SharePointSetupController validates all interpolated user inputs against regex patterns before building scripts",
+    "performance.tsx uses useServerContext() and syncs server selection to/from shared context",
+    "storage-replica.tsx uses useServerContext() and syncs server selection to/from shared context",
+    "GetPartnerships returns StatusCode(500) with error message on exception instead of Ok(empty)",
+    "SignalR lifecycle handlers are registered exactly once in getSignalRConnection, not per mount cycle",
+    "Frontend builds successfully with bun run build"
+  ],
+  "verification": [
+    "cd src/Nexus.Frontend && bun install && bun run build"
+  ],
+  "blocked_reason": null
+}

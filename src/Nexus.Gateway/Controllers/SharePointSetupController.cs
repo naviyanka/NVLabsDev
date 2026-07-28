@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Nexus.Gateway.Services;
 using System.Text.Json;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Nexus.Gateway.Controllers;
 
@@ -13,6 +14,64 @@ public class SharePointSetupController : ControllerBase
 {
     private readonly PluginBackgroundJobManager _jobManager;
     private readonly ILogger<SharePointSetupController> _logger;
+
+    // Strict validation patterns to prevent PowerShell injection
+    private static readonly Regex SafePathPattern = new(@"^[a-zA-Z0-9._\\/:+\-\s]+$", RegexOptions.Compiled);
+    private static readonly Regex SafeUncPathPattern = new(@"^\\\\[a-zA-Z0-9._\-\\]+$", RegexOptions.Compiled);
+    private static readonly Regex SafeUrlPattern = new(@"^https?://[a-zA-Z0-9._\-/:%?&=+]+$", RegexOptions.Compiled);
+    private static readonly Regex SafeServerNamePattern = new(@"^[a-zA-Z0-9._\-]+$", RegexOptions.Compiled);
+    private static readonly Regex SafeInstanceNamePattern = new(@"^[a-zA-Z0-9._\-]+$", RegexOptions.Compiled);
+    private static readonly Regex SafeDiskPattern = new(@"^[a-zA-Z]$", RegexOptions.Compiled);
+    private static readonly Regex SafeEditionPattern = new(@"^[a-zA-Z0-9._\-]+$", RegexOptions.Compiled);
+    private static readonly Regex SafeAdminPattern = new(@"^[a-zA-Z0-9._\-\\]+$", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Validates a local file share path (e.g., "C:\SharePoint\Setup").
+    /// </summary>
+    private static bool IsValidPath(string? value)
+        => !string.IsNullOrWhiteSpace(value) && SafePathPattern.IsMatch(value);
+
+    /// <summary>
+    /// Validates a UNC path (e.g., "\\server\share").
+    /// </summary>
+    private static bool IsValidUncPath(string? value)
+        => !string.IsNullOrWhiteSpace(value) && SafeUncPathPattern.IsMatch(value);
+
+    /// <summary>
+    /// Validates a URL (http/https only).
+    /// </summary>
+    private static bool IsValidUrl(string? value)
+        => !string.IsNullOrWhiteSpace(value) && SafeUrlPattern.IsMatch(value);
+
+    /// <summary>
+    /// Validates a server hostname/IP.
+    /// </summary>
+    private static bool IsValidServerName(string? value)
+        => !string.IsNullOrWhiteSpace(value) && SafeServerNamePattern.IsMatch(value);
+
+    /// <summary>
+    /// Validates a SQL instance name.
+    /// </summary>
+    private static bool IsValidInstanceName(string? value)
+        => !string.IsNullOrWhiteSpace(value) && SafeInstanceNamePattern.IsMatch(value);
+
+    /// <summary>
+    /// Validates a disk drive letter (single letter).
+    /// </summary>
+    private static bool IsValidDisk(string? value)
+        => !string.IsNullOrWhiteSpace(value) && SafeDiskPattern.IsMatch(value);
+
+    /// <summary>
+    /// Validates an edition name.
+    /// </summary>
+    private static bool IsValidEdition(string? value)
+        => !string.IsNullOrWhiteSpace(value) && SafeEditionPattern.IsMatch(value);
+
+    /// <summary>
+    /// Validates a SQL admin account name (domain\user format allowed).
+    /// </summary>
+    private static bool IsValidAdmin(string? value)
+        => !string.IsNullOrWhiteSpace(value) && SafeAdminPattern.IsMatch(value);
 
     public SharePointSetupController(PluginBackgroundJobManager jobManager, ILogger<SharePointSetupController> logger)
     {
@@ -30,6 +89,72 @@ public class SharePointSetupController : ControllerBase
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var p = payload.Deserialize<SharePointSetupPayload>(options);
             if (p == null || p.Configurations == null) return BadRequest("Invalid payload");
+
+            // Validate top-level user-supplied fields before interpolation into PowerShell scripts
+            if (!string.IsNullOrWhiteSpace(p.FileSharePath) && !p.FileSharePath.StartsWith(@"\\"))
+            {
+                if (!IsValidPath(p.FileSharePath))
+                    return BadRequest(new { error = "Invalid FileSharePath. Only alphanumeric characters, dots, underscores, hyphens, slashes, backslashes, colons, and spaces are allowed." });
+            }
+            else if (!string.IsNullOrWhiteSpace(p.FileSharePath) && p.FileSharePath.StartsWith(@"\\"))
+            {
+                if (!IsValidUncPath(p.FileSharePath))
+                    return BadRequest(new { error = "Invalid FileSharePath UNC path. Only alphanumeric characters, dots, underscores, hyphens, and backslashes are allowed." });
+            }
+
+            if (!string.IsNullOrWhiteSpace(p.FileShareUrl))
+            {
+                // FileShareUrl can be a UNC path (\\server\share) or an HTTP URL
+                if (p.FileShareUrl.StartsWith(@"\\"))
+                {
+                    if (!IsValidUncPath(p.FileShareUrl))
+                        return BadRequest(new { error = "Invalid FileShareUrl. Only alphanumeric characters, dots, underscores, hyphens, and backslashes are allowed for UNC paths." });
+                }
+                else if (!IsValidPath(p.FileShareUrl))
+                {
+                    return BadRequest(new { error = "Invalid FileShareUrl. Only alphanumeric characters, dots, underscores, hyphens, slashes, backslashes, colons, and spaces are allowed." });
+                }
+            }
+
+            // Validate each configuration entry
+            foreach (var conf in p.Configurations)
+            {
+                if (!string.IsNullOrWhiteSpace(conf.SpEdition) && !IsValidEdition(conf.SpEdition))
+                    return BadRequest(new { error = $"Invalid SpEdition '{conf.SpEdition}'. Only alphanumeric characters, dots, underscores, and hyphens are allowed." });
+
+                if (!string.IsNullOrWhiteSpace(conf.SqlDownloadUrl) && !IsValidUrl(conf.SqlDownloadUrl))
+                    return BadRequest(new { error = $"Invalid SqlDownloadUrl. Must be a valid HTTP/HTTPS URL with safe characters." });
+
+                if (!string.IsNullOrWhiteSpace(conf.SpDownloadUrl) && !IsValidUrl(conf.SpDownloadUrl))
+                    return BadRequest(new { error = $"Invalid SpDownloadUrl. Must be a valid HTTP/HTTPS URL with safe characters." });
+
+                if (!string.IsNullOrWhiteSpace(conf.SqlTargetServer) && !IsValidServerName(conf.SqlTargetServer))
+                    return BadRequest(new { error = $"Invalid SqlTargetServer '{conf.SqlTargetServer}'. Only alphanumeric characters, dots, underscores, and hyphens are allowed." });
+
+                if (!string.IsNullOrWhiteSpace(conf.SqlInstanceName) && !IsValidInstanceName(conf.SqlInstanceName))
+                    return BadRequest(new { error = $"Invalid SqlInstanceName '{conf.SqlInstanceName}'. Only alphanumeric characters, dots, underscores, and hyphens are allowed." });
+
+                if (!string.IsNullOrWhiteSpace(conf.SqlDisk) && !IsValidDisk(conf.SqlDisk))
+                    return BadRequest(new { error = $"Invalid SqlDisk '{conf.SqlDisk}'. Must be a single drive letter (e.g., 'D')." });
+
+                if (conf.SpServers != null)
+                {
+                    foreach (var server in conf.SpServers)
+                    {
+                        if (!IsValidServerName(server))
+                            return BadRequest(new { error = $"Invalid SpServer '{server}'. Only alphanumeric characters, dots, underscores, and hyphens are allowed." });
+                    }
+                }
+
+                if (conf.SqlAdmins != null)
+                {
+                    foreach (var admin in conf.SqlAdmins)
+                    {
+                        if (!IsValidAdmin(admin))
+                            return BadRequest(new { error = $"Invalid SqlAdmin '{admin}'. Only alphanumeric characters, dots, underscores, hyphens, and backslashes are allowed." });
+                    }
+                }
+            }
 
             var dcScript = new StringBuilder();
             var basePath = string.IsNullOrWhiteSpace(p.FileSharePath) ? p.FileShareUrl : p.FileSharePath;
