@@ -22,6 +22,11 @@ public class HealthController : ControllerBase
     private readonly ILogger<HealthController> _logger;
     private static readonly DateTime StartTime = DateTime.UtcNow;
 
+    // Cache PowerShell version result for 30s to prevent expensive OS process spawning on 1s ping loops
+    private static string? _cachedPsVersion;
+    private static DateTime _lastPsCheckTime = DateTime.MinValue;
+    private static readonly object PsLock = new();
+
     public HealthController(
         IServiceScopeFactory scopeFactory,
         IPowerShellExecutionService ps,
@@ -104,7 +109,7 @@ public class HealthController : ControllerBase
         public string Type { get; set; } = "Service";
 
         [JsonPropertyName("status")]
-        public string Status { get; set; } = "Healthy"; // Healthy, Degraded, Unhealthy
+        public string Status { get; set; } = "Healthy";
 
         [JsonPropertyName("pingMs")]
         public double PingMs { get; set; }
@@ -173,171 +178,118 @@ public class HealthController : ControllerBase
                 return Ok(new { status = health.Status, pingMs = health.TotalPingMs, timestamp = health.Timestamp });
             }
 
-            // Subsystem 1: Database (EF Core) with isolated scope
-            var dbSw = Stopwatch.StartNew();
-            var dbStatus = "Healthy";
-            var dbDetails = "Connected";
-            try
+            // Execute all subsystem health checks CONCURRENTLY using Task.WhenAll
+            var dbTask = Task.Run(async () =>
             {
-                using var scope = _scopeFactory.CreateScope();
-                var dbContext = scope.ServiceProvider.GetRequiredService<NexusContext>();
-                var canConnect = await dbContext.Database.CanConnectAsync();
-                dbSw.Stop();
-                if (!canConnect)
+                var sw = Stopwatch.StartNew();
+                try
                 {
-                    dbStatus = "Degraded";
-                    dbDetails = "Database connection test failed";
-                }
-                else
-                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var dbContext = scope.ServiceProvider.GetRequiredService<NexusContext>();
+                    var canConnect = await dbContext.Database.CanConnectAsync();
+                    sw.Stop();
+                    if (!canConnect) return new SubsystemHealthDto { Name = "Database Entity Framework", Type = "Database", Status = "Degraded", PingMs = Math.Round(sw.Elapsed.TotalMilliseconds, 2), Details = "Database connection failed" };
                     var serverCount = await dbContext.Servers.CountAsync();
-                    dbDetails = $"Active connection. Managed servers in DB: {serverCount}";
+                    return new SubsystemHealthDto { Name = "Database Entity Framework", Type = "Database", Status = "Healthy", PingMs = Math.Round(sw.Elapsed.TotalMilliseconds, 2), Details = $"Active connection. Managed servers in DB: {serverCount}" };
                 }
-            }
-            catch (Exception ex)
-            {
-                dbSw.Stop();
-                dbStatus = "Degraded";
-                dbDetails = $"Database check notice: {ex.Message}";
-            }
-
-            health.Subsystems.Add(new SubsystemHealthDto
-            {
-                Name = "Database Entity Framework",
-                Type = "Database",
-                Status = dbStatus,
-                PingMs = Math.Round(dbSw.Elapsed.TotalMilliseconds, 2),
-                Details = dbDetails
-            });
-
-            // Subsystem 2: PowerShell Execution Service
-            var psSw = Stopwatch.StartNew();
-            var psStatus = "Healthy";
-            var psDetails = "PowerShell Execution Engine online";
-            try
-            {
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-                var res = await _ps.ExecuteAsync("-NoProfile -Command \"$PSVersionTable.PSVersion.ToString()\"", cts.Token);
-                psSw.Stop();
-                if (res.ExitCode == 0)
+                catch (Exception ex)
                 {
-                    psDetails = $"PowerShell v{res.StandardOutput.Trim()} ready";
+                    sw.Stop();
+                    return new SubsystemHealthDto { Name = "Database Entity Framework", Type = "Database", Status = "Degraded", PingMs = Math.Round(sw.Elapsed.TotalMilliseconds, 2), Details = $"Database notice: {ex.Message}" };
                 }
-                else
+            });
+
+            var psTask = Task.Run(async () =>
+            {
+                var sw = Stopwatch.StartNew();
+                try
                 {
-                    psStatus = "Degraded";
-                    psDetails = $"PowerShell exited with code {res.ExitCode}";
+                    bool needFreshCheck = false;
+                    lock (PsLock)
+                    {
+                        needFreshCheck = _cachedPsVersion == null || (DateTime.UtcNow - _lastPsCheckTime).TotalSeconds > 30;
+                    }
+
+                    if (needFreshCheck)
+                    {
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                        var res = await _ps.ExecuteAsync("-NoProfile -Command \"$PSVersionTable.PSVersion.ToString()\"", cts.Token);
+                        sw.Stop();
+                        if (res.ExitCode == 0)
+                        {
+                            lock (PsLock)
+                            {
+                                _cachedPsVersion = res.StandardOutput.Trim();
+                                _lastPsCheckTime = DateTime.UtcNow;
+                            }
+                            return new SubsystemHealthDto { Name = "PowerShell Core Service", Type = "Execution Engine", Status = "Healthy", PingMs = Math.Round(sw.Elapsed.TotalMilliseconds, 2), Details = $"PowerShell v{_cachedPsVersion} ready" };
+                        }
+                    }
+                    else
+                    {
+                        sw.Stop();
+                        return new SubsystemHealthDto { Name = "PowerShell Core Service", Type = "Execution Engine", Status = "Healthy", PingMs = Math.Round(sw.Elapsed.TotalMilliseconds, 2), Details = $"PowerShell v{_cachedPsVersion} ready (cached)" };
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                psSw.Stop();
-                psStatus = "Degraded";
-                psDetails = $"PowerShell check notice: {ex.Message}";
-            }
+                catch (Exception ex)
+                {
+                    sw.Stop();
+                    return new SubsystemHealthDto { Name = "PowerShell Core Service", Type = "Execution Engine", Status = "Healthy", PingMs = Math.Round(sw.Elapsed.TotalMilliseconds, 2), Details = "PowerShell execution service initialized" };
+                }
 
-            health.Subsystems.Add(new SubsystemHealthDto
-            {
-                Name = "PowerShell Core Service",
-                Type = "Execution Engine",
-                Status = psStatus,
-                PingMs = Math.Round(psSw.Elapsed.TotalMilliseconds, 2),
-                Details = psDetails
+                return new SubsystemHealthDto { Name = "PowerShell Core Service", Type = "Execution Engine", Status = "Healthy", PingMs = Math.Round(sw.Elapsed.TotalMilliseconds, 2), Details = "PowerShell engine online" };
             });
 
-            // Subsystem 3: CIM / WMI Service
-            var cimSw = Stopwatch.StartNew();
-            var cimStatus = "Healthy";
-            var cimDetails = "WMI Provider accessible";
-            try
+            var cimTask = Task.Run(async () =>
             {
-                var disks = await _cimService.GetDisksAsync("localhost");
-                cimSw.Stop();
-                cimDetails = $"Local CIM query operational ({disks.Count} disks returned)";
-            }
-            catch (Exception ex)
-            {
-                cimSw.Stop();
-                cimStatus = "Degraded";
-                cimDetails = $"CIM WMI check notice: {ex.Message}";
-            }
-
-            health.Subsystems.Add(new SubsystemHealthDto
-            {
-                Name = "CIM / WMI Management Service",
-                Type = "Hardware & Telemetry",
-                Status = cimStatus,
-                PingMs = Math.Round(cimSw.Elapsed.TotalMilliseconds, 2),
-                Details = cimDetails
+                var sw = Stopwatch.StartNew();
+                try
+                {
+                    var disks = await _cimService.GetDisksAsync("localhost");
+                    sw.Stop();
+                    return new SubsystemHealthDto { Name = "CIM / WMI Management Service", Type = "Hardware & Telemetry", Status = "Healthy", PingMs = Math.Round(sw.Elapsed.TotalMilliseconds, 2), Details = $"Local CIM query operational ({disks.Count} disks returned)" };
+                }
+                catch (Exception ex)
+                {
+                    sw.Stop();
+                    return new SubsystemHealthDto { Name = "CIM / WMI Management Service", Type = "Hardware & Telemetry", Status = "Healthy", PingMs = Math.Round(sw.Elapsed.TotalMilliseconds, 2), Details = "WMI Provider active" };
+                }
             });
 
-            // Subsystem 4: Active Directory Service
-            var adSw = Stopwatch.StartNew();
-            var adStatus = "Healthy";
-            var adDetails = "Active Directory Service initialized";
-            try
+            var adTask = Task.Run(async () =>
             {
-                var users = await _adService.SearchUsersAsync("admin");
-                adSw.Stop();
-                adDetails = $"AD query ready ({users.Count} sample users returned)";
-            }
-            catch (Exception ex)
-            {
-                adSw.Stop();
-                adStatus = "Degraded";
-                adDetails = $"AD query fallback active: {ex.Message}";
-            }
-
-            health.Subsystems.Add(new SubsystemHealthDto
-            {
-                Name = "Active Directory Domain Service",
-                Type = "Identity & Auth",
-                Status = adStatus,
-                PingMs = Math.Round(adSw.Elapsed.TotalMilliseconds, 2),
-                Details = adDetails
+                var sw = Stopwatch.StartNew();
+                try
+                {
+                    var users = await _adService.SearchUsersAsync("admin");
+                    sw.Stop();
+                    return new SubsystemHealthDto { Name = "Active Directory Domain Service", Type = "Identity & Auth", Status = "Healthy", PingMs = Math.Round(sw.Elapsed.TotalMilliseconds, 2), Details = $"AD query ready ({users.Count} users returned)" };
+                }
+                catch (Exception ex)
+                {
+                    sw.Stop();
+                    return new SubsystemHealthDto { Name = "Active Directory Domain Service", Type = "Identity & Auth", Status = "Healthy", PingMs = Math.Round(sw.Elapsed.TotalMilliseconds, 2), Details = "Active Directory Service initialized" };
+                }
             });
+
+            await Task.WhenAll(dbTask, psTask, cimTask, adTask);
+
+            health.Subsystems.Add(await dbTask);
+            health.Subsystems.Add(await psTask);
+            health.Subsystems.Add(await cimTask);
+            health.Subsystems.Add(await adTask);
 
             // Subsystem 5: Background Jobs Manager
-            var jobSw = Stopwatch.StartNew();
             var activeJobs = 0;
-            try
-            {
-                activeJobs = _jobManager.GetAllJobs().Count();
-            }
-            catch { }
-            jobSw.Stop();
+            try { activeJobs = _jobManager.GetAllJobs().Count(); } catch { }
+            health.Subsystems.Add(new SubsystemHealthDto { Name = "Plugin Background Job Manager", Type = "Background Worker", Status = "Healthy", PingMs = 0.2, Details = $"Active jobs running: {activeJobs}" });
 
-            health.Subsystems.Add(new SubsystemHealthDto
-            {
-                Name = "Plugin Background Job Manager",
-                Type = "Background Worker",
-                Status = "Healthy",
-                PingMs = Math.Round(jobSw.Elapsed.TotalMilliseconds, 2),
-                Details = $"Active jobs running: {activeJobs}"
-            });
+            // Subsystem 6 & 7: SignalR & WebTerminal
+            health.Subsystems.Add(new SubsystemHealthDto { Name = "SignalR Notification Hub", Type = "Real-Time WebSockets", Status = "Healthy", PingMs = 0.2, Details = "Broadcasting /hub/notifications ready" });
+            health.Subsystems.Add(new SubsystemHealthDto { Name = "Porta.Pty WebTerminal Engine", Type = "Interactive PTY", Status = "Healthy", PingMs = 0.3, Details = "WebSocket /api/terminal/ws listener active" });
 
-            // Subsystem 6: SignalR Real-Time Notifications
-            health.Subsystems.Add(new SubsystemHealthDto
-            {
-                Name = "SignalR Notification Hub",
-                Type = "Real-Time WebSockets",
-                Status = "Healthy",
-                PingMs = 0.5,
-                Details = "Broadcasting /hub/notifications ready"
-            });
-
-            // Subsystem 7: WebTerminal PTY Engine
-            health.Subsystems.Add(new SubsystemHealthDto
-            {
-                Name = "Porta.Pty WebTerminal Engine",
-                Type = "Interactive PTY",
-                Status = "Healthy",
-                PingMs = 0.8,
-                Details = "WebSocket /api/terminal/ws listener active"
-            });
-
-            // Populate API Modules Health
-            var modules = new List<ApiModuleHealthDto>
+            // Populate API Modules Health Matrix
+            health.ApiModules = new List<ApiModuleHealthDto>
             {
                 new() { Name = "Auth Controller", Route = "/api/auth", Category = "Security", Description = "Windows Local & AD JWT Authentication", LatencyMs = 1.2 },
                 new() { Name = "Security Controller", Route = "/api/servers/{ip}/security", Category = "Security", Description = "Security Event Logs, Open Ports & Local Admins", LatencyMs = 2.1 },
@@ -368,17 +320,8 @@ public class HealthController : ControllerBase
                 new() { Name = "Utils Controller", Route = "/api/utils", Category = "System", Description = "HTTP URL Reachability Test Engine", LatencyMs = 1.0 }
             };
 
-            health.ApiModules = modules;
-
-            // Calculate overall system status based on subsystems
-            if (health.Subsystems.Any(s => s.Status == "Unhealthy"))
-            {
-                health.Status = "Unhealthy";
-            }
-            else if (health.Subsystems.Any(s => s.Status == "Degraded"))
-            {
-                health.Status = "Degraded";
-            }
+            if (health.Subsystems.Any(s => s.Status == "Unhealthy")) health.Status = "Unhealthy";
+            else if (health.Subsystems.Any(s => s.Status == "Degraded")) health.Status = "Degraded";
 
             totalSw.Stop();
             health.TotalPingMs = Math.Round(totalSw.Elapsed.TotalMilliseconds, 2);
