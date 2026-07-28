@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { GoogleGenAI } from "@google/genai";
 
 export const sendGeminiChatFn = createServerFn({ method: "POST" })
   .validator((data: { message: string; history?: any[]; model?: string; geminiApiKey?: string }) => data)
@@ -16,6 +15,7 @@ export const sendGeminiChatFn = createServerFn({ method: "POST" })
     }
 
     try {
+      const { GoogleGenAI } = await import("@google/genai");
       const ai = new GoogleGenAI({
         apiKey,
         httpOptions: {
@@ -70,6 +70,7 @@ export const runGeminiAnalyzeFn = createServerFn({ method: "POST" })
     }
 
     try {
+      const { GoogleGenAI } = await import("@google/genai");
       const ai = new GoogleGenAI({
         apiKey,
         httpOptions: {
