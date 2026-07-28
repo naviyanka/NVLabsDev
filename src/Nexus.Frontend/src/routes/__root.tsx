@@ -52,6 +52,18 @@ if (typeof window !== "undefined") {
   };
 }
 
+/**
+ * Global fetch interceptor for NEXUS API requests.
+ * 
+ * Purpose:
+ * 1. Auto-injects JWT Bearer token from localStorage for all /api/ and /hub/ requests
+ * 2. Handles 401 responses by clearing the token and redirecting to /login
+ * 3. Tracks backend online/offline status and dispatches events for the UI status indicator
+ * 4. Enforces the global "backend enabled" toggle from settings
+ *
+ * This monkey-patch approach is intentional: it centralizes auth header injection
+ * so individual API client functions don't need to handle authentication.
+ */
 if (typeof window !== "undefined") {
   try {
     if (!(window as any).__nexus_original_fetch) {

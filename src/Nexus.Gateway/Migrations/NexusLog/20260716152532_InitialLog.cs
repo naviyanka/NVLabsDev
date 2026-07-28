@@ -3,6 +3,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
+// NOTE: The 2026-07-16 timestamp in this migration filename was generated with an
+// incorrectly set system clock during initial development. It does not affect runtime
+// behavior as EF Core uses the __EFMigrationsHistory table, not file timestamps.
+
 namespace Nexus.Gateway.Migrations.NexusLog
 {
     /// <inheritdoc />

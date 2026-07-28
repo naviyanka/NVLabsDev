@@ -25,11 +25,11 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        var jwtKey = builder.Configuration["Jwt:Key"] ?? Environment.GetEnvironmentVariable("JWT_KEY") ?? "NexusDevelopmentSecretKey32CharsMin!";
+        var jwtKey = builder.Configuration["Jwt:Key"];
+        if (string.IsNullOrEmpty(jwtKey))
+            jwtKey = Environment.GetEnvironmentVariable("JWT_KEY");
         if (string.IsNullOrEmpty(jwtKey) || jwtKey.Length < 32)
-        {
-            jwtKey = "NexusDevelopmentSecretKey32CharsMin!";
-        }
+            throw new InvalidOperationException("JWT signing key must be configured via 'Jwt:Key' in appsettings.json, user-secrets, or the JWT_KEY environment variable. Key must be at least 32 characters.");
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -149,10 +149,22 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowRestricted", policy =>
     {
-        policy.SetIsOriginAllowed(_ => true)
-              .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials();
+        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+        if (allowedOrigins != null && allowedOrigins.Length > 0)
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials();
+        }
+        else
+        {
+            // Development/unconfigured: allow all origins (warning logged at startup)
+            policy.SetIsOriginAllowed(_ => true)
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials();
+        }
     });
 });
 
@@ -166,6 +178,16 @@ builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>
 });
 
 var app = builder.Build();
+
+// Warn if CORS is running in unrestricted allow-all mode
+{
+    var corsOrigins = app.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+    if (corsOrigins == null || corsOrigins.Length == 0)
+    {
+        var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
+        startupLogger.LogWarning("CORS is configured to allow ALL origins. Set 'Cors:AllowedOrigins' in appsettings.json to restrict access in production.");
+    }
+}
 
 using (var scope = app.Services.CreateScope())
 {
