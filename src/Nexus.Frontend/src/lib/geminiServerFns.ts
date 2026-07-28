@@ -54,7 +54,7 @@ async function callOpenAICompatibleEndpoint({
     { role: "system", content: systemPrompt },
     ...messages.map((m) => ({
       role: m.role === "model" ? "assistant" : m.role,
-      content: m.content,
+      content: m.content || "",
     })),
   ];
 
@@ -76,6 +76,54 @@ async function callOpenAICompatibleEndpoint({
   const json = await res.json();
   const content = json.choices?.[0]?.message?.content || "No response received from AI model.";
   return content;
+}
+
+async function callGeminiRestEndpoint({
+  apiKey,
+  model = "gemini-2.5-flash",
+  messages,
+  systemPrompt,
+}: {
+  apiKey: string;
+  model?: string;
+  messages: Array<{ role: string; content: string }>;
+  systemPrompt: string;
+}) {
+  const selectedModel = model && model.trim() ? model.trim() : "gemini-2.5-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey.trim()}`;
+
+  const formattedContents = messages.map((m) => ({
+    role: m.role === "model" || m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content || "" }],
+  }));
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      system_instruction: {
+        parts: [{ text: systemPrompt }],
+      },
+      contents: formattedContents,
+      generationConfig: {
+        temperature: 0.3,
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Google Gemini REST API returned HTTP ${res.status}: ${errText.slice(0, 300)}`);
+  }
+
+  const json = await res.json();
+  const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) {
+    throw new Error("No text response received from Gemini API.");
+  }
+  return text;
 }
 
 export const sendGeminiChatFn = createServerFn({ method: "POST" })
@@ -108,7 +156,7 @@ export const sendGeminiChatFn = createServerFn({ method: "POST" })
       }
     }
 
-    // Default: Gemini Provider
+    // Default: Gemini Provider via Direct REST API (Zero SDK Module Resolution Errors)
     const apiKey = geminiApiKey || customKey || process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
@@ -120,39 +168,19 @@ export const sendGeminiChatFn = createServerFn({ method: "POST" })
     }
 
     try {
-      const { GoogleGenAI } = await import("@google/genai");
-      const ai = new GoogleGenAI({
+      const formattedHistory = (history || []).map((h) => ({
+        role: h.role,
+        content: h.content || h.text || "",
+      }));
+
+      const reply = await callGeminiRestEndpoint({
         apiKey,
-        httpOptions: {
-          headers: {
-            "User-Agent": "aistudio-build",
-          },
-        },
-      });
-
-      const formattedContents = [];
-      if (Array.isArray(history) && history.length > 0) {
-        for (const item of history) {
-          formattedContents.push({
-            role: item.role === "user" ? "user" : "model",
-            parts: [{ text: item.content || item.text || "" }],
-          });
-        }
-      }
-      formattedContents.push({
-        role: "user",
-        parts: [{ text: message }],
-      });
-
-      const response = await ai.models.generateContent({
         model: model || "gemini-2.5-flash",
-        contents: formattedContents,
-        config: {
-          systemInstruction: NEXUS_COPILOT_SYSTEM_PROMPT,
-        },
+        messages: [...formattedHistory, { role: "user", content: message }],
+        systemPrompt: NEXUS_COPILOT_SYSTEM_PROMPT,
       });
 
-      return { reply: response.text || "No response received from Gemini AI." };
+      return { reply };
     } catch (err: any) {
       console.error("Gemini Chat Error:", err);
       return { reply: `⚠️ [GEMINI] Error: ${err.message || "Failed to query Gemini AI"}` };
@@ -213,27 +241,16 @@ export const runGeminiAnalyzeFn = createServerFn({ method: "POST" })
     }
 
     try {
-      const { GoogleGenAI } = await import("@google/genai");
-      const ai = new GoogleGenAI({
+      const selectedModel = type === "powershell" ? "gemini-2.5-pro" : model || "gemini-2.5-flash";
+
+      const analysis = await callGeminiRestEndpoint({
         apiKey,
-        httpOptions: {
-          headers: {
-            "User-Agent": "aistudio-build",
-          },
-        },
-      });
-
-      const selectedModel = type === "powershell" ? "gemini-2.5-pro" : model;
-
-      const response = await ai.models.generateContent({
         model: selectedModel,
-        contents: prompt,
-        config: {
-          systemInstruction: NEXUS_COPILOT_SYSTEM_PROMPT,
-        },
+        messages: [{ role: "user", content: prompt }],
+        systemPrompt: NEXUS_COPILOT_SYSTEM_PROMPT,
       });
 
-      return { analysis: response.text || "No analysis generated." };
+      return { analysis };
     } catch (err: any) {
       console.error("Gemini Analyze Error:", err);
       return { analysis: `Error running analysis: ${err.message || "Failed to analyze data"}` };
