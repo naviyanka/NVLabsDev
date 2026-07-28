@@ -181,13 +181,23 @@ interface AnalyzePayload {
 // ─── Check if an error indicates tools/functions are not supported ──────────
 function isToolNotSupportedError(errorText: string): boolean {
   const lower = errorText.toLowerCase();
+  // Match specific phrases that indicate the model/endpoint does not support tool calling.
+  // Avoid matching generic mentions of "tool" or "function" in unrelated errors
+  // (e.g., rate limits, invalid tool_call_id references).
   return (
-    lower.includes("tool") ||
-    lower.includes("function") ||
-    lower.includes("does not support") ||
-    lower.includes("not supported") ||
-    lower.includes("unknown parameter") ||
-    lower.includes("unrecognized request argument")
+    lower.includes("does not support tools") ||
+    lower.includes("does not support function") ||
+    lower.includes("tools is not supported") ||
+    lower.includes("tool_choice is not supported") ||
+    lower.includes("functions is not supported") ||
+    lower.includes("unrecognized request argument: tools") ||
+    lower.includes("unrecognized request argument: tool_choice") ||
+    lower.includes("unknown parameter: tools") ||
+    lower.includes("unknown parameter: tool_choice") ||
+    lower.includes("does not support 'tools'") ||
+    lower.includes("does not support 'functions'") ||
+    (lower.includes("not supported") && lower.includes("tool_choice")) ||
+    (lower.includes("not supported") && lower.includes("tools"))
   );
 }
 
@@ -473,10 +483,14 @@ export const sendCopilotChatFn = createServerFn({ method: "POST" })
     // Handle OpenAI-compatible, Ollama (CPU self-hosted), or Custom Endpoints
     if (provider === "openai" || provider === "ollama" || provider === "custom") {
       try {
+        const effectiveModel = model || (provider === "ollama" ? "llama3.2:1b" : provider === "openai" ? "gpt-4o-mini" : "");
+        if (!effectiveModel) {
+          return { reply: `⚠️ [${provider.toUpperCase()}] No model configured. Please set a model name in Settings for your custom endpoint.` };
+        }
         const reply = await callOpenAICompatibleAgentic({
           baseUrl: provider === "openai" ? "https://api.openai.com/v1" : baseUrl,
-          apiKey: customKey || "",
-          model: model || (provider === "ollama" ? "llama3.2:1b" : "gpt-4o-mini"),
+          apiKey: customKey || undefined,
+          model: effectiveModel,
           messages: [...history, { role: "user", content: message }],
           systemPrompt: NEXUS_COPILOT_SYSTEM_PROMPT,
           backendBaseUrl,
@@ -553,10 +567,14 @@ export const runCopilotAnalyzeFn = createServerFn({ method: "POST" })
 
     if (provider === "openai" || provider === "ollama" || provider === "custom") {
       try {
+        const effectiveModel = model || (provider === "ollama" ? "llama3.2:1b" : provider === "openai" ? "gpt-4o-mini" : "");
+        if (!effectiveModel) {
+          return { analysis: `⚠️ [${provider.toUpperCase()}] No model configured. Please set a model name in Settings for your custom endpoint.` };
+        }
         const analysis = await callOpenAICompatibleAgentic({
           baseUrl: provider === "openai" ? "https://api.openai.com/v1" : baseUrl,
-          apiKey: customKey || geminiApiKey,
-          model: model || (provider === "ollama" ? "llama3.2:1b" : "gpt-4o-mini"),
+          apiKey: customKey || undefined,
+          model: effectiveModel,
           messages: [{ role: "user", content: prompt }],
           systemPrompt: NEXUS_COPILOT_SYSTEM_PROMPT,
           backendBaseUrl,
