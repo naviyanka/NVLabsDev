@@ -2,7 +2,7 @@
   "id": "FEAT-007",
   "type": "fix",
   "description": "Address v2 review findings: SharePointSetupController command injection validation, wire useServerContext into route pages, GetPartnerships error handling, and fix SignalR handler accumulation.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Add input validation to SharePointSetupController ExecuteSetup for all user-supplied fields (FileSharePath, FileShareUrl, SqlDownloadUrl, SqlTargetServer, SqlInstanceName, SqlDisk, SpServers) using regex allowlist patterns",
     "Update performance.tsx to use useServerContext() for initial server value and sync changes back to shared context",
@@ -22,5 +22,6 @@
   "verification": [
     "cd src/Nexus.Frontend && bun install && bun run build"
   ],
-  "blocked_reason": null
+  "blocked_reason": null,
+  "findings": "All 4 v2 review findings addressed. (1) SharePointSetupController now validates all user-supplied fields (FileSharePath, FileShareUrl, SqlDownloadUrl, SpDownloadUrl, SqlTargetServer, SqlInstanceName, SqlDisk, SpServers, SqlAdmins, SpEdition) against strict regex patterns before they are interpolated into PowerShell scripts. Returns 400 BadRequest for invalid input. (2) performance.tsx and storage-replica.tsx now use useServerContext() - initial server value comes from shared context and changes are synced back so server selection persists across page navigation. (3) StorageReplicaController GetPartnerships catch block now returns StatusCode(500) with error and detail fields instead of Ok(empty array). (4) SignalR lifecycle handlers (onreconnecting, onreconnected, onclose) are now registered once in getSignalRConnection() and fan out to a Set of state listeners that hooks subscribe/unsubscribe to on mount/unmount - no handler accumulation. Frontend build passes cleanly."
 }
