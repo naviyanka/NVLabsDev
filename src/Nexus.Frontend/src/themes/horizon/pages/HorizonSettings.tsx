@@ -9,6 +9,8 @@ import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { TerminalThemePreview } from "@/components/settings/TerminalThemePreview";
 import { SettingsImportExport } from "@/components/settings/SettingsImportExport";
 import { SoftwareRepoManager } from "@/components/apps/SoftwareRepoManager";
+import { ApiHealthSettingsView } from "@/components/settings/ApiHealthSettingsView";
+
 
 interface AppSettings {
   language: string;
