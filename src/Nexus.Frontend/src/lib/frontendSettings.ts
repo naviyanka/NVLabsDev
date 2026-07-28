@@ -113,9 +113,9 @@ export function saveFrontendSettings(updates: Partial<FrontendSettings>) {
       }));
     }
 
-    if (updates.copilotEnabled !== undefined || updates.geminiApiKey !== undefined) {
+    if (updates.copilotEnabled !== undefined || updates.geminiApiKey !== undefined || updates.aiProvider !== undefined || updates.aiBaseUrl !== undefined || updates.aiApiKey !== undefined || updates.aiModel !== undefined) {
       window.dispatchEvent(new CustomEvent("nexus-copilot-change", {
-        detail: { copilotEnabled: next.copilotEnabled, geminiApiKey: next.geminiApiKey }
+        detail: { copilotEnabled: next.copilotEnabled, geminiApiKey: next.geminiApiKey, aiProvider: next.aiProvider, aiBaseUrl: next.aiBaseUrl, aiApiKey: next.aiApiKey, aiModel: next.aiModel }
       }));
     }
   } catch (e) {

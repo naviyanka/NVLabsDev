@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { BackendStatusModal } from "@/components/ui/BackendStatusModal";
 import { BackendStatusMonitor } from "@/components/ui/BackendStatusMonitor";
 import { CommandPalette } from "@/components/ui/CommandPalette";
-import { GeminiCopilotDrawer } from "@/components/ai/GeminiCopilotDrawer";
+import { CopilotDrawer } from "@/components/ai/CopilotDrawer";
 import { getFrontendSettings } from "@/lib/frontendSettings";
 import { getNotificationsClient } from "@/api/client";
 
@@ -356,7 +356,7 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
             <button
               onClick={() => setCopilotOpen(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-400 font-semibold text-xs transition-all shadow-xs hover:shadow-md hover:scale-105 cursor-pointer"
-              title="Open Gemini SysAdmin Copilot Chatbot"
+              title="Open Nexus Copilot"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
               <span className="hidden sm:inline font-mono">Nexus Copilot</span>
@@ -439,7 +439,7 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
       />
 
       {copilotEnabled && (
-        <GeminiCopilotDrawer
+        <CopilotDrawer
           isOpen={copilotOpen}
           onClose={() => setCopilotOpen(false)}
         />

@@ -5,7 +5,7 @@ import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
 import { getEventsClient as getEvents, getServersClient, type EventEntry, type EventLevel, type Server } from "@/api/client";
 import { ThemeContext } from "./__root";
-import { GeminiIntelligenceCard } from "@/components/ai/GeminiIntelligenceCard";
+import { AiIntelligenceCard } from "@/components/ai/AiIntelligenceCard";
 
 export const Route = createFileRoute("/events")({
   head: () => ({ meta: [{ title: "Event Viewer — NEXUS" }, { name: "description", content: "Browse system, application, and security event logs." }] }),
@@ -122,7 +122,7 @@ function EventsPage() {
         </div>
         <ServerSelector value={server} onChange={setServer} />
         
-        <GeminiIntelligenceCard
+        <AiIntelligenceCard
           title="Event Log AI Root-Cause Diagnostics"
           type="events"
           dataToAnalyze={filtered.slice(0, 15).map((e) => ({

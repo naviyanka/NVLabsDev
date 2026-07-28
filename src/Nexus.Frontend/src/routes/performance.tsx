@@ -6,7 +6,7 @@ import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { NxCard } from "@/components/ui/NxCard";
 import { ServerSelector } from "@/components/ui/ServerSelector";
 import { getPerformanceHistoryClient, getProcessesClient, type PerfSample, type Process } from "@/api/client";
-import { GeminiIntelligenceCard } from "@/components/ai/GeminiIntelligenceCard";
+import { AiIntelligenceCard } from "@/components/ai/AiIntelligenceCard";
 
 export const Route = createFileRoute("/performance")({
   head: () => ({ meta: [{ title: "Performance — NEXUS" }, { name: "description", content: "Live CPU, memory, disk and network metrics." }] }),
@@ -44,7 +44,7 @@ function Performance() {
       <PageHeader eyebrow="Telemetry" title="Performance Monitor" subtitle="Real-time metric streams refreshing every 3 seconds" />
       <ServerSelector value={server} onChange={setServer} />
       
-      <GeminiIntelligenceCard
+      <AiIntelligenceCard
         title="Performance Bottleneck Intelligence"
         type="performance"
         dataToAnalyze={{

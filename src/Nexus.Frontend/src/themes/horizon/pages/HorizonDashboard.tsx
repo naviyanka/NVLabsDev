@@ -5,7 +5,7 @@ import { Server as ServerIcon, CheckCircle, XCircle, AlertTriangle, ChevronRight
 import { toast } from "sonner";
 import { getApiUrl } from "@/lib/backend";
 import { getFrontendSettings } from "@/lib/frontendSettings";
-import { GeminiIntelligenceCard } from "@/components/ai/GeminiIntelligenceCard";
+import { AiIntelligenceCard } from "@/components/ai/AiIntelligenceCard";
 
 export function HorizonDashboard() {
   const [servers, setServers] = useState<Server[]>([]);
@@ -202,7 +202,7 @@ export function HorizonDashboard() {
       </section>
 
       {/* Gemini AI Fleet Diagnostic Intelligence */}
-      <GeminiIntelligenceCard
+      <AiIntelligenceCard
         title="Fleet Diagnostic Intelligence"
         type="metrics"
         dataToAnalyze={{
