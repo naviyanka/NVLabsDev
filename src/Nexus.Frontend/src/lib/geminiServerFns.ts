@@ -65,6 +65,7 @@ async function callOpenAICompatibleEndpoint({
       model: model || "qwen2.5:0.5b",
       messages: formattedMessages,
       temperature: 0.3,
+      stream: false,
     }),
   });
 
@@ -73,7 +74,57 @@ async function callOpenAICompatibleEndpoint({
     throw new Error(`AI Gateway returned HTTP ${res.status}: ${errText.slice(0, 300)}`);
   }
 
-  const json = await res.json();
+  // Check if the gateway returned SSE streaming despite stream:false
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("text/event-stream")) {
+    // Parse SSE stream: collect all delta content chunks
+    const sseText = await res.text();
+    const lines = sseText.split("\n");
+    let fullContent = "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data: ")) continue;
+      const payload = trimmed.slice(6);
+      if (payload === "[DONE]") break;
+      try {
+        const chunk = JSON.parse(payload);
+        const delta = chunk.choices?.[0]?.delta?.content || "";
+        fullContent += delta;
+      } catch {
+        // skip malformed SSE lines
+      }
+    }
+    return fullContent || "No response received from AI model.";
+  }
+
+  // Standard non-streaming JSON response
+  const rawText = await res.text();
+  // Some gateways prepend SSE "data: " even with application/json content-type
+  let jsonText = rawText;
+  if (rawText.trimStart().startsWith("data: ")) {
+    // Concatenate SSE data lines
+    const lines = rawText.split("\n");
+    let fullContent = "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data: ")) continue;
+      const payload = trimmed.slice(6);
+      if (payload === "[DONE]") break;
+      try {
+        const chunk = JSON.parse(payload);
+        // Could be a full response or a delta chunk
+        const full = chunk.choices?.[0]?.message?.content;
+        if (full) return full;
+        const delta = chunk.choices?.[0]?.delta?.content || "";
+        fullContent += delta;
+      } catch {
+        // skip malformed lines
+      }
+    }
+    return fullContent || "No response received from AI model.";
+  }
+
+  const json = JSON.parse(jsonText);
   const content = json.choices?.[0]?.message?.content || "No response received from AI model.";
   return content;
 }
