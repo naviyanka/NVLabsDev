@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Nexus.Gateway.Models;
 using Nexus.Gateway.Services;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace Nexus.Gateway.Controllers;
 
@@ -14,11 +15,34 @@ public class StorageReplicaController : ControllerBase
     private readonly IPowerShellExecutionService _psService;
     private readonly ILogger<StorageReplicaController> _logger;
 
+    // Strict validation patterns to prevent PowerShell injection
+    private static readonly Regex SafeNamePattern = new(@"^[a-zA-Z0-9._\-]+$", RegexOptions.Compiled);
+    private static readonly Regex SafeVolumePathPattern = new(@"^[a-zA-Z]:\\[a-zA-Z0-9\\_.\-\s]+$", RegexOptions.Compiled);
+    private static readonly Regex SafeServerPattern = new(@"^[a-zA-Z0-9._\-]+$", RegexOptions.Compiled);
+
     public StorageReplicaController(IPowerShellExecutionService psService, ILogger<StorageReplicaController> logger)
     {
         _psService = psService;
         _logger = logger;
     }
+
+    /// <summary>
+    /// Validates that a partnership/group name contains only safe characters.
+    /// </summary>
+    private static bool IsValidName(string? value)
+        => !string.IsNullOrWhiteSpace(value) && SafeNamePattern.IsMatch(value);
+
+    /// <summary>
+    /// Validates that a server name/hostname contains only safe characters.
+    /// </summary>
+    private static bool IsValidServer(string? value)
+        => !string.IsNullOrWhiteSpace(value) && SafeServerPattern.IsMatch(value);
+
+    /// <summary>
+    /// Validates that a volume path matches expected Windows path format (e.g., "E:\Data").
+    /// </summary>
+    private static bool IsValidVolumePath(string? value)
+        => !string.IsNullOrWhiteSpace(value) && SafeVolumePathPattern.IsMatch(value);
 
     /// <summary>
     /// List all Storage Replica partnerships on the target server.
@@ -86,6 +110,24 @@ $partnerships | ConvertTo-Json -Depth 3
     {
         try
         {
+            // Validate all user-supplied inputs to prevent PowerShell injection
+            if (!IsValidServer(request.SourceServer))
+                return BadRequest(new { error = "Invalid SourceServer. Only alphanumeric, dots, hyphens, and underscores are allowed." });
+            if (!IsValidServer(request.DestServer))
+                return BadRequest(new { error = "Invalid DestServer. Only alphanumeric, dots, hyphens, and underscores are allowed." });
+            if (!IsValidName(request.ReplicationGroup))
+                return BadRequest(new { error = "Invalid ReplicationGroup name. Only alphanumeric, dots, hyphens, and underscores are allowed." });
+            if (!IsValidVolumePath(request.SourceVol))
+                return BadRequest(new { error = "Invalid SourceVol path. Must be a valid Windows path (e.g., E:\\Data)." });
+            if (!IsValidVolumePath(request.DestVol))
+                return BadRequest(new { error = "Invalid DestVol path. Must be a valid Windows path (e.g., E:\\Data)." });
+            if (!IsValidVolumePath(request.SourceLogVol))
+                return BadRequest(new { error = "Invalid SourceLogVol path. Must be a valid Windows path (e.g., E:\\Logs)." });
+            if (!IsValidVolumePath(request.DestLogVol))
+                return BadRequest(new { error = "Invalid DestLogVol path. Must be a valid Windows path (e.g., E:\\Logs)." });
+            if (request.LogSizeGb < 1 || request.LogSizeGb > 1024)
+                return BadRequest(new { error = "LogSizeGb must be between 1 and 1024." });
+
             var mode = request.Mode == "Asynchronous" ? "Asynchronous" : "Synchronous";
             var encryptionFlag = request.Encryption ? "-EnableEncryption" : "";
 
@@ -130,6 +172,15 @@ New-SRPartnership `
     {
         try
         {
+            if (!IsValidName(partnershipId))
+                return BadRequest(new { error = "Invalid partnershipId. Only alphanumeric, dots, hyphens, and underscores are allowed." });
+
+            if (!string.IsNullOrEmpty(request.Mode) && request.Mode != "Synchronous" && request.Mode != "Asynchronous")
+                return BadRequest(new { error = "Mode must be 'Synchronous' or 'Asynchronous'." });
+
+            if (request.LogSizeGb.HasValue && (request.LogSizeGb.Value < 1 || request.LogSizeGb.Value > 1024))
+                return BadRequest(new { error = "LogSizeGb must be between 1 and 1024." });
+
             var setClauses = new List<string>();
 
             if (!string.IsNullOrEmpty(request.Mode))
@@ -182,6 +233,9 @@ Set-SRPartnership -Name '{partnershipId}' `
     {
         try
         {
+            if (!IsValidName(partnershipId))
+                return BadRequest(new { error = "Invalid partnershipId. Only alphanumeric, dots, hyphens, and underscores are allowed." });
+
             var script = $@"
 Remove-SRPartnership -Name '{partnershipId}' -Force -ErrorAction Stop
 Remove-SRGroup -Name '{partnershipId}' -Force -ErrorAction SilentlyContinue
@@ -212,6 +266,9 @@ Remove-SRGroup -Name '{partnershipId}' -Force -ErrorAction SilentlyContinue
     {
         try
         {
+            if (!IsValidName(partnershipId))
+                return BadRequest(new { error = "Invalid partnershipId. Only alphanumeric, dots, hyphens, and underscores are allowed." });
+
             var script = $@"
 $partnership = Get-SRPartnership -Name '{partnershipId}' -ErrorAction Stop
 Set-SRPartnership -Name '{partnershipId}' `
@@ -244,6 +301,9 @@ Set-SRPartnership -Name '{partnershipId}' `
     {
         try
         {
+            if (!IsValidName(partnershipId))
+                return BadRequest(new { error = "Invalid partnershipId. Only alphanumeric, dots, hyphens, and underscores are allowed." });
+
             var script = $@"
 $partnership = Get-SRPartnership -Name '{partnershipId}' -ErrorAction Stop
 $destComputer = $partnership.DestinationComputerName
@@ -282,6 +342,9 @@ Write-Output 'Failover completed. Destination volume is now primary.'
     {
         try
         {
+            if (!IsValidName(partnershipId))
+                return BadRequest(new { error = "Invalid partnershipId. Only alphanumeric, dots, hyphens, and underscores are allowed." });
+
             var script = $@"
 $partnership = Get-SRPartnership -Name '{partnershipId}' -ErrorAction Stop
 if ($partnership.ReplicationStatus -eq 'Suspended' -or $partnership.ReplicationStatus -eq 'Paused') {{
@@ -319,6 +382,9 @@ if ($partnership.ReplicationStatus -eq 'Suspended' -or $partnership.ReplicationS
     {
         try
         {
+            if (!IsValidName(partnershipId))
+                return BadRequest(new { error = "Invalid partnershipId. Only alphanumeric, dots, hyphens, and underscores are allowed." });
+
             var script = $@"
 $partnership = Get-SRPartnership -Name '{partnershipId}' -ErrorAction Stop
 Sync-SRGroup -Name $partnership.SourceRGName -Force -ErrorAction Stop

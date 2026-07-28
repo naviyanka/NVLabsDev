@@ -82,6 +82,7 @@ builder.Services.AddSingleton<PluginBackgroundJobManager>();
 builder.Services.AddTransient<ServerService>();
 builder.Services.AddTransient<NotificationService>();
 builder.Services.AddTransient<IPowerShellExecutionService, PowerShellExecutionService>();
+builder.Services.AddTransient<PluginSandboxService>();
 builder.Services.AddScoped<AuditLogService>();
 builder.Services.AddHostedService<TelemetryBackgroundService>();
 builder.Services.AddHostedService<LogPersistenceService>();

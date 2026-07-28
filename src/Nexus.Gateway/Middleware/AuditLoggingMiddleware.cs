@@ -126,6 +126,13 @@ public class AuditLoggingMiddleware
             };
 
             // Compute hash chain
+            //
+            // KNOWN LIMITATION: Hash-chain concurrency
+            // Under concurrent requests, multiple middleware instances may read the same "last" entry
+            // before either writes, producing entries that both reference the same predecessor (a fork).
+            // This is acceptable for low-traffic admin panels but becomes a correctness issue under
+            // heavy concurrency. A production-grade fix would use a queue/serializer for audit writes
+            // or optimistic concurrency with retry on the hash computation.
             using var scope = context.RequestServices.CreateScope();
             var logDb = scope.ServiceProvider.GetRequiredService<NexusLogContext>();
 

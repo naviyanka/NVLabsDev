@@ -81,18 +81,25 @@ export async function stopSignalRConnection(): Promise<void> {
 /**
  * React hook for managing SignalR connection state and event subscriptions.
  * Provides connection state tracking, auto-connect, and typed event handlers.
+ *
+ * Uses a mounted ref flag to prevent lifecycle handler stacking: since SignalR's
+ * onreconnecting/onreconnected/onclose do not support handler removal, registered
+ * callbacks guard against state updates after the component unmounts.
  */
 export function useSignalR() {
   const [connectionState, setConnectionState] =
     useState<SignalRConnectionState>("disconnected");
   const connectionRef = useRef<HubConnection | null>(null);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     const connection = getSignalRConnection();
     connectionRef.current = connection;
 
-    // Track state changes
+    // Track state changes (guarded by mounted flag)
     const updateState = () => {
+      if (!mountedRef.current) return;
       switch (connection.state) {
         case HubConnectionState.Connected:
           setConnectionState("connected");
@@ -107,18 +114,31 @@ export function useSignalR() {
       }
     };
 
-    connection.onreconnecting(() => setConnectionState("reconnecting"));
-    connection.onreconnected(() => setConnectionState("connected"));
-    connection.onclose(() => setConnectionState("disconnected"));
+    // Lifecycle handlers guarded by mountedRef to prevent stale updates.
+    // SignalR does not expose a way to unregister onreconnecting/onreconnected/onclose,
+    // so the mounted flag ensures callbacks become no-ops after unmount.
+    connection.onreconnecting(() => {
+      if (mountedRef.current) setConnectionState("reconnecting");
+    });
+    connection.onreconnected(() => {
+      if (mountedRef.current) setConnectionState("connected");
+    });
+    connection.onclose(() => {
+      if (mountedRef.current) setConnectionState("disconnected");
+    });
 
     // Start connection
     startSignalRConnection()
       .then(() => updateState())
-      .catch(() => setConnectionState("disconnected"));
+      .catch(() => {
+        if (mountedRef.current) setConnectionState("disconnected");
+      });
 
     return () => {
-      // Do not stop the singleton connection on unmount;
-      // other components may still use it.
+      // Mark as unmounted so lifecycle callbacks become no-ops.
+      // Do not stop the singleton connection; other components may still use it.
+      mountedRef.current = false;
+      connectionRef.current = null;
     };
   }, []);
 

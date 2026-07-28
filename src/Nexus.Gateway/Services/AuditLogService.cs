@@ -201,6 +201,17 @@ public class AuditLogService
         };
     }
 
+    /// <summary>
+    /// Purges audit log entries older than the specified retention period.
+    ///
+    /// KNOWN LIMITATION: Purging old entries severs the hash chain at the boundary.
+    /// After purge, the first remaining entry's PreviousHash references a now-deleted entry.
+    /// Integrity verification handles this by only checking PreviousHash for entries where i > 0
+    /// within the queried range, but the logical chain is broken at the purge boundary.
+    /// A production-grade fix would either: (a) store a "chain anchor" marker entry that records
+    /// the last hash before purge, or (b) re-hash the first remaining entry with a null predecessor.
+    /// For this admin-facing system, the current behavior is acceptable and documented.
+    /// </summary>
     public async Task<int> PurgeExpiredAsync(int retentionDays)
     {
         var cutoff = DateTime.UtcNow.AddDays(-retentionDays);
