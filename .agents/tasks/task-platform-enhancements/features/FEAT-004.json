@@ -1,0 +1,26 @@
+{
+  "id": "FEAT-004",
+  "type": "feat",
+  "description": "Storage Replica and SharePoint Setup backend controller completion. The Storage Replica endpoint in VmsController currently returns an empty list. The SharePoint Setup controller already has a working execute endpoint but no status/progress reporting. Implement proper backend logic for both.",
+  "status": "in_progress",
+  "steps": [
+    "Create src/Nexus.Gateway/Controllers/StorageReplicaController.cs - a dedicated controller at route 'api/servers/{serverId}/storage-replica' with full CRUD: GET (list partnerships via PowerShell Get-SRPartnership), POST (create via New-SRPartnership), PUT {id} (update settings via Set-SRPartnership), DELETE {id} (remove via Remove-SRPartnership), POST {id}/swap (Set-SRPartnership -NewSourceComputerName), POST {id}/failover (Mount-SRDestination), POST {id}/toggle-pause (Suspend-SRPartnership or Resume-SRPartnership), POST {id}/resync (Sync-SRGroup). Each action uses IPowerShellExecutionService. Return the ReplicaPartnership model.",
+    "Create src/Nexus.Gateway/Models/StorageReplicaModels.cs with ReplicaPartnershipDto matching the frontend's ReplicaPartnership interface (id, sourceServer, destServer, sourceVol, destVol, sourceLogVol, destLogVol, mode, status, progress, bytes, latencyMs, transferRateMbps, name, replicationGroup, logSizeGb, encryption, autoFailover)",
+    "Remove the stub storage-replica endpoint from src/Nexus.Gateway/Controllers/VmsController.cs (the GetStorageReplica method that returns empty list)",
+    "Add to src/Nexus.Gateway/Controllers/SharePointSetupController.cs: GET /api/plugins/SharePointSetup/status endpoint that returns the status of running SharePoint deployment jobs by querying PluginBackgroundJobManager for jobs with 'sharepoint_' prefix, GET /api/plugins/SharePointSetup/logs/{jobId} endpoint that returns logs for a specific SP job",
+    "Update the CreateReplicaPartnershipDto in frontend's client.ts to match the new backend model (update the ReplicaPartnership interface to include the additional fields: sourceVol, destVol, sourceLogVol, destLogVol, mode, progress, bytes, latencyMs, transferRateMbps, name, replicationGroup, logSizeGb, encryption, autoFailover)"
+  ],
+  "acceptance_criteria": [
+    "StorageReplicaController exists with full CRUD and action endpoints",
+    "StorageReplicaModels.cs has complete DTO matching frontend interface",
+    "VmsController no longer has the stub storage-replica endpoint",
+    "SharePointSetupController has status and logs endpoints",
+    "Frontend ReplicaPartnership interface in client.ts matches backend DTO",
+    "Frontend builds successfully with bun run build"
+  ],
+  "verification": [
+    "cd src/Nexus.Frontend && bun install && bun run build"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
