@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Sparkles, Send, X, Bot, User, Copy, CheckCircle2, RefreshCw } from "lucide-react";
 import { getFrontendSettings } from "@/lib/frontendSettings";
 import { sendGeminiChatFn } from "@/lib/geminiServerFns";
+import { getApiUrl } from "@/lib/backend";
 
 interface Message {
   id: string;
@@ -76,6 +77,10 @@ export const GeminiCopilotDrawer: React.FC<GeminiCopilotDrawerProps> = ({
 
     try {
       const settings = getFrontendSettings();
+      // Get auth token and backend base URL for live API access
+      const authToken = typeof window !== "undefined" ? localStorage.getItem("nexus_token") || "" : "";
+      const rawApiUrl = getApiUrl(""); // e.g. "http://host:5010/api"
+      const backendBaseUrl = rawApiUrl.replace(/\/api\/?$/, ""); // strip trailing /api
       const data = await sendGeminiChatFn({
         data: {
           message: text,
@@ -85,6 +90,8 @@ export const GeminiCopilotDrawer: React.FC<GeminiCopilotDrawerProps> = ({
           apiKey: settings.aiApiKey,
           geminiApiKey: settings.geminiApiKey,
           model: settings.aiModel,
+          authToken,
+          backendBaseUrl,
         },
       });
 
