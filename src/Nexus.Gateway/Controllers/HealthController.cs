@@ -360,7 +360,7 @@ public class HealthController : ControllerBase
             _logger.LogError(ex, "Error processing health check request");
             return Ok(new SystemHealthDto
             {
-                Status = "Healthy",
+                Status = "Unhealthy",
                 Timestamp = DateTime.UtcNow,
                 TotalPingMs = Math.Round(totalSw.Elapsed.TotalMilliseconds, 2)
             });

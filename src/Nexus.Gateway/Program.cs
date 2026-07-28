@@ -159,7 +159,7 @@ builder.Services.AddCors(options =>
         }
         else
         {
-            // Development/unconfigured: allow all origins
+            // Development/unconfigured: allow all origins (warning logged at startup)
             policy.SetIsOriginAllowed(_ => true)
                   .AllowAnyMethod()
                   .AllowAnyHeader()
@@ -178,6 +178,16 @@ builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>
 });
 
 var app = builder.Build();
+
+// Warn if CORS is running in unrestricted allow-all mode
+{
+    var corsOrigins = app.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+    if (corsOrigins == null || corsOrigins.Length == 0)
+    {
+        var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
+        startupLogger.LogWarning("CORS is configured to allow ALL origins. Set 'Cors:AllowedOrigins' in appsettings.json to restrict access in production.");
+    }
+}
 
 using (var scope = app.Services.CreateScope())
 {

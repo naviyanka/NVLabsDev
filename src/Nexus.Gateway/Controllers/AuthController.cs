@@ -30,6 +30,19 @@ namespace Nexus.Gateway.Controllers
         {
             var remoteIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
+            // Periodic cleanup: remove expired entries when dictionary exceeds size threshold
+            if (_loginAttempts.Count > 100)
+            {
+                var expiredKeys = _loginAttempts
+                    .Where(kvp => DateTime.UtcNow - kvp.Value.WindowStart > RateLimitWindow)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+                foreach (var key in expiredKeys)
+                {
+                    _loginAttempts.TryRemove(key, out _);
+                }
+            }
+
             // Rate limiting check
             if (_loginAttempts.TryGetValue(remoteIp, out var attempt))
             {
