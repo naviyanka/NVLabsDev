@@ -169,7 +169,9 @@ public class OllamaController : ControllerBase
         try
         {
             var client = _httpClientFactory.CreateClient();
-            client.Timeout = TimeSpan.FromSeconds(8);
+            client.Timeout = TimeSpan.FromSeconds(30);
+
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 NEXUS/1.0");
 
             if (!string.IsNullOrWhiteSpace(apiKey))
             {
@@ -178,20 +180,46 @@ public class OllamaController : ControllerBase
 
             // 1. Try standard OpenAI /v1/models endpoint
             var modelsUrl = targetUrl.EndsWith("/models", StringComparison.OrdinalIgnoreCase) ? targetUrl : $"{targetUrl}/models";
-            var response = await client.GetAsync(modelsUrl);
+            var response = await client.GetAsync(modelsUrl, HttpCompletionOption.ResponseHeadersRead);
 
             if (response.IsSuccessStatusCode)
             {
-                var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-                if (json.TryGetProperty("data", out var dataArr) && dataArr.ValueKind == JsonValueKind.Array)
+                using var stream = await response.Content.ReadAsStreamAsync();
+                using var doc = await JsonDocument.ParseAsync(stream);
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("data", out var dataArr) && dataArr.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var item in dataArr.EnumerateArray())
                     {
-                        if (item.TryGetProperty("id", out var idProp))
+                        string? modelId = null;
+                        if (item.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.String)
                         {
-                            var idStr = idProp.GetString();
-                            if (!string.IsNullOrWhiteSpace(idStr)) models.Add(idStr);
+                            modelId = idProp.GetString();
                         }
+                        else if (item.TryGetProperty("name", out var nameProp) && nameProp.ValueKind == JsonValueKind.String)
+                        {
+                            modelId = nameProp.GetString();
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(modelId)) models.Add(modelId.Trim());
+                    }
+                }
+                else if (root.TryGetProperty("models", out var modelsArr) && modelsArr.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in modelsArr.EnumerateArray())
+                    {
+                        string? modelId = null;
+                        if (item.TryGetProperty("name", out var nameProp) && nameProp.ValueKind == JsonValueKind.String)
+                        {
+                            modelId = nameProp.GetString();
+                        }
+                        else if (item.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.String)
+                        {
+                            modelId = idProp.GetString();
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(modelId)) models.Add(modelId.Trim());
                     }
                 }
             }
@@ -203,15 +231,16 @@ public class OllamaController : ControllerBase
                 var tagsRes = await client.GetAsync(tagsUrl);
                 if (tagsRes.IsSuccessStatusCode)
                 {
-                    var json = await tagsRes.Content.ReadFromJsonAsync<JsonElement>();
-                    if (json.TryGetProperty("models", out var modelsArr) && modelsArr.ValueKind == JsonValueKind.Array)
+                    using var stream = await tagsRes.Content.ReadAsStreamAsync();
+                    using var doc = await JsonDocument.ParseAsync(stream);
+                    if (doc.RootElement.TryGetProperty("models", out var modelsArr) && modelsArr.ValueKind == JsonValueKind.Array)
                     {
                         foreach (var item in modelsArr.EnumerateArray())
                         {
-                            if (item.TryGetProperty("name", out var nameProp))
+                            if (item.TryGetProperty("name", out var nameProp) && nameProp.ValueKind == JsonValueKind.String)
                             {
                                 var nameStr = nameProp.GetString();
-                                if (!string.IsNullOrWhiteSpace(nameStr)) models.Add(nameStr);
+                                if (!string.IsNullOrWhiteSpace(nameStr)) models.Add(nameStr.Trim());
                             }
                         }
                     }
