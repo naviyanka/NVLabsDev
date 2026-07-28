@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Cpu, Download, Check, RefreshCw, Sparkles, HardDrive, Terminal, ShieldCheck, Play, AlertCircle } from "lucide-react";
+import { Cpu, Download, Check, RefreshCw, Sparkles, HardDrive, ShieldCheck, Play, Trash2, XCircle } from "lucide-react";
 import { getApiUrl } from "@/lib/backend";
 import { getFrontendSettings, saveFrontendSettings } from "@/lib/frontendSettings";
 
@@ -69,7 +69,9 @@ export const OllamaManager: React.FC = () => {
   });
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [installing, setInstalling] = useState(false);
+  const [uninstalling, setUninstalling] = useState(false);
   const [pullingModel, setPullingModel] = useState<string | null>(null);
+  const [deletingModel, setDeletingModel] = useState<string | null>(null);
 
   const fetchStatus = async () => {
     setLoadingStatus(true);
@@ -99,8 +101,8 @@ export const OllamaManager: React.FC = () => {
       const res = await fetch(getApiUrl("/ollama/install"), { method: "POST" });
       const data = await res.json();
       if (data.success) {
-        toast.success("Ollama setup initiated successfully! Checking status...");
-        setTimeout(fetchStatus, 5000);
+        toast.success("Ollama setup sequence executed successfully! Refreshing status...");
+        setTimeout(fetchStatus, 4000);
       } else {
         toast.error(`Installation error: ${data.message || "Failed to run setup"}`);
       }
@@ -111,9 +113,33 @@ export const OllamaManager: React.FC = () => {
     }
   };
 
+  const handleUninstallOllama = async () => {
+    if (!window.confirm("Are you sure you want to completely uninstall Ollama and remove local CPU service?")) {
+      return;
+    }
+    setUninstalling(true);
+    toast.info("Initiating Ollama Removal & Cleanup sequence...");
+    try {
+      const res = await fetch(getApiUrl("/ollama/uninstall"), { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Ollama uninstalled from system. AI provider reset to Gemini.");
+        const settings = getFrontendSettings();
+        saveFrontendSettings({ ...settings, aiProvider: "gemini", aiModel: "gemini-2.5-flash" });
+        setTimeout(fetchStatus, 3000);
+      } else {
+        toast.error(`Uninstall warning: ${data.message}`);
+      }
+    } catch (e: any) {
+      toast.error(`Uninstall error: ${e.message}`);
+    } finally {
+      setUninstalling(false);
+    }
+  };
+
   const handlePullModel = async (modelName: string) => {
     setPullingModel(modelName);
-    toast.info(`Pulling lightweight CPU model '${modelName}'... This may take 1-2 minutes depending on connection.`);
+    toast.info(`Pulling lightweight CPU model '${modelName}'... Please wait.`);
     try {
       const res = await fetch(getApiUrl("/ollama/pull"), {
         method: "POST",
@@ -124,7 +150,6 @@ export const OllamaManager: React.FC = () => {
       if (data.success) {
         toast.success(`Model '${modelName}' downloaded successfully!`);
         
-        // Auto-configure Ollama as active AI provider in settings
         const settings = getFrontendSettings();
         saveFrontendSettings({
           ...settings,
@@ -145,6 +170,26 @@ export const OllamaManager: React.FC = () => {
     }
   };
 
+  const handleDeleteModel = async (modelName: string) => {
+    setDeletingModel(modelName);
+    try {
+      const res = await fetch(getApiUrl(`/ollama/model?model=${encodeURIComponent(modelName)}`), {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Model '${modelName}' deleted.`);
+        fetchStatus();
+      } else {
+        toast.error(`Failed to remove model: ${data.message}`);
+      }
+    } catch (e: any) {
+      toast.error(`Error deleting model: ${e.message}`);
+    } finally {
+      setDeletingModel(null);
+    }
+  };
+
   const currentSettings = getFrontendSettings();
   const activeModel = currentSettings.aiModel;
 
@@ -161,7 +206,7 @@ export const OllamaManager: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           <button
             onClick={fetchStatus}
             disabled={loadingStatus}
@@ -188,9 +233,20 @@ export const OllamaManager: React.FC = () => {
               )}
             </button>
           ) : (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono text-xs font-semibold">
-              <Check className="w-4 h-4 text-emerald-500" /> Ollama Installed {status.isRunning ? "(Service Online)" : "(Service Stopped)"}
-            </div>
+            <>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-mono text-xs font-semibold">
+                <Check className="w-4 h-4 text-emerald-500" /> Ollama Installed {status.isRunning ? "(Service Online)" : "(Service Stopped)"}
+              </div>
+              <button
+                onClick={handleUninstallOllama}
+                disabled={uninstalling}
+                className="px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                title="Remove Ollama Setup & Service"
+              >
+                {uninstalling ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                Uninstall Ollama
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -200,24 +256,32 @@ export const OllamaManager: React.FC = () => {
         <div className="p-4 bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl space-y-2">
           <div className="flex items-center justify-between text-xs font-bold text-[var(--text)]">
             <span className="flex items-center gap-1.5">
-              <HardDrive className="w-4 h-4 text-cyan-500" /> Locally Available Models ({status.installedModels.length})
+              <HardDrive className="w-4 h-4 text-cyan-500" /> Installed Local Models ({status.installedModels.length})
             </span>
             <span className="font-mono text-[11px] text-[var(--text-sub)]">{status.version}</span>
           </div>
           {status.installedModels.length > 0 ? (
             <div className="flex flex-wrap gap-2 pt-1">
               {status.installedModels.map((m) => (
-                <span
+                <div
                   key={m}
-                  className={`text-xs px-2.5 py-1 rounded-lg font-mono flex items-center gap-1.5 border ${
+                  className={`text-xs px-2.5 py-1 rounded-lg font-mono flex items-center gap-2 border ${
                     activeModel === m
                       ? "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/40 font-bold"
                       : "bg-[var(--bg-surface)] text-[var(--text-sub)] border-[var(--border-c)]"
                   }`}
                 >
-                  {m}
+                  <span>{m}</span>
                   {activeModel === m && <span className="text-[10px] bg-cyan-500 text-white px-1.5 py-0.2 rounded-full uppercase">Active</span>}
-                </span>
+                  <button
+                    onClick={() => handleDeleteModel(m)}
+                    disabled={deletingModel === m}
+                    className="p-0.5 text-red-400 hover:text-red-600 cursor-pointer ml-1"
+                    title={`Delete model ${m}`}
+                  >
+                    {deletingModel === m ? <RefreshCw className="w-3 h-3 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
               ))}
             </div>
           ) : (
