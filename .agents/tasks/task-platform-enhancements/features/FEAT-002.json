@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Real-time Dashboard via SignalR - implement proper SignalR client integration on the frontend for live performance metrics, notifications, and server status updates. Replace the 3-second polling in performance.tsx with a persistent SignalR connection. Enhance the NotificationHub to support streaming performance data and server status changes.",
+  "status": "completed",
+  "steps": [
+    "Create src/Nexus.Frontend/src/lib/signalr.ts - a SignalR client manager that creates and manages a persistent connection to /hub/notifications using @microsoft/signalr (already in package.json). Include: automatic reconnection with exponential backoff, connection state tracking, event subscription/unsubscription, token-based auth (reads nexus_token from localStorage). Export a singleton useSignalR React hook and a getSignalRConnection() function.",
+    "Enhance src/Nexus.Gateway/Hubs/NotificationHub.cs: add methods for clients to subscribe to specific server metrics (JoinServerGroup, LeaveServerGroup), add a ReceivePerformanceData event that streams PerfSample data, add a ReceiveServerStatus event for server online/offline status changes, add OnConnectedAsync and OnDisconnectedAsync with proper group management",
+    "Create src/Nexus.Gateway/Services/PerformanceStreamService.cs - a background service that reads from the TelemetryBackgroundService data and broadcasts to the hub at intervals (every 2 seconds) via IHubContext<NotificationHub>. Send ReceivePerformanceData to server-specific groups.",
+    "Register PerformanceStreamService in src/Nexus.Gateway/Program.cs as a hosted service",
+    "Update src/Nexus.Frontend/src/routes/performance.tsx to use the SignalR connection instead of polling: subscribe to the selected server's performance group via hub, receive PerfSample data in real-time via ReceivePerformanceData event, fall back to polling if SignalR connection fails. Keep the existing REST fetch as fallback.",
+    "Create src/Nexus.Frontend/src/components/ui/ConnectionStatus.tsx - a small indicator component that shows SignalR connection state (connected/reconnecting/disconnected) in the UI"
+  ],
+  "acceptance_criteria": [
+    "signalr.ts module exists with connection manager and useSignalR hook",
+    "NotificationHub has JoinServerGroup/LeaveServerGroup methods and ReceivePerformanceData event",
+    "PerformanceStreamService broadcasts telemetry data to connected clients",
+    "Performance page subscribes to SignalR with REST polling as fallback",
+    "ConnectionStatus component shows real-time connection state",
+    "Frontend builds successfully with bun run build"
+  ],
+  "verification": [
+    "cd src/Nexus.Frontend && bun install && bun run build"
+  ],
+  "blocked_reason": null,
+  "findings": "Frontend build passes successfully. Backend cannot be compiled (net8.0-windows on Linux), validated via code review. The INVALID_ANNOTATION warnings from @microsoft/signalr are pre-existing and do not affect the build. The performance.tsx uses diskR/diskW/netIn/netOut from the API response which maps to the C# PerfSample model properties. Used 'as any' cast for diskR/diskW since the frontend PerfSample interface only declares disk/netIn/netOut but the actual API returns separate diskR and diskW fields."
+}
