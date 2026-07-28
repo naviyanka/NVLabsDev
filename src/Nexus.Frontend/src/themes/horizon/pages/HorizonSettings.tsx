@@ -10,6 +10,7 @@ import { TerminalThemePreview } from "@/components/settings/TerminalThemePreview
 import { SettingsImportExport } from "@/components/settings/SettingsImportExport";
 import { SoftwareRepoManager } from "@/components/apps/SoftwareRepoManager";
 import { ApiHealthSettingsView } from "@/components/settings/ApiHealthSettingsView";
+import { OllamaManager } from "@/components/settings/OllamaManager";
 
 
 interface AppSettings {
@@ -954,6 +955,9 @@ export function HorizonSettings() {
                   </div>
                 </div>
               </section>
+
+              {/* One-Click Ollama Setup & Lightweight CPU Model Manager */}
+              <OllamaManager />
 
               {/* Local LLM & Auto Remediation Roadmap Options */}
               <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 space-y-4 shadow-sm">
