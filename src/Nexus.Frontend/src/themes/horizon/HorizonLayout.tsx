@@ -368,6 +368,14 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
             onClick={() => setShowBackendModal(true)}
             className="cursor-pointer"
           />
+          {/* Quick Settings Direct Action */}
+          <button
+            onClick={() => navigate({ to: "/settings" })}
+            className="text-[var(--text-sub)] hover:bg-[var(--amber-low)] hover:text-[var(--amber)] rounded-full p-2 transition-all relative cursor-pointer"
+            title="Open App Settings"
+          >
+            <SettingsIcon size={18} />
+          </button>
           <button 
             onClick={() => document.documentElement.classList.toggle('dark')} 
             className="text-[var(--text-sub)] hover:bg-[var(--amber-low)] hover:text-[var(--amber)] rounded-full p-2 transition-all relative"
