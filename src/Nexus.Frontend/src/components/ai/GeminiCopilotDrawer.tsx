@@ -76,7 +76,11 @@ export function GeminiCopilotDrawer({
         data: {
           message: text,
           history: messages.map((m) => ({ role: m.role, content: m.content })),
+          provider: settings.aiProvider || "gemini",
+          baseUrl: settings.aiBaseUrl || "http://localhost:11434/v1",
+          apiKey: settings.aiApiKey,
           geminiApiKey: settings.geminiApiKey,
+          model: settings.aiModel,
         },
       });
 
@@ -96,7 +100,7 @@ export function GeminiCopilotDrawer({
         {
           id: (Date.now() + 1).toString(),
           role: "model",
-          content: `⚠️ Error contacting Gemini AI: ${err.message || "Network error"}`,
+          content: `⚠️ Error contacting AI Gateway: ${err.message || "Network error"}`,
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         },
       ]);
@@ -104,6 +108,10 @@ export function GeminiCopilotDrawer({
       setLoading(false);
     }
   };
+
+  const currentSettings = getFrontendSettings();
+  const currentProvider = currentSettings.aiProvider || "gemini";
+  const currentModel = currentSettings.aiModel || (currentProvider === "ollama" ? "llama3.2:1b" : "gemini-2.5-flash");
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -134,8 +142,8 @@ export function GeminiCopilotDrawer({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="font-semibold text-sm text-[var(--text,#f4f4f5)]">Nexus Copilot</h2>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-mono border border-amber-500/30">
-                  Gemini 3.6 Flash
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-mono border border-amber-500/30 uppercase">
+                  {currentProvider === "ollama" ? "CPU Ollama" : currentProvider} ({currentModel})
                 </span>
               </div>
               <p className="text-xs text-[var(--text-sub,#a1a1aa)]">Server Operations & Infrastructure Assistant</p>

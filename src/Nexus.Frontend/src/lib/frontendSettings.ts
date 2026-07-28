@@ -18,6 +18,10 @@ export interface FrontendSettings {
   scriptTemplates?: ScriptTemplate[];
   copilotEnabled?: boolean;
   geminiApiKey?: string;
+  aiProvider?: "gemini" | "openai" | "ollama" | "custom";
+  aiBaseUrl?: string;
+  aiApiKey?: string;
+  aiModel?: string;
 }
 
 const STORAGE_KEY = "nexus-frontend-settings";
@@ -41,7 +45,11 @@ const defaultSettings: FrontendSettings = {
   autoRefreshInterval: 30,
   scriptTemplates: defaultScriptTemplates,
   copilotEnabled: true,
-  geminiApiKey: ""
+  geminiApiKey: "",
+  aiProvider: "gemini",
+  aiBaseUrl: "http://localhost:11434/v1",
+  aiApiKey: "",
+  aiModel: "gemini-2.5-flash",
 };
 
 export function getFrontendSettings(): FrontendSettings {

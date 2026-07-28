@@ -36,6 +36,10 @@ interface AppSettings {
   auditLoggingEnabled?: boolean;
   copilotEnabled?: boolean;
   geminiApiKey?: string;
+  aiProvider?: "gemini" | "openai" | "ollama" | "custom";
+  aiBaseUrl?: string;
+  aiApiKey?: string;
+  aiModel?: string;
 
   isFirstRunSetup?: boolean;
   dataDirectoryPath?: string;
@@ -84,7 +88,11 @@ const DEFAULT_SETTINGS: AppSettings = {
   llmModelEndpoint: "http://localhost:11434/v1",
   autoRemediationPolicy: "ManualApproval",
   wireguardTunnelPort: 51820,
-  ddnsProviderDomain: "nexus-edge.cloudflare.com"
+  ddnsProviderDomain: "nexus-edge.cloudflare.com",
+  aiProvider: "gemini",
+  aiBaseUrl: "http://localhost:11434/v1",
+  aiApiKey: "",
+  aiModel: "gemini-2.5-flash"
 };
 
 const CATEGORIES = [
@@ -787,50 +795,163 @@ export function HorizonSettings() {
                   </label>
                 </div>
 
-                {/* Gemini API Key Input Field */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-[var(--text)] uppercase tracking-wider flex items-center gap-1.5">
-                      <Key className="w-3.5 h-3.5 text-amber-400" /> Gemini API Key
-                    </label>
-                    <span className="text-[10px] text-[var(--text-sub)] font-mono">
-                      {s.geminiApiKey ? "Using Custom Key" : "Inheriting System Env (GEMINI_API_KEY)"}
-                    </span>
+                {/* AI Provider & Gateway Selection */}
+                <div className="space-y-4 pt-2">
+                  <label className="text-xs font-semibold text-[var(--text)] uppercase tracking-wider block">
+                    Select AI Provider & Execution Model
+                  </label>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => patch({ aiProvider: "gemini", aiModel: "gemini-2.5-flash" })}
+                      className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        (s.aiProvider || "gemini") === "gemini"
+                          ? "border-amber-500 bg-amber-500/10 text-white shadow-xs"
+                          : "border-[var(--border-c)] bg-[var(--bg-void)] text-[var(--text-sub)] hover:border-zinc-500"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between font-bold text-xs">
+                        <span className="flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-amber-400" /> Google Gemini</span>
+                        {(s.aiProvider || "gemini") === "gemini" && <Check className="w-4 h-4 text-amber-400" />}
+                      </div>
+                      <p className="text-[11px] opacity-80 mt-1">Cloud AI Studio (gemini-2.5-flash, gemini-2.5-pro).</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => patch({ aiProvider: "ollama", aiBaseUrl: s.aiBaseUrl || "http://localhost:11434/v1", aiModel: s.aiModel && s.aiModel !== "gemini-2.5-flash" ? s.aiModel : "llama3.2:1b" })}
+                      className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        s.aiProvider === "ollama"
+                          ? "border-cyan-500 bg-cyan-500/10 text-white shadow-xs"
+                          : "border-[var(--border-c)] bg-[var(--bg-void)] text-[var(--text-sub)] hover:border-zinc-500"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between font-bold text-xs">
+                        <span className="flex items-center gap-1.5"><Cpu className="w-4 h-4 text-cyan-400" /> Ollama (CPU Self-Hosted)</span>
+                        {s.aiProvider === "ollama" && <Check className="w-4 h-4 text-cyan-400" />}
+                      </div>
+                      <p className="text-[11px] opacity-80 mt-1">100% Local CPU, No-GPU required, Air-Gapped (qwen2.5:0.5b, llama3.2:1b).</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => patch({ aiProvider: "openai", aiModel: "gpt-4o-mini" })}
+                      className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        s.aiProvider === "openai"
+                          ? "border-emerald-500 bg-emerald-500/10 text-white shadow-xs"
+                          : "border-[var(--border-c)] bg-[var(--bg-void)] text-[var(--text-sub)] hover:border-zinc-500"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between font-bold text-xs">
+                        <span className="flex items-center gap-1.5"><Globe className="w-4 h-4 text-emerald-400" /> OpenAI Official</span>
+                        {s.aiProvider === "openai" && <Check className="w-4 h-4 text-emerald-400" />}
+                      </div>
+                      <p className="text-[11px] opacity-80 mt-1">Official OpenAI endpoint (gpt-4o-mini, gpt-4o).</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => patch({ aiProvider: "custom", aiBaseUrl: s.aiBaseUrl || "https://api.groq.com/openai/v1", aiModel: s.aiModel || "llama-3.3-70b-versatile" })}
+                      className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        s.aiProvider === "custom"
+                          ? "border-purple-500 bg-purple-500/10 text-white shadow-xs"
+                          : "border-[var(--border-c)] bg-[var(--bg-void)] text-[var(--text-sub)] hover:border-zinc-500"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between font-bold text-xs">
+                        <span className="flex items-center gap-1.5"><Zap className="w-4 h-4 text-purple-400" /> Custom OpenAI Gateway</span>
+                        {s.aiProvider === "custom" && <Check className="w-4 h-4 text-purple-400" />}
+                      </div>
+                      <p className="text-[11px] opacity-80 mt-1">Groq, OpenRouter, LocalAI, LM Studio or custom endpoint.</p>
+                    </button>
                   </div>
-                  <div className="relative">
+                </div>
+
+                {/* Base URL (shown for Ollama & Custom) */}
+                {(s.aiProvider === "ollama" || s.aiProvider === "custom") && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-[var(--text)] uppercase tracking-wider block">
+                      AI Gateway Base URL
+                    </label>
                     <input
-                      type={showApiKey ? "text" : "password"}
-                      value={s.geminiApiKey || ""}
-                      onChange={(e) => patch({ geminiApiKey: e.target.value })}
-                      placeholder="AIzaSy... (Leave empty to use default environment key)"
-                      className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl pl-3 pr-20 py-2.5 text-xs text-[var(--text)] font-mono focus:border-amber-500 focus:outline-none"
+                      type="text"
+                      value={s.aiBaseUrl || (s.aiProvider === "ollama" ? "http://localhost:11434/v1" : "https://api.groq.com/openai/v1")}
+                      onChange={(e) => patch({ aiBaseUrl: e.target.value })}
+                      placeholder="http://localhost:11434/v1 or https://api.groq.com/openai/v1"
+                      className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2.5 text-xs text-[var(--text)] font-mono focus:border-amber-500 focus:outline-none"
                     />
-                    <div className="absolute right-2 top-2 flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="p-1 text-[var(--text-sub)] hover:text-white transition-colors cursor-pointer"
-                        title={showApiKey ? "Hide Key" : "Show Key"}
-                      >
-                        {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                      {s.geminiApiKey && (
+                    <p className="text-[11px] text-[var(--text-sub)]">
+                      {s.aiProvider === "ollama" 
+                        ? "Ensure local Ollama service is running locally on CPU (`ollama serve`). REST endpoint defaults to `http://localhost:11434/v1`." 
+                        : "Enter the base URL for your OpenAI-compatible API endpoint (e.g. Groq, OpenRouter, vLLM)."}
+                    </p>
+                  </div>
+                )}
+
+                {/* API Key Field */}
+                {(s.aiProvider || "gemini") !== "ollama" && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-[var(--text)] uppercase tracking-wider flex items-center gap-1.5">
+                        <Key className="w-3.5 h-3.5 text-amber-400" /> API Key ({s.aiProvider || "gemini"})
+                      </label>
+                      <span className="text-[10px] text-[var(--text-sub)] font-mono">
+                        {(s.aiApiKey || s.geminiApiKey) ? "Custom Key Configured" : "No Key Entered"}
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showApiKey ? "text" : "password"}
+                        value={(s.aiProvider === "gemini" ? (s.geminiApiKey || s.aiApiKey) : s.aiApiKey) || ""}
+                        onChange={(e) => {
+                          patch({ aiApiKey: e.target.value, geminiApiKey: s.aiProvider === "gemini" ? e.target.value : s.geminiApiKey });
+                        }}
+                        placeholder={s.aiProvider === "gemini" ? "AIzaSy... (Gemini API Key)" : "sk-... (OpenAI or Gateway Key)"}
+                        className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl pl-3 pr-20 py-2.5 text-xs text-[var(--text)] font-mono focus:border-amber-500 focus:outline-none"
+                      />
+                      <div className="absolute right-2 top-2 flex items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => {
-                            patch({ geminiApiKey: "" });
-                            toast.info("Gemini API key cleared. Reverted to environment key.");
-                          }}
-                          className="px-2 py-0.5 text-[10px] bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded transition-all cursor-pointer font-sans"
+                          onClick={() => setShowApiKey(!showApiKey)}
+                          className="p-1 text-[var(--text-sub)] hover:text-white transition-colors cursor-pointer"
+                          title={showApiKey ? "Hide Key" : "Show Key"}
                         >
-                          Clear
+                          {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
-                      )}
+                      </div>
                     </div>
                   </div>
-                  <p className="text-[11px] text-[var(--text-sub)]">
-                    Enter your custom Google Gemini API key to override the server's default configuration. You can obtain a key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-amber-400 underline">aistudio.google.com</a>.
-                  </p>
+                )}
+
+                {/* Model Name Input & Presets */}
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-[var(--text)] uppercase tracking-wider block">
+                    AI Model Identifier
+                  </label>
+                  <input
+                    type="text"
+                    value={s.aiModel || (s.aiProvider === "ollama" ? "llama3.2:1b" : "gemini-2.5-flash")}
+                    onChange={(e) => patch({ aiModel: e.target.value })}
+                    placeholder="gemini-2.5-flash, qwen2.5:0.5b, llama3.2:1b, gpt-4o-mini..."
+                    className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2.5 text-xs text-[var(--text)] font-mono focus:border-amber-500 focus:outline-none"
+                  />
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    <span className="text-[11px] text-[var(--text-sub)] self-center mr-1">Presets:</span>
+                    {(s.aiProvider === "ollama" ? ["qwen2.5:0.5b", "llama3.2:1b", "phi3:mini"] :
+                      s.aiProvider === "openai" ? ["gpt-4o-mini", "gpt-4o"] :
+                      s.aiProvider === "custom" ? ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"] :
+                      ["gemini-2.5-flash", "gemini-2.5-pro"]).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => patch({ aiModel: m })}
+                        className="text-[10px] bg-[var(--bg-void)] hover:bg-amber-500/20 text-[var(--text-sub)] hover:text-amber-400 border border-[var(--border-c)] px-2 py-0.5 rounded transition-all font-mono cursor-pointer"
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </section>
 
