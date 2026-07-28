@@ -37,8 +37,16 @@ import { Route as DevicesRouteImport } from './routes/devices'
 import { Route as DefenderRouteImport } from './routes/defender'
 import { Route as CertificatesRouteImport } from './routes/certificates'
 import { Route as AppsRouteImport } from './routes/apps'
+import { Route as HealthRouteImport } from './routes/health'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PluginIdRouteImport } from './routes/plugin.$id'
+
+const HealthRoute = HealthRouteImport.update({
+  id: '/health',
+  path: '/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+
 
 const VswitchesRoute = VswitchesRouteImport.update({
   id: '/vswitches',
@@ -638,6 +646,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppsRoute: AppsRoute,
+  HealthRoute: HealthRoute,
   CertificatesRoute: CertificatesRoute,
   DefenderRoute: DefenderRoute,
   DevicesRoute: DevicesRoute,

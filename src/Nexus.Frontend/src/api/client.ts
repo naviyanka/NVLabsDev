@@ -2202,3 +2202,55 @@ export async function testNotificationClient(type: string = "Info"): Promise<boo
     return false;
   }
 }
+
+// System Health API Client
+export interface SubsystemHealth {
+  name: string;
+  type: string;
+  status: "Healthy" | "Degraded" | "Unhealthy";
+  pingMs: number;
+  details: string;
+}
+
+export interface ApiModuleHealth {
+  name: string;
+  route: string;
+  category: string;
+  status: string;
+  latencyMs: number;
+  description: string;
+}
+
+export interface SystemHealthData {
+  status: "Healthy" | "Degraded" | "Unhealthy";
+  timestamp: string;
+  uptimeSeconds: number;
+  totalPingMs: number;
+  version: string;
+  memory: {
+    allocatedMB: number;
+    workingSetMB: number;
+    gcTotalMB: number;
+  };
+  system: {
+    os: string;
+    machineName: string;
+    processorCount: number;
+    is64BitOS: boolean;
+  };
+  subsystems: SubsystemHealth[];
+  apiModules: ApiModuleHealth[];
+}
+
+export async function getHealthClient(detailed: boolean = true): Promise<SystemHealthData | null> {
+  try {
+    const res = await fetch(getApiUrl(`/health?detailed=${detailed}`));
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (e) {
+    console.error("Failed to fetch health data", e);
+  }
+  return null;
+}
+

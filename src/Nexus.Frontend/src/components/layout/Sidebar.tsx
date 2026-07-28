@@ -27,6 +27,7 @@ const CORE_ITEMS: Item[] = [
 ];
 
 const SYSTEM_ITEMS: Item[] = [
+  { to: "/health", label: "API Health", icon: Activity },
   { to: "/plugins", label: "Plugins", icon: Puzzle },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
