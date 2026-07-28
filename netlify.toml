@@ -1,3 +1,7 @@
+# Netlify configuration for frontend-only preview deployments.
+# This file configures automated builds of the React frontend (src/Nexus.Frontend) for
+# Netlify deploy previews. It is NOT related to the .NET backend deployment.
+
 [build]
   base = "src/Nexus.Frontend"
   command = "npm install && npm run build"

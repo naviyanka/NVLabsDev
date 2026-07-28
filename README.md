@@ -2,7 +2,7 @@
 
 NEXUS is a modern, web-based Windows Server and Active Directory administration panel designed to replace legacy tools. Built with a lightning-fast React frontend and a robust .NET 8 backend, it provides real-time monitoring, process management, and domain administration through a sleek, highly customizable interface.
 
-![Nexus Dashboard](https://via.placeholder.com/1200x600?text=Nexus+Dashboard) *(Replace with actual screenshot)*
+> *Screenshots coming soon.*
 
 ## ✨ Features & Capabilities
 
@@ -95,18 +95,10 @@ Deploying NEXUS to your own server for domain management is simple.
 2. Build the frontend: `npm run build`
 3. Serve the frontend statically, or use the built-in .NET host. 
 
-### Option 2: Using the Installer (Recommended)
-NEXUS comes with a custom installer built to handle port configurations, SSL certificates, and Windows Service registration.
-
-1. Open `src/Nexus.Installer` in Visual Studio.
-2. Compile the installer project.
-3. Run `Nexus.Installer.exe` on your target Windows Server.
-4. The installer will prompt you to:
-   - Select the URL / FQDN to bind the application to.
-   - Choose an existing SSL certificate or generate a self-signed cert.
-   - Install NEXUS as a background Windows Service.
-
-Once installed, simply browse to your configured URL (e.g., `https://nexus.yourdomain.local`).
+### Option 2: Windows Service Installer (Planned)
+A graphical installer for automated Windows Service registration, SSL binding, and port
+configuration is planned for a future release. See the Packaging/ directory for current
+Inno Setup scripts.
 
 ---
 
