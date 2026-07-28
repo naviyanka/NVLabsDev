@@ -2,7 +2,7 @@
   "id": "FEAT-004",
   "type": "feat",
   "description": "Storage Replica and SharePoint Setup backend controller completion. The Storage Replica endpoint in VmsController currently returns an empty list. The SharePoint Setup controller already has a working execute endpoint but no status/progress reporting. Implement proper backend logic for both.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Create src/Nexus.Gateway/Controllers/StorageReplicaController.cs - a dedicated controller at route 'api/servers/{serverId}/storage-replica' with full CRUD: GET (list partnerships via PowerShell Get-SRPartnership), POST (create via New-SRPartnership), PUT {id} (update settings via Set-SRPartnership), DELETE {id} (remove via Remove-SRPartnership), POST {id}/swap (Set-SRPartnership -NewSourceComputerName), POST {id}/failover (Mount-SRDestination), POST {id}/toggle-pause (Suspend-SRPartnership or Resume-SRPartnership), POST {id}/resync (Sync-SRGroup). Each action uses IPowerShellExecutionService. Return the ReplicaPartnership model.",
     "Create src/Nexus.Gateway/Models/StorageReplicaModels.cs with ReplicaPartnershipDto matching the frontend's ReplicaPartnership interface (id, sourceServer, destServer, sourceVol, destVol, sourceLogVol, destLogVol, mode, status, progress, bytes, latencyMs, transferRateMbps, name, replicationGroup, logSizeGb, encryption, autoFailover)",
@@ -22,5 +22,5 @@
     "cd src/Nexus.Frontend && bun install && bun run build"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All acceptance criteria met. StorageReplicaController created with 8 endpoints (GET, POST, PUT, DELETE, swap, failover, toggle-pause, resync). StorageReplicaModels.cs has full DTO. VmsController stub removed. SharePointSetupController has status and logs endpoints. Frontend ReplicaPartnership interface updated with all fields used by storage-replica.tsx. Frontend builds cleanly with bun run build."
 }
