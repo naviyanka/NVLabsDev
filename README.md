@@ -117,6 +117,8 @@ NEXUS is designed to be highly modular.
 - **Adding a new frontend route**: Check out `src/Nexus.Frontend/src/routes`. We use TanStack Router for file-based routing.
 - **Modifying backend logic**: Look into `src/Nexus.Gateway/Controllers` for API endpoints and `src/Nexus.Gateway/Services` for core business logic.
 - **Adding PowerShell Scripts**: The backend uses `IPowerShellExecutionService` to run scripts safely. You can add new PS scripts in the backend services and expose them via API.
+- **API & Architecture Documentation**: Read the full [API & Frontend Integration Guide](file:///c:/Users/OrgAdmin/Documents/NVLabs/API_INTEGRATION_GUIDE.md) for endpoint matrices and visual sequence diagrams.
 
 ## 📝 License
 MIT License
+
