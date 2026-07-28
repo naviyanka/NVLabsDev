@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Plugin System SDK, Lifecycle Hooks, Capability Descriptors, and Sandboxing. Extend PluginEntity model with lifecycle hooks (onInstall, onActivate, onDeactivate, onUninstall), capability descriptors (requiredPermissions, supportedPlatforms, minVersion), and a sandboxing/permission model. Create a Plugin SDK specification document. Add backend validation of plugin permissions. Update frontend plugin pages to show SDK info and permissions.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Extend src/Nexus.Gateway/Models/PluginEntity.cs with new fields: Version, MinGatewayVersion, RequiredCapabilities (JSON string list like 'filesystem', 'network', 'registry', 'activedirectory'), SandboxLevel ('full', 'restricted', 'minimal'), LifecycleHooks (JSON object with OnInstall, OnActivate, OnDeactivate, OnUninstall script content), DependsOn (comma-separated plugin IDs), ApiVersion string",
     "Create src/Nexus.Gateway/Models/PluginManifest.cs with a PluginManifest class that defines the SDK contract: Id, Name, Description, Version, Author, ApiVersion, Capabilities (list of PluginCapability enum), Permissions (list of PluginPermission objects with Resource, Actions, Justification), LifecycleHooks (dictionary of hook name to script), EntryPoint, SandboxPolicy (enum: Unrestricted, Standard, Strict)",
@@ -24,5 +24,5 @@
     "cd src/Nexus.Frontend && bun install && bun run build"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Frontend build passes successfully. Backend cannot be compiled (net8.0-windows on Linux), validated via code review. The INVALID_ANNOTATION warnings from @microsoft/signalr are pre-existing and do not affect the build."
 }
