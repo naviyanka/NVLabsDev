@@ -130,6 +130,30 @@ export function HorizonSettings() {
   const [pingResults, setPingResults] = useState<Record<string, BackendPingResult>>({});
   const [isPinging, setIsPinging] = useState<Record<string, boolean>>({});
 
+  const [discoveringModels, setDiscoveringModels] = useState(false);
+  const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
+
+  const handleDiscoverModels = async () => {
+    setDiscoveringModels(true);
+    toast.info("Connecting to AI Gateway to discover available models...");
+    try {
+      const targetUrl = s.aiBaseUrl || (s.aiProvider === "ollama" ? "http://localhost:11434/v1" : "https://api.groq.com/openai/v1");
+      const key = s.aiApiKey || s.geminiApiKey || "";
+      const res = await fetch(getApiUrl(`/ollama/discover-models?baseUrl=${encodeURIComponent(targetUrl)}&apiKey=${encodeURIComponent(key)}`));
+      const data = await res.json();
+      if (data.success && Array.isArray(data.models) && data.models.length > 0) {
+        setDiscoveredModels(data.models);
+        toast.success(`Discovered ${data.models.length} model(s) from gateway!`);
+      } else {
+        toast.error(`Model discovery: ${data.message || "No models returned by gateway"}`);
+      }
+    } catch (e: any) {
+      toast.error(`Failed to query gateway models: ${e.message}`);
+    } finally {
+      setDiscoveringModels(false);
+    }
+  };
+
   useEffect(() => {
     setBackendHostsState(getBackendHosts());
     setGlobalBackendEnabled(isBackendEnabledGlobally());
@@ -927,9 +951,23 @@ export function HorizonSettings() {
 
                 {/* Model Name Input & Presets */}
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-[var(--text)] uppercase tracking-wider block">
-                    AI Model Identifier
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-[var(--text)] uppercase tracking-wider block">
+                      AI Model Identifier
+                    </label>
+                    {(s.aiProvider === "custom" || s.aiProvider === "ollama" || s.aiProvider === "openai") && (
+                      <button
+                        type="button"
+                        onClick={handleDiscoverModels}
+                        disabled={discoveringModels}
+                        className="text-[11px] text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${discoveringModels ? "animate-spin" : ""}`} />
+                        Discover Models
+                      </button>
+                    )}
+                  </div>
+
                   <input
                     type="text"
                     value={s.aiModel || (s.aiProvider === "ollama" ? "llama3.2:1b" : "gemini-2.5-flash")}
@@ -937,6 +975,32 @@ export function HorizonSettings() {
                     placeholder="gemini-2.5-flash, qwen2.5:0.5b, llama3.2:1b, gpt-4o-mini..."
                     className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2.5 text-xs text-[var(--text)] font-mono focus:border-amber-500 focus:outline-none"
                   />
+
+                  {/* Discovered Models Badges */}
+                  {discoveredModels.length > 0 && (
+                    <div className="p-3 bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl space-y-1.5">
+                      <span className="text-[11px] font-bold text-[var(--text)] flex items-center gap-1">
+                        <Sparkles className="w-3.5 h-3.5 text-cyan-500" /> Discovered Gateway Models ({discoveredModels.length}):
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
+                        {discoveredModels.map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => patch({ aiModel: m })}
+                            className={`text-[10px] px-2.5 py-1 rounded-lg font-mono border cursor-pointer transition-all ${
+                              s.aiModel === m
+                                ? "bg-cyan-500 text-white font-bold border-cyan-400 shadow-xs"
+                                : "bg-[var(--bg-surface)] hover:bg-cyan-500/15 text-[var(--text-sub)] hover:text-cyan-400 border-[var(--border-c)]"
+                            }`}
+                          >
+                            {m}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex flex-wrap gap-1.5 pt-1">
                     <span className="text-[11px] text-[var(--text-sub)] self-center mr-1">Presets:</span>
                     {(s.aiProvider === "ollama" ? ["qwen2.5:0.5b", "llama3.2:1b", "phi3:mini"] :

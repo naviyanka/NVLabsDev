@@ -160,6 +160,81 @@ public class OllamaController : ControllerBase
         }
     }
 
+    [HttpGet("discover-models")]
+    public async Task<IActionResult> DiscoverModels([FromQuery] string? baseUrl = null, [FromQuery] string? apiKey = null)
+    {
+        var models = new List<string>();
+        string targetUrl = string.IsNullOrWhiteSpace(baseUrl) ? "http://localhost:11434/v1" : baseUrl.Trim().TrimEnd('/');
+        
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(8);
+
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey.Trim());
+            }
+
+            // 1. Try standard OpenAI /v1/models endpoint
+            var modelsUrl = targetUrl.EndsWith("/models", StringComparison.OrdinalIgnoreCase) ? targetUrl : $"{targetUrl}/models";
+            var response = await client.GetAsync(modelsUrl);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+                if (json.TryGetProperty("data", out var dataArr) && dataArr.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in dataArr.EnumerateArray())
+                    {
+                        if (item.TryGetProperty("id", out var idProp))
+                        {
+                            var idStr = idProp.GetString();
+                            if (!string.IsNullOrWhiteSpace(idStr)) models.Add(idStr);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // 2. Try Ollama native /api/tags if /v1/models didn't work
+                var rawBase = targetUrl.Replace("/v1", "");
+                var tagsUrl = $"{rawBase}/api/tags";
+                var tagsRes = await client.GetAsync(tagsUrl);
+                if (tagsRes.IsSuccessStatusCode)
+                {
+                    var json = await tagsRes.Content.ReadFromJsonAsync<JsonElement>();
+                    if (json.TryGetProperty("models", out var modelsArr) && modelsArr.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var item in modelsArr.EnumerateArray())
+                        {
+                            if (item.TryGetProperty("name", out var nameProp))
+                            {
+                                var nameStr = nameProp.GetString();
+                                if (!string.IsNullOrWhiteSpace(nameStr)) models.Add(nameStr);
+                            }
+                        }
+                    }
+                }
+            }
+
+            return Ok(new {
+                success = true,
+                count = models.Count,
+                models = models.Distinct().ToList()
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to discover models from {BaseUrl}", targetUrl);
+            return Ok(new {
+                success = false,
+                message = ex.Message,
+                models = new List<string>()
+            });
+        }
+    }
+
     [HttpGet("install-progress")]
     public IActionResult GetInstallProgress()
     {
