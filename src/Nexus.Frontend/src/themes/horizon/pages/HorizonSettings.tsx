@@ -807,15 +807,15 @@ export function HorizonSettings() {
                       onClick={() => patch({ aiProvider: "gemini", aiModel: "gemini-2.5-flash" })}
                       className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                         (s.aiProvider || "gemini") === "gemini"
-                          ? "border-amber-500 bg-amber-500/10 text-white shadow-xs"
-                          : "border-[var(--border-c)] bg-[var(--bg-void)] text-[var(--text-sub)] hover:border-zinc-500"
+                          ? "border-amber-500 bg-amber-500/10 text-[var(--text)] shadow-xs ring-1 ring-amber-500/40"
+                          : "border-[var(--border-c)] bg-[var(--bg-surface)] text-[var(--text-sub)] hover:border-amber-500/40 hover:bg-[var(--bg-void)]"
                       }`}
                     >
                       <div className="flex items-center justify-between font-bold text-xs">
-                        <span className="flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-amber-400" /> Google Gemini</span>
-                        {(s.aiProvider || "gemini") === "gemini" && <Check className="w-4 h-4 text-amber-400" />}
+                        <span className="flex items-center gap-1.5 text-[var(--text)]"><Sparkles className="w-4 h-4 text-amber-500" /> Google Gemini</span>
+                        {(s.aiProvider || "gemini") === "gemini" && <Check className="w-4 h-4 text-amber-500" />}
                       </div>
-                      <p className="text-[11px] opacity-80 mt-1">Cloud AI Studio (gemini-2.5-flash, gemini-2.5-pro).</p>
+                      <p className="text-[11px] text-[var(--text-sub)] mt-1">Cloud AI Studio (gemini-2.5-flash, gemini-2.5-pro).</p>
                     </button>
 
                     <button
@@ -823,15 +823,15 @@ export function HorizonSettings() {
                       onClick={() => patch({ aiProvider: "ollama", aiBaseUrl: s.aiBaseUrl || "http://localhost:11434/v1", aiModel: s.aiModel && s.aiModel !== "gemini-2.5-flash" ? s.aiModel : "llama3.2:1b" })}
                       className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                         s.aiProvider === "ollama"
-                          ? "border-cyan-500 bg-cyan-500/10 text-white shadow-xs"
-                          : "border-[var(--border-c)] bg-[var(--bg-void)] text-[var(--text-sub)] hover:border-zinc-500"
+                          ? "border-cyan-500 bg-cyan-500/10 text-[var(--text)] shadow-xs ring-1 ring-cyan-500/40"
+                          : "border-[var(--border-c)] bg-[var(--bg-surface)] text-[var(--text-sub)] hover:border-cyan-500/40 hover:bg-[var(--bg-void)]"
                       }`}
                     >
                       <div className="flex items-center justify-between font-bold text-xs">
-                        <span className="flex items-center gap-1.5"><Cpu className="w-4 h-4 text-cyan-400" /> Ollama (CPU Self-Hosted)</span>
-                        {s.aiProvider === "ollama" && <Check className="w-4 h-4 text-cyan-400" />}
+                        <span className="flex items-center gap-1.5 text-[var(--text)]"><Cpu className="w-4 h-4 text-cyan-500" /> Ollama (CPU Self-Hosted)</span>
+                        {s.aiProvider === "ollama" && <Check className="w-4 h-4 text-cyan-500" />}
                       </div>
-                      <p className="text-[11px] opacity-80 mt-1">100% Local CPU, No-GPU required, Air-Gapped (qwen2.5:0.5b, llama3.2:1b).</p>
+                      <p className="text-[11px] text-[var(--text-sub)] mt-1">100% Local CPU, No-GPU required, Air-Gapped (qwen2.5:0.5b, llama3.2:1b).</p>
                     </button>
 
                     <button
@@ -839,15 +839,15 @@ export function HorizonSettings() {
                       onClick={() => patch({ aiProvider: "openai", aiModel: "gpt-4o-mini" })}
                       className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                         s.aiProvider === "openai"
-                          ? "border-emerald-500 bg-emerald-500/10 text-white shadow-xs"
-                          : "border-[var(--border-c)] bg-[var(--bg-void)] text-[var(--text-sub)] hover:border-zinc-500"
+                          ? "border-emerald-500 bg-emerald-500/10 text-[var(--text)] shadow-xs ring-1 ring-emerald-500/40"
+                          : "border-[var(--border-c)] bg-[var(--bg-surface)] text-[var(--text-sub)] hover:border-emerald-500/40 hover:bg-[var(--bg-void)]"
                       }`}
                     >
                       <div className="flex items-center justify-between font-bold text-xs">
-                        <span className="flex items-center gap-1.5"><Globe className="w-4 h-4 text-emerald-400" /> OpenAI Official</span>
-                        {s.aiProvider === "openai" && <Check className="w-4 h-4 text-emerald-400" />}
+                        <span className="flex items-center gap-1.5 text-[var(--text)]"><Globe className="w-4 h-4 text-emerald-500" /> OpenAI Official</span>
+                        {s.aiProvider === "openai" && <Check className="w-4 h-4 text-emerald-500" />}
                       </div>
-                      <p className="text-[11px] opacity-80 mt-1">Official OpenAI endpoint (gpt-4o-mini, gpt-4o).</p>
+                      <p className="text-[11px] text-[var(--text-sub)] mt-1">Official OpenAI endpoint (gpt-4o-mini, gpt-4o).</p>
                     </button>
 
                     <button
@@ -855,15 +855,15 @@ export function HorizonSettings() {
                       onClick={() => patch({ aiProvider: "custom", aiBaseUrl: s.aiBaseUrl || "https://api.groq.com/openai/v1", aiModel: s.aiModel || "llama-3.3-70b-versatile" })}
                       className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                         s.aiProvider === "custom"
-                          ? "border-purple-500 bg-purple-500/10 text-white shadow-xs"
-                          : "border-[var(--border-c)] bg-[var(--bg-void)] text-[var(--text-sub)] hover:border-zinc-500"
+                          ? "border-purple-500 bg-purple-500/10 text-[var(--text)] shadow-xs ring-1 ring-purple-500/40"
+                          : "border-[var(--border-c)] bg-[var(--bg-surface)] text-[var(--text-sub)] hover:border-purple-500/40 hover:bg-[var(--bg-void)]"
                       }`}
                     >
                       <div className="flex items-center justify-between font-bold text-xs">
-                        <span className="flex items-center gap-1.5"><Zap className="w-4 h-4 text-purple-400" /> Custom OpenAI Gateway</span>
-                        {s.aiProvider === "custom" && <Check className="w-4 h-4 text-purple-400" />}
+                        <span className="flex items-center gap-1.5 text-[var(--text)]"><Zap className="w-4 h-4 text-purple-500" /> Custom OpenAI Gateway</span>
+                        {s.aiProvider === "custom" && <Check className="w-4 h-4 text-purple-500" />}
                       </div>
-                      <p className="text-[11px] opacity-80 mt-1">Groq, OpenRouter, LocalAI, LM Studio or custom endpoint.</p>
+                      <p className="text-[11px] text-[var(--text-sub)] mt-1">Groq, OpenRouter, LocalAI, LM Studio or custom endpoint.</p>
                     </button>
                   </div>
                 </div>
