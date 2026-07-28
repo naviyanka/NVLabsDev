@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Cpu, Download, Check, RefreshCw, Sparkles, HardDrive, ShieldCheck, Play, Trash2, XCircle, AlertCircle, Loader2 } from "lucide-react";
+import { Cpu, Download, Check, RefreshCw, Sparkles, HardDrive, ShieldCheck, Play, Trash2, XCircle, AlertCircle, Loader2, Server, ExternalLink, Plus } from "lucide-react";
 import { getApiUrl } from "@/lib/backend";
 import { getFrontendSettings, saveFrontendSettings } from "@/lib/frontendSettings";
 
@@ -8,7 +8,15 @@ interface OllamaStatus {
   isInstalled: boolean;
   isRunning: boolean;
   version: string;
+  serverIp: string;
   installedModels: string[];
+}
+
+interface ServerItem {
+  id: string;
+  name: string;
+  ip: string;
+  status: string;
 }
 
 interface InstallProgress {
@@ -68,11 +76,23 @@ const RECOMMENDED_MODELS: CuratedModel[] = [
   },
 ];
 
+const POPULAR_CUSTOM_PRESETS = [
+  { tag: "deepseek-r1:1.5b", label: "DeepSeek R1 (1.5B)", desc: "Reasoning Model" },
+  { tag: "qwen2.5-coder:1.5b", label: "Qwen 2.5 Coder (1.5B)", desc: "Code Generation" },
+  { tag: "nomic-embed-text", label: "Nomic Embed Text", desc: "Vector Embeddings" },
+  { tag: "mistral:7b-instruct-q4_K_M", label: "Mistral 7B (Quantized)", desc: "General Purpose" },
+  { tag: "codellama:7b", label: "CodeLlama 7B", desc: "PowerShell & Scripting" },
+];
+
 export const OllamaManager: React.FC = () => {
+  const [servers, setServers] = useState<ServerItem[]>([]);
+  const [selectedServerIp, setSelectedServerIp] = useState<string>("127.0.0.1");
+
   const [status, setStatus] = useState<OllamaStatus>({
     isInstalled: false,
     isRunning: false,
     version: "",
+    serverIp: "127.0.0.1",
     installedModels: [],
   });
   const [loadingStatus, setLoadingStatus] = useState(true);
@@ -80,6 +100,8 @@ export const OllamaManager: React.FC = () => {
   const [uninstalling, setUninstalling] = useState(false);
   const [pullingModel, setPullingModel] = useState<string | null>(null);
   const [deletingModel, setDeletingModel] = useState<string | null>(null);
+
+  const [customModelInput, setCustomModelInput] = useState<string>("");
 
   const [installProgress, setInstallProgress] = useState<InstallProgress>({
     phase: "idle",
@@ -89,18 +111,28 @@ export const OllamaManager: React.FC = () => {
     message: "",
   });
 
+  // Fetch servers list
+  useEffect(() => {
+    fetch(getApiUrl("/servers"))
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setServers(data);
+      })
+      .catch(() => {});
+  }, []);
+
   const fetchStatus = async () => {
     setLoadingStatus(true);
     try {
-      const res = await fetch(getApiUrl("/ollama/status"));
+      const res = await fetch(getApiUrl(`/ollama/status?serverIp=${encodeURIComponent(selectedServerIp)}`));
       if (res.ok) {
         const data = await res.json();
         setStatus(data);
       } else {
-        setStatus({ isInstalled: false, isRunning: false, version: "", installedModels: [] });
+        setStatus({ isInstalled: false, isRunning: false, version: "", serverIp: selectedServerIp, installedModels: [] });
       }
     } catch {
-      setStatus({ isInstalled: false, isRunning: false, version: "", installedModels: [] });
+      setStatus({ isInstalled: false, isRunning: false, version: "", serverIp: selectedServerIp, installedModels: [] });
     } finally {
       setLoadingStatus(false);
     }
@@ -108,7 +140,7 @@ export const OllamaManager: React.FC = () => {
 
   useEffect(() => {
     fetchStatus();
-  }, []);
+  }, [selectedServerIp]);
 
   // Poll install progress while installing
   useEffect(() => {
@@ -122,7 +154,7 @@ export const OllamaManager: React.FC = () => {
             setInstallProgress(data);
             if (data.phase === "completed") {
               setInstalling(false);
-              toast.success("Ollama installation completed successfully!");
+              toast.success(`Ollama setup completed on target ${selectedServerIp}!`);
               fetchStatus();
             } else if (data.phase === "failed") {
               setInstalling(false);
@@ -135,7 +167,7 @@ export const OllamaManager: React.FC = () => {
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [installing, installProgress.phase]);
+  }, [installing, installProgress.phase, selectedServerIp]);
 
   const handleInstallOllama = async () => {
     setInstalling(true);
@@ -144,11 +176,11 @@ export const OllamaManager: React.FC = () => {
       percent: 5,
       bytesDownloaded: 0,
       totalBytes: 0,
-      message: "Initiating setup process...",
+      message: `Initiating setup process on ${selectedServerIp}...`,
     });
-    toast.info("Starting One-Click Ollama Setup...");
+    toast.info(`Starting One-Click Ollama Setup on ${selectedServerIp}...`);
     try {
-      const res = await fetch(getApiUrl("/ollama/install"), { method: "POST" });
+      const res = await fetch(getApiUrl(`/ollama/install?serverIp=${encodeURIComponent(selectedServerIp)}`), { method: "POST" });
       const data = await res.json();
       if (!data.success) {
         toast.error(`Setup start error: ${data.message}`);
@@ -161,18 +193,20 @@ export const OllamaManager: React.FC = () => {
   };
 
   const handleUninstallOllama = async () => {
-    if (!window.confirm("Are you sure you want to completely uninstall Ollama and remove local CPU service?")) {
+    if (!window.confirm(`Are you sure you want to completely uninstall Ollama on server ${selectedServerIp}?`)) {
       return;
     }
     setUninstalling(true);
-    toast.info("Initiating Ollama Removal & Cleanup sequence...");
+    toast.info(`Initiating Ollama Removal & Cleanup sequence on ${selectedServerIp}...`);
     try {
-      const res = await fetch(getApiUrl("/ollama/uninstall"), { method: "POST" });
+      const res = await fetch(getApiUrl(`/ollama/uninstall?serverIp=${encodeURIComponent(selectedServerIp)}`), { method: "POST" });
       const data = await res.json();
       if (data.success) {
-        toast.success("Ollama uninstalled from system. AI provider reset to Gemini.");
-        const settings = getFrontendSettings();
-        saveFrontendSettings({ ...settings, aiProvider: "gemini", aiModel: "gemini-2.5-flash" });
+        toast.success(`Ollama uninstalled from ${selectedServerIp}.`);
+        if (selectedServerIp === "127.0.0.1") {
+          const settings = getFrontendSettings();
+          saveFrontendSettings({ ...settings, aiProvider: "gemini", aiModel: "gemini-2.5-flash" });
+        }
         setInstallProgress({ phase: "idle", percent: 0, bytesDownloaded: 0, totalBytes: 0, message: "" });
         setTimeout(fetchStatus, 3000);
       } else {
@@ -186,30 +220,36 @@ export const OllamaManager: React.FC = () => {
   };
 
   const handlePullModel = async (modelName: string) => {
-    setPullingModel(modelName);
-    toast.info(`Pulling lightweight CPU model '${modelName}'... Please wait.`);
+    const targetModel = modelName.trim();
+    if (!targetModel) {
+      toast.error("Please enter a valid model tag.");
+      return;
+    }
+    setPullingModel(targetModel);
+    toast.info(`Pulling model '${targetModel}' on target server ${selectedServerIp}... Please wait.`);
     try {
-      const res = await fetch(getApiUrl("/ollama/pull"), {
+      const res = await fetch(getApiUrl(`/ollama/pull?serverIp=${encodeURIComponent(selectedServerIp)}`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: modelName }),
+        body: JSON.stringify({ model: targetModel }),
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(`Model '${modelName}' downloaded successfully!`);
+        toast.success(`Model '${targetModel}' pulled successfully!`);
         
+        // Auto-configure Ollama as active AI provider in settings
         const settings = getFrontendSettings();
         saveFrontendSettings({
           ...settings,
           aiProvider: "ollama",
-          aiBaseUrl: settings.aiBaseUrl || "http://localhost:11434/v1",
-          aiModel: modelName,
+          aiBaseUrl: selectedServerIp === "127.0.0.1" ? "http://localhost:11434/v1" : `http://${selectedServerIp}:11434/v1`,
+          aiModel: targetModel,
         });
-        toast.success(`NEXUS Copilot configured to run locally using '${modelName}'!`);
-        
+        toast.success(`NEXUS Copilot configured to run locally using '${targetModel}'!`);
+        setCustomModelInput("");
         fetchStatus();
       } else {
-        toast.error(`Failed to pull model: ${data.message || "Pull command failed"}`);
+        toast.error(`Failed to pull model '${targetModel}': ${data.message || "Pull command error"}`);
       }
     } catch (e: any) {
       toast.error(`Error pulling model: ${e.message}`);
@@ -221,7 +261,7 @@ export const OllamaManager: React.FC = () => {
   const handleDeleteModel = async (modelName: string) => {
     setDeletingModel(modelName);
     try {
-      const res = await fetch(getApiUrl(`/ollama/model?model=${encodeURIComponent(modelName)}`), {
+      const res = await fetch(getApiUrl(`/ollama/model?model=${encodeURIComponent(modelName)}&serverIp=${encodeURIComponent(selectedServerIp)}`), {
         method: "DELETE",
       });
       const data = await res.json();
@@ -243,18 +283,37 @@ export const OllamaManager: React.FC = () => {
 
   return (
     <div className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 space-y-6 shadow-sm">
-      {/* Header & Status */}
+      {/* Header & Target Server Selector */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--border-c)] pb-5">
         <div>
           <h3 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
             <Cpu className="w-5 h-5 text-cyan-500" /> One-Click Local CPU AI Setup (Ollama)
           </h3>
           <p className="text-xs text-[var(--text-sub)] mt-1">
-            Run lightweight LLMs completely on your CPU. No GPU required, 100% free, private, and air-gapped.
+            Run lightweight LLMs completely on CPU. No GPU required, 100% free, private, and air-gapped.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Target Server Selector Dropdown */}
+          <div className="flex items-center gap-1.5 bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-2.5 py-1.5">
+            <Server className="w-4 h-4 text-cyan-500" />
+            <select
+              value={selectedServerIp}
+              onChange={(e) => setSelectedServerIp(e.target.value)}
+              className="bg-transparent text-xs text-[var(--text)] font-semibold focus:outline-none cursor-pointer"
+            >
+              <option value="127.0.0.1">Local Gateway (127.0.0.1)</option>
+              {servers
+                .filter((s) => s.ip !== "127.0.0.1" && s.ip !== "localhost")
+                .map((s) => (
+                  <option key={s.id} value={s.ip}>
+                    {s.name} ({s.ip})
+                  </option>
+                ))}
+            </select>
+          </div>
+
           <button
             onClick={fetchStatus}
             disabled={loadingStatus}
@@ -292,7 +351,7 @@ export const OllamaManager: React.FC = () => {
                 title="Remove Ollama Setup & Service"
               >
                 {uninstalling ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                Uninstall Ollama
+                Uninstall
               </button>
             </>
           )}
@@ -362,7 +421,7 @@ export const OllamaManager: React.FC = () => {
         <div className="p-4 bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl space-y-2">
           <div className="flex items-center justify-between text-xs font-bold text-[var(--text)]">
             <span className="flex items-center gap-1.5">
-              <HardDrive className="w-4 h-4 text-cyan-500" /> Installed Local Models ({status.installedModels.length})
+              <HardDrive className="w-4 h-4 text-cyan-500" /> Installed Models on {selectedServerIp} ({status.installedModels.length})
             </span>
             <span className="font-mono text-[11px] text-[var(--text-sub)]">{status.version}</span>
           </div>
@@ -391,10 +450,74 @@ export const OllamaManager: React.FC = () => {
               ))}
             </div>
           ) : (
-            <p className="text-xs text-[var(--text-sub)]">No models pulled yet. Select a lightweight model below to download with one click.</p>
+            <p className="text-xs text-[var(--text-sub)]">No models pulled yet. Select a model below or enter a custom tag to download.</p>
           )}
         </div>
       )}
+
+      {/* CUSTOM MODEL INPUT FIELD */}
+      <div className="p-4 bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-bold text-[var(--text)] uppercase tracking-wider flex items-center gap-1.5">
+            <Plus className="w-4 h-4 text-cyan-500" /> Pull Custom Ollama Model
+          </label>
+          <a
+            href="https://ollama.com/library"
+            target="_blank"
+            rel="noreferrer"
+            className="text-[11px] text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1 font-medium"
+          >
+            Browse Ollama Library <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handlePullModel(customModelInput);
+          }}
+          className="flex items-center gap-2"
+        >
+          <input
+            type="text"
+            value={customModelInput}
+            onChange={(e) => setCustomModelInput(e.target.value)}
+            placeholder="Enter any model tag (e.g. deepseek-r1:1.5b, mistral, nomic-embed-text, codellama)..."
+            className="flex-1 bg-[var(--bg-surface)] border border-[var(--border-c)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--text)] font-mono placeholder-[var(--text-sub)] focus:border-cyan-500 focus:outline-none"
+          />
+          <button
+            type="submit"
+            disabled={!customModelInput.trim() || pullingModel === customModelInput}
+            className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-600 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 shadow-md cursor-pointer shrink-0"
+          >
+            {pullingModel === customModelInput ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Pulling...
+              </>
+            ) : (
+              <>
+                <Download className="w-3.5 h-3.5" /> Pull Model
+              </>
+            )}
+          </button>
+        </form>
+
+        {/* Popular Presets Pills */}
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          <span className="text-[11px] text-[var(--text-sub)] self-center mr-1">Popular Presets:</span>
+          {POPULAR_CUSTOM_PRESETS.map((p) => (
+            <button
+              key={p.tag}
+              type="button"
+              onClick={() => handlePullModel(p.tag)}
+              disabled={pullingModel === p.tag}
+              className="text-[10px] bg-[var(--bg-surface)] hover:bg-cyan-500/15 text-[var(--text-sub)] hover:text-cyan-600 dark:hover:text-cyan-400 border border-[var(--border-c)] px-2.5 py-1 rounded-lg transition-all font-mono cursor-pointer flex items-center gap-1"
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Curated Models Grid */}
       <div className="space-y-3">
