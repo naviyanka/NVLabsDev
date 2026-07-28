@@ -14,12 +14,14 @@ public class PluginsController : ControllerBase
 {
     private readonly NexusContext _db;
     private readonly PluginBackgroundJobManager _jobManager;
+    private readonly PluginSandboxService _sandboxService;
     private readonly ILogger<PluginsController> _logger;
 
-    public PluginsController(NexusContext db, PluginBackgroundJobManager jobManager, ILogger<PluginsController> logger)
+    public PluginsController(NexusContext db, PluginBackgroundJobManager jobManager, PluginSandboxService sandboxService, ILogger<PluginsController> logger)
     {
         _db = db;
         _jobManager = jobManager;
+        _sandboxService = sandboxService;
         _logger = logger;
     }
 
@@ -103,23 +105,6 @@ public class PluginsController : ControllerBase
         return NoContent();
     }
 
-    [HttpPost("{id}/run")]
-    [Authorize(Roles = "Administrators,Domain Admins")]
-    public async Task<IActionResult> Run(string id, [FromQuery] string[] serverIps)
-    {
-        if (serverIps == null || serverIps.Length == 0) return BadRequest("No servers specified");
-
-        var plugin = await _db.Plugins.FindAsync(id);
-        if (plugin == null) return NotFound();
-
-        foreach (var ip in serverIps)
-        {
-            _jobManager.StartJob(id, ip, plugin.ScriptType, plugin.ScriptContent);
-        }
-
-        return Ok(new { started = true });
-    }
-
     [HttpGet("{id}/jobs")]
     public IActionResult GetJobs(string id)
     {
@@ -154,5 +139,73 @@ public class PluginsController : ControllerBase
     {
         _jobManager.RetryJob(id, serverIp);
         return Ok(new { retried = true });
+    }
+
+    /// <summary>
+    /// Returns the full SDK manifest for a plugin, including capabilities, permissions,
+    /// lifecycle hooks, and sandbox policy.
+    /// </summary>
+    [HttpGet("{id}/manifest")]
+    public async Task<IActionResult> GetManifest(string id)
+    {
+        var plugin = await _db.Plugins.FindAsync(id);
+        if (plugin == null) return NotFound();
+
+        var manifest = _sandboxService.BuildManifest(plugin);
+        return Ok(manifest);
+    }
+
+    /// <summary>
+    /// Validates a plugin's script content against its declared capabilities and sandbox policy.
+    /// Returns validation result with any violations found.
+    /// </summary>
+    [HttpPost("{id}/validate")]
+    public async Task<IActionResult> ValidatePlugin(string id)
+    {
+        var plugin = await _db.Plugins.FindAsync(id);
+        if (plugin == null) return NotFound();
+
+        var result = _sandboxService.Validate(plugin);
+        return Ok(result);
+    }
+
+    [HttpPost("{id}/run")]
+    [Authorize(Roles = "Administrators,Domain Admins")]
+    public async Task<IActionResult> Run(string id, [FromQuery] string[] serverIps)
+    {
+        if (serverIps == null || serverIps.Length == 0) return BadRequest("No servers specified");
+
+        var plugin = await _db.Plugins.FindAsync(id);
+        if (plugin == null) return NotFound();
+
+        // Validate plugin against sandbox before execution
+        var validation = _sandboxService.Validate(plugin);
+        if (!validation.IsValid)
+        {
+            return BadRequest(new
+            {
+                error = "Plugin failed sandbox validation",
+                violations = validation.Violations
+            });
+        }
+
+        // Execute OnActivate lifecycle hook if defined
+        var manifest = _sandboxService.BuildManifest(plugin);
+        if (manifest.LifecycleHooks.TryGetValue("OnActivate", out var onActivateScript))
+        {
+            _logger.LogInformation("Executing OnActivate hook for plugin {PluginId}", id);
+            foreach (var ip in serverIps)
+            {
+                _jobManager.StartJob(id + "_hook_activate", ip, plugin.ScriptType, onActivateScript);
+            }
+        }
+
+        // Run the main plugin script
+        foreach (var ip in serverIps)
+        {
+            _jobManager.StartJob(id, ip, plugin.ScriptType, plugin.ScriptContent);
+        }
+
+        return Ok(new { started = true });
     }
 }
