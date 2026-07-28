@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Cpu, Download, Check, RefreshCw, Sparkles, HardDrive, ShieldCheck, Play, Trash2, XCircle } from "lucide-react";
+import { Cpu, Download, Check, RefreshCw, Sparkles, HardDrive, ShieldCheck, Play, Trash2, XCircle, AlertCircle, Loader2 } from "lucide-react";
 import { getApiUrl } from "@/lib/backend";
 import { getFrontendSettings, saveFrontendSettings } from "@/lib/frontendSettings";
 
@@ -9,6 +9,14 @@ interface OllamaStatus {
   isRunning: boolean;
   version: string;
   installedModels: string[];
+}
+
+interface InstallProgress {
+  phase: "idle" | "downloading" | "installing" | "completed" | "failed";
+  percent: number;
+  bytesDownloaded: number;
+  totalBytes: number;
+  message: string;
 }
 
 interface CuratedModel {
@@ -73,6 +81,14 @@ export const OllamaManager: React.FC = () => {
   const [pullingModel, setPullingModel] = useState<string | null>(null);
   const [deletingModel, setDeletingModel] = useState<string | null>(null);
 
+  const [installProgress, setInstallProgress] = useState<InstallProgress>({
+    phase: "idle",
+    percent: 0,
+    bytesDownloaded: 0,
+    totalBytes: 0,
+    message: "",
+  });
+
   const fetchStatus = async () => {
     setLoadingStatus(true);
     try {
@@ -94,21 +110,52 @@ export const OllamaManager: React.FC = () => {
     fetchStatus();
   }, []);
 
+  // Poll install progress while installing
+  useEffect(() => {
+    let intervalId: any = null;
+    if (installing || installProgress.phase === "downloading" || installProgress.phase === "installing") {
+      intervalId = setInterval(async () => {
+        try {
+          const res = await fetch(getApiUrl("/ollama/install-progress"));
+          if (res.ok) {
+            const data: InstallProgress = await res.json();
+            setInstallProgress(data);
+            if (data.phase === "completed") {
+              setInstalling(false);
+              toast.success("Ollama installation completed successfully!");
+              fetchStatus();
+            } else if (data.phase === "failed") {
+              setInstalling(false);
+              toast.error(`Installation failed: ${data.message}`);
+            }
+          }
+        } catch { }
+      }, 1000);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [installing, installProgress.phase]);
+
   const handleInstallOllama = async () => {
     setInstalling(true);
-    toast.info("Initiating One-Click Ollama Installation for Windows...");
+    setInstallProgress({
+      phase: "downloading",
+      percent: 5,
+      bytesDownloaded: 0,
+      totalBytes: 0,
+      message: "Initiating setup process...",
+    });
+    toast.info("Starting One-Click Ollama Setup...");
     try {
       const res = await fetch(getApiUrl("/ollama/install"), { method: "POST" });
       const data = await res.json();
-      if (data.success) {
-        toast.success("Ollama setup sequence executed successfully! Refreshing status...");
-        setTimeout(fetchStatus, 4000);
-      } else {
-        toast.error(`Installation error: ${data.message || "Failed to run setup"}`);
+      if (!data.success) {
+        toast.error(`Setup start error: ${data.message}`);
+        setInstalling(false);
       }
     } catch (e: any) {
-      toast.error(`Error executing installer: ${e.message}`);
-    } finally {
+      toast.error(`Error starting installer: ${e.message}`);
       setInstalling(false);
     }
   };
@@ -126,6 +173,7 @@ export const OllamaManager: React.FC = () => {
         toast.success("Ollama uninstalled from system. AI provider reset to Gemini.");
         const settings = getFrontendSettings();
         saveFrontendSettings({ ...settings, aiProvider: "gemini", aiModel: "gemini-2.5-flash" });
+        setInstallProgress({ phase: "idle", percent: 0, bytesDownloaded: 0, totalBytes: 0, message: "" });
         setTimeout(fetchStatus, 3000);
       } else {
         toast.error(`Uninstall warning: ${data.message}`);
@@ -219,12 +267,12 @@ export const OllamaManager: React.FC = () => {
           {!status.isInstalled ? (
             <button
               onClick={handleInstallOllama}
-              disabled={installing}
+              disabled={installing || installProgress.phase === "downloading" || installProgress.phase === "installing"}
               className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold text-xs flex items-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer disabled:opacity-50"
             >
               {installing ? (
                 <>
-                  <RefreshCw className="w-4 h-4 animate-spin" /> Installing Ollama...
+                  <Loader2 className="w-4 h-4 animate-spin" /> Processing Setup...
                 </>
               ) : (
                 <>
@@ -250,6 +298,64 @@ export const OllamaManager: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* LIVE PROGRESS BAR SECTION */}
+      {(installing || (installProgress.phase !== "idle" && installProgress.phase !== "completed")) && (
+        <div className="p-4 bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl space-y-3 shadow-inner">
+          <div className="flex items-center justify-between text-xs font-bold text-[var(--text)]">
+            <span className="flex items-center gap-2">
+              {installProgress.phase === "downloading" ? (
+                <>
+                  <Download className="w-4 h-4 text-blue-500 animate-bounce" />
+                  <span className="text-blue-500 font-bold uppercase tracking-wider">Phase 1: Downloading Setup Package</span>
+                </>
+              ) : installProgress.phase === "installing" ? (
+                <>
+                  <Cpu className="w-4 h-4 text-purple-500 animate-spin" />
+                  <span className="text-purple-500 font-bold uppercase tracking-wider">Phase 2: Installing Ollama Windows Service</span>
+                </>
+              ) : installProgress.phase === "failed" ? (
+                <>
+                  <AlertCircle className="w-4 h-4 text-red-500" />
+                  <span className="text-red-500 font-bold uppercase tracking-wider">Installation Failed</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4 text-emerald-500" />
+                  <span className="text-emerald-500 font-bold uppercase tracking-wider">Installation Complete</span>
+                </>
+              )}
+            </span>
+
+            <span className="font-mono text-xs font-bold text-[var(--text)]">{installProgress.percent}%</span>
+          </div>
+
+          {/* Color-Coded Progress Bar: BLUE for Downloading, PURPLE for Installing */}
+          <div className="w-full h-3.5 bg-[var(--bg-surface)] rounded-full overflow-hidden border border-[var(--border-c)] p-0.5">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${
+                installProgress.phase === "downloading"
+                  ? "bg-gradient-to-r from-blue-500 via-cyan-500 to-blue-600 shadow-md shadow-blue-500/30 animate-pulse"
+                  : installProgress.phase === "installing"
+                  ? "bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-600 shadow-md shadow-purple-500/30 animate-pulse"
+                  : installProgress.phase === "failed"
+                  ? "bg-red-500"
+                  : "bg-emerald-500"
+              }`}
+              style={{ width: `${Math.max(5, Math.min(100, installProgress.percent))}%` }}
+            />
+          </div>
+
+          <p className="text-[11px] text-[var(--text-sub)] font-mono flex items-center justify-between">
+            <span>{installProgress.message || "Processing..."}</span>
+            {installProgress.totalBytes > 0 && (
+              <span>
+                {Math.round(installProgress.bytesDownloaded / (1024 * 1024))} MB / {Math.round(installProgress.totalBytes / (1024 * 1024))} MB
+              </span>
+            )}
+          </p>
+        </div>
+      )}
 
       {/* Installed Models Overview */}
       {status.isInstalled && (

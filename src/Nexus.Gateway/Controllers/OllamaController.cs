@@ -7,6 +7,15 @@ using System.Text.Json;
 
 namespace Nexus.Gateway.Controllers;
 
+public class OllamaProgressState
+{
+    public string Phase { get; set; } = "idle"; // idle, downloading, installing, completed, failed
+    public int Percent { get; set; } = 0;
+    public long BytesDownloaded { get; set; } = 0;
+    public long TotalBytes { get; set; } = 0;
+    public string Message { get; set; } = "";
+}
+
 [ApiController]
 [Route("api/[controller]")]
 public class OllamaController : ControllerBase
@@ -14,6 +23,9 @@ public class OllamaController : ControllerBase
     private readonly ILogger<OllamaController> _logger;
     private readonly IPowerShellExecutionService _ps;
     private readonly IHttpClientFactory _httpClientFactory;
+
+    private static readonly OllamaProgressState _progress = new();
+    private static readonly object _progressLock = new();
 
     public OllamaController(ILogger<OllamaController> logger, IPowerShellExecutionService ps, IHttpClientFactory httpClientFactory)
     {
@@ -88,52 +100,175 @@ public class OllamaController : ControllerBase
         });
     }
 
-    [HttpPost("install")]
-    public async Task<IActionResult> InstallOllama()
+    [HttpGet("install-progress")]
+    public IActionResult GetInstallProgress()
     {
-        try {
-            _logger.LogInformation("Initiating One-Click Ollama Installation...");
+        lock (_progressLock)
+        {
+            return Ok(new {
+                phase = _progress.Phase,
+                percent = _progress.Percent,
+                bytesDownloaded = _progress.BytesDownloaded,
+                totalBytes = _progress.TotalBytes,
+                message = _progress.Message
+            });
+        }
+    }
 
-            string script = @"
-                $ProgressPreference = 'SilentlyContinue'
-                [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    [HttpPost("install")]
+    public IActionResult InstallOllama()
+    {
+        lock (_progressLock)
+        {
+            if (_progress.Phase == "downloading" || _progress.Phase == "installing")
+            {
+                return Ok(new { success = true, message = "Installation already in progress." });
+            }
 
-                $installed = Get-Command ollama -ErrorAction SilentlyContinue
-                if (-not $installed) {
-                    $winget = Get-Command winget -ErrorAction SilentlyContinue
-                    if ($winget) {
-                        Write-Host 'Installing Ollama via Winget...'
-                        & winget install --id Ollama.Ollama -e --accept-package-agreements --accept-source-agreements --silent
-                    } else {
-                        Write-Host 'Downloading OllamaSetup.exe...'
-                        $installer = Join-Path $env:TEMP 'OllamaSetup.exe'
-                        [System.Net.WebClient]::new().DownloadFile('https://ollama.com/download/OllamaSetup.exe', $installer)
-                        Write-Host 'Executing silent installer...'
-                        Start-Process -FilePath $installer -ArgumentList '/silent' -Wait
+            _progress.Phase = "downloading";
+            _progress.Percent = 5;
+            _progress.BytesDownloaded = 0;
+            _progress.TotalBytes = 0;
+            _progress.Message = "Starting download of OllamaSetup.exe...";
+        }
+
+        // Run background thread so HTTP response is instant while progress is updated live
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                string tempInstaller = Path.Combine(Path.GetTempPath(), "OllamaSetup.exe");
+
+                // Check if Winget can do the install
+                bool wingetSuccess = false;
+                try
+                {
+                    var wingetCheck = await _ps.ExecuteAsync("-NoProfile -Command \"winget --version\"", CancellationToken.None, 5000);
+                    if (wingetCheck.ExitCode == 0)
+                    {
+                        lock (_progressLock)
+                        {
+                            _progress.Phase = "installing";
+                            _progress.Percent = 40;
+                            _progress.Message = "Installing Ollama package via Winget...";
+                        }
+
+                        var wingetInstall = await _ps.ExecuteAsync("-NoProfile -ExecutionPolicy Bypass -Command \"winget install --id Ollama.Ollama -e --accept-package-agreements --accept-source-agreements --silent\"", CancellationToken.None, 300000);
+                        if (wingetInstall.ExitCode == 0 || wingetInstall.StandardOutput.Contains("Successfully"))
+                        {
+                            wingetSuccess = true;
+                        }
+                    }
+                }
+                catch { }
+
+                if (!wingetSuccess)
+                {
+                    // Direct C# HttpClient stream download for precise percentage
+                    lock (_progressLock)
+                    {
+                        _progress.Phase = "downloading";
+                        _progress.Percent = 10;
+                        _progress.Message = "Downloading OllamaSetup.exe from ollama.com...";
+                    }
+
+                    using (var httpClient = new HttpClient())
+                    {
+                        httpClient.Timeout = TimeSpan.FromMinutes(10);
+                        using var response = await httpClient.GetAsync("https://ollama.com/download/OllamaSetup.exe", HttpCompletionOption.ResponseHeadersRead);
+                        response.EnsureSuccessStatusCode();
+
+                        long totalBytes = response.Content.Headers.ContentLength ?? 65000000;
+                        lock (_progressLock)
+                        {
+                            _progress.TotalBytes = totalBytes;
+                        }
+
+                        using var contentStream = await response.Content.ReadAsStreamAsync();
+                        using var fileStream = new FileStream(tempInstaller, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
+
+                        byte[] buffer = new byte[8192];
+                        long bytesReadTotal = 0;
+                        int read;
+
+                        while ((read = await contentStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                        {
+                            await fileStream.WriteAsync(buffer, 0, read);
+                            bytesReadTotal += read;
+
+                            int downloadPercent = (int)((bytesReadTotal * 50) / totalBytes);
+                            lock (_progressLock)
+                            {
+                                _progress.BytesDownloaded = bytesReadTotal;
+                                _progress.Percent = Math.Min(50, 10 + downloadPercent);
+                                _progress.Message = $"Downloading OllamaSetup.exe ({bytesReadTotal / (1024 * 1024)} MB / {totalBytes / (1024 * 1024)} MB)...";
+                            }
+                        }
+                    }
+
+                    // Phase 2: Installing Setup
+                    lock (_progressLock)
+                    {
+                        _progress.Phase = "installing";
+                        _progress.Percent = 60;
+                        _progress.Message = "Executing silent Windows installer (OllamaSetup.exe /silent)...";
+                    }
+
+                    using var installProcess = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = tempInstaller,
+                            Arguments = "/silent",
+                            UseShellExecute = true,
+                            CreateNoWindow = true
+                        }
+                    };
+
+                    installProcess.Start();
+                    await installProcess.WaitForExitAsync();
+
+                    lock (_progressLock)
+                    {
+                        _progress.Percent = 90;
+                        _progress.Message = "Registering background Ollama service...";
                     }
                 }
 
-                $appDataPath = Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'
-                if (Test-Path $appDataPath) {
-                    Start-Process -FilePath $appDataPath -ArgumentList 'apphost' -WindowStyle Hidden -ErrorAction SilentlyContinue
-                } else {
-                    Start-Process -FilePath 'ollama' -ArgumentList 'serve' -WindowStyle Hidden -ErrorAction SilentlyContinue
+                // Start Ollama service in background
+                try
+                {
+                    string appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Ollama", "ollama.exe");
+                    string exePath = System.IO.File.Exists(appDataPath) ? appDataPath : "ollama";
+                    
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = exePath,
+                        Arguments = "apphost",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    });
                 }
-                Write-Host 'Ollama Installation Complete.'
-            ";
+                catch { }
 
-            var encoded = EncodeScript(script);
-            var result = await _ps.ExecuteAsync($"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encoded}", HttpContext.RequestAborted, 600000);
+                lock (_progressLock)
+                {
+                    _progress.Phase = "completed";
+                    _progress.Percent = 100;
+                    _progress.Message = "Ollama setup completed successfully!";
+                }
+            }
+            catch (Exception ex)
+            {
+                lock (_progressLock)
+                {
+                    _progress.Phase = "failed";
+                    _progress.Message = $"Installation error: {ex.Message}";
+                }
+            }
+        });
 
-            return Ok(new {
-                success = result.ExitCode == 0 || result.StandardOutput.Contains("Complete") || result.StandardOutput.Contains("Ollama"),
-                message = "Ollama setup process executed.",
-                output = result.StandardOutput + " " + result.StandardError
-            });
-        } catch (Exception ex) {
-            _logger.LogError(ex, "Failed to execute Ollama installation.");
-            return StatusCode(500, new { success = false, message = ex.Message });
-        }
+        return Ok(new { success = true, message = "Ollama installation background task started." });
     }
 
     [HttpPost("uninstall")]
@@ -167,6 +302,13 @@ public class OllamaController : ControllerBase
 
             var encoded = EncodeScript(script);
             var result = await _ps.ExecuteAsync($"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encoded}", HttpContext.RequestAborted, 300000);
+
+            lock (_progressLock)
+            {
+                _progress.Phase = "idle";
+                _progress.Percent = 0;
+                _progress.Message = "";
+            }
 
             return Ok(new {
                 success = true,
