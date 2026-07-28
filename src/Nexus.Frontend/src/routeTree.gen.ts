@@ -30,6 +30,7 @@ import { Route as PluginsRouteImport } from './routes/plugins'
 import { Route as PerformanceRouteImport } from './routes/performance'
 import { Route as NetworksRouteImport } from './routes/networks'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as HealthRouteImport } from './routes/health'
 import { Route as FirewallRouteImport } from './routes/firewall'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as EventsRouteImport } from './routes/events'
@@ -37,16 +38,8 @@ import { Route as DevicesRouteImport } from './routes/devices'
 import { Route as DefenderRouteImport } from './routes/defender'
 import { Route as CertificatesRouteImport } from './routes/certificates'
 import { Route as AppsRouteImport } from './routes/apps'
-import { Route as HealthRouteImport } from './routes/health'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PluginIdRouteImport } from './routes/plugin.$id'
-
-const HealthRoute = HealthRouteImport.update({
-  id: '/health',
-  path: '/health',
-  getParentRoute: () => rootRouteImport,
-} as any)
-
 
 const VswitchesRoute = VswitchesRouteImport.update({
   id: '/vswitches',
@@ -153,6 +146,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HealthRoute = HealthRouteImport.update({
+  id: '/health',
+  path: '/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FirewallRoute = FirewallRouteImport.update({
   id: '/firewall',
   path: '/firewall',
@@ -208,6 +206,7 @@ export interface FileRoutesByFullPath {
   '/events': typeof EventsRoute
   '/files': typeof FilesRoute
   '/firewall': typeof FirewallRoute
+  '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/networks': typeof NetworksRoute
   '/performance': typeof PerformanceRoute
@@ -240,6 +239,7 @@ export interface FileRoutesByTo {
   '/events': typeof EventsRoute
   '/files': typeof FilesRoute
   '/firewall': typeof FirewallRoute
+  '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/networks': typeof NetworksRoute
   '/performance': typeof PerformanceRoute
@@ -273,6 +273,7 @@ export interface FileRoutesById {
   '/events': typeof EventsRoute
   '/files': typeof FilesRoute
   '/firewall': typeof FirewallRoute
+  '/health': typeof HealthRoute
   '/login': typeof LoginRoute
   '/networks': typeof NetworksRoute
   '/performance': typeof PerformanceRoute
@@ -307,6 +308,7 @@ export interface FileRouteTypes {
     | '/events'
     | '/files'
     | '/firewall'
+    | '/health'
     | '/login'
     | '/networks'
     | '/performance'
@@ -339,6 +341,7 @@ export interface FileRouteTypes {
     | '/events'
     | '/files'
     | '/firewall'
+    | '/health'
     | '/login'
     | '/networks'
     | '/performance'
@@ -371,6 +374,7 @@ export interface FileRouteTypes {
     | '/events'
     | '/files'
     | '/firewall'
+    | '/health'
     | '/login'
     | '/networks'
     | '/performance'
@@ -404,6 +408,7 @@ export interface RootRouteChildren {
   EventsRoute: typeof EventsRoute
   FilesRoute: typeof FilesRoute
   FirewallRoute: typeof FirewallRoute
+  HealthRoute: typeof HealthRoute
   LoginRoute: typeof LoginRoute
   NetworksRoute: typeof NetworksRoute
   PerformanceRoute: typeof PerformanceRoute
@@ -577,6 +582,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/health': {
+      id: '/health'
+      path: '/health'
+      fullPath: '/health'
+      preLoaderRoute: typeof HealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/firewall': {
       id: '/firewall'
       path: '/firewall'
@@ -646,13 +658,13 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppsRoute: AppsRoute,
-  HealthRoute: HealthRoute,
   CertificatesRoute: CertificatesRoute,
   DefenderRoute: DefenderRoute,
   DevicesRoute: DevicesRoute,
   EventsRoute: EventsRoute,
   FilesRoute: FilesRoute,
   FirewallRoute: FirewallRoute,
+  HealthRoute: HealthRoute,
   LoginRoute: LoginRoute,
   NetworksRoute: NetworksRoute,
   PerformanceRoute: PerformanceRoute,
