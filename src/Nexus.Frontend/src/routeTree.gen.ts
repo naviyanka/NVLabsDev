@@ -37,6 +37,7 @@ import { Route as EventsRouteImport } from './routes/events'
 import { Route as DevicesRouteImport } from './routes/devices'
 import { Route as DefenderRouteImport } from './routes/defender'
 import { Route as CertificatesRouteImport } from './routes/certificates'
+import { Route as AuditRouteImport } from './routes/audit'
 import { Route as AppsRouteImport } from './routes/apps'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PluginIdRouteImport } from './routes/plugin.$id'
@@ -181,6 +182,11 @@ const CertificatesRoute = CertificatesRouteImport.update({
   path: '/certificates',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuditRoute = AuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppsRoute = AppsRouteImport.update({
   id: '/apps',
   path: '/apps',
@@ -200,6 +206,7 @@ const PluginIdRoute = PluginIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/apps': typeof AppsRoute
+  '/audit': typeof AuditRoute
   '/certificates': typeof CertificatesRoute
   '/defender': typeof DefenderRoute
   '/devices': typeof DevicesRoute
@@ -233,6 +240,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/apps': typeof AppsRoute
+  '/audit': typeof AuditRoute
   '/certificates': typeof CertificatesRoute
   '/defender': typeof DefenderRoute
   '/devices': typeof DevicesRoute
@@ -267,6 +275,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/apps': typeof AppsRoute
+  '/audit': typeof AuditRoute
   '/certificates': typeof CertificatesRoute
   '/defender': typeof DefenderRoute
   '/devices': typeof DevicesRoute
@@ -302,6 +311,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/apps'
+    | '/audit'
     | '/certificates'
     | '/defender'
     | '/devices'
@@ -335,6 +345,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/apps'
+    | '/audit'
     | '/certificates'
     | '/defender'
     | '/devices'
@@ -368,6 +379,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/apps'
+    | '/audit'
     | '/certificates'
     | '/defender'
     | '/devices'
@@ -402,6 +414,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppsRoute: typeof AppsRoute
+  AuditRoute: typeof AuditRoute
   CertificatesRoute: typeof CertificatesRoute
   DefenderRoute: typeof DefenderRoute
   DevicesRoute: typeof DevicesRoute
@@ -631,6 +644,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CertificatesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/audit': {
+      id: '/audit'
+      path: '/audit'
+      fullPath: '/audit'
+      preLoaderRoute: typeof AuditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/apps': {
       id: '/apps'
       path: '/apps'
@@ -658,6 +678,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppsRoute: AppsRoute,
+  AuditRoute: AuditRoute,
   CertificatesRoute: CertificatesRoute,
   DefenderRoute: DefenderRoute,
   DevicesRoute: DevicesRoute,

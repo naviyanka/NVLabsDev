@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Nexus.Gateway.BackgroundServices;
 using Nexus.Gateway.Services;
 using Nexus.Gateway.Hubs;
+using Nexus.Gateway.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -81,10 +82,12 @@ builder.Services.AddSingleton<PluginBackgroundJobManager>();
 builder.Services.AddTransient<ServerService>();
 builder.Services.AddTransient<NotificationService>();
 builder.Services.AddTransient<IPowerShellExecutionService, PowerShellExecutionService>();
+builder.Services.AddScoped<AuditLogService>();
 builder.Services.AddHostedService<TelemetryBackgroundService>();
 builder.Services.AddHostedService<LogPersistenceService>();
 builder.Services.AddHostedService<AdSyncBackgroundService>();
 builder.Services.AddHostedService<PerformanceStreamService>();
+builder.Services.AddHostedService<AuditRetentionService>();
 builder.Services.AddSignalR();
 builder.Services.AddHttpClient();
 
@@ -235,6 +238,7 @@ app.UseCors("AllowRestricted");
 app.UseWebSockets();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<AuditLoggingMiddleware>();
 app.MapControllers();
 app.MapHub<NotificationHub>("/hub/notifications");
 
