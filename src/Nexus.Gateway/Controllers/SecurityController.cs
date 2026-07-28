@@ -29,6 +29,12 @@ public class SecurityController : ControllerBase
     {
         try
         {
+            // Validate IP/hostname parameter to prevent command injection
+            if (string.IsNullOrWhiteSpace(ip) || !System.Text.RegularExpressions.Regex.IsMatch(ip, @"^[a-zA-Z0-9\.\-\:]+$") || ip.Length > 255)
+            {
+                return BadRequest("Invalid server IP or hostname.");
+            }
+
             if (!refresh)
             {
                 var cachedSnapshot = await _db.SecuritySnapshots.FindAsync(ip);

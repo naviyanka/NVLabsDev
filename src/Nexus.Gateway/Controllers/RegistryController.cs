@@ -28,10 +28,11 @@ public class RegistryController : ControllerBase
                 return BadRequest("Path is required.");
             }
 
-            var cleanPath = path.Replace("'", "''");
+            var pathBytes = System.Text.Encoding.UTF8.GetBytes(path);
+            var pathBase64 = Convert.ToBase64String(pathBytes);
 
             var script = @"
-                $path = '" + cleanPath + @"'
+                $path = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('" + pathBase64 + @"'))
                 
                 # Map standard hives to PS provider drives
                 $path = $path -replace '^HKEY_LOCAL_MACHINE', 'HKLM:'

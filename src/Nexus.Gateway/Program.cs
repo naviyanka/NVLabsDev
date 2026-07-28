@@ -25,11 +25,11 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        var jwtKey = builder.Configuration["Jwt:Key"] ?? Environment.GetEnvironmentVariable("JWT_KEY") ?? "NexusDevelopmentSecretKey32CharsMin!";
+        var jwtKey = builder.Configuration["Jwt:Key"];
+        if (string.IsNullOrEmpty(jwtKey))
+            jwtKey = Environment.GetEnvironmentVariable("JWT_KEY");
         if (string.IsNullOrEmpty(jwtKey) || jwtKey.Length < 32)
-        {
-            jwtKey = "NexusDevelopmentSecretKey32CharsMin!";
-        }
+            throw new InvalidOperationException("JWT signing key must be configured via 'Jwt:Key' in appsettings.json, user-secrets, or the JWT_KEY environment variable. Key must be at least 32 characters.");
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
