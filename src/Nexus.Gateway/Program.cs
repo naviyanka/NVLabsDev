@@ -215,8 +215,7 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<NotificationHub>("/hub/notifications");
 
-app.MapGet("/api/health", () => Results.Ok(new { status = "Healthy" })).AllowAnonymous();
-
 app.MapReverseProxy();
 
 app.Run();
+
