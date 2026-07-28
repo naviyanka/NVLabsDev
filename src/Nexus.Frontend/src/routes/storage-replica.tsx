@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { ServerSelector } from "@/components/ui/ServerSelector";
 import {
   getReplicaPartnershipsClient,
   swapReplicaDirectionClient,
@@ -70,7 +71,7 @@ function formatBytes(bytes: number) {
 function SRPage() {
   const [partnerships, setPartnerships] = useState<ReplicaPartnership[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedServer, setSelectedServer] = useState<string>("all");
+  const [selectedServer, setSelectedServer] = useState<string>("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedMode, setSelectedMode] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -81,10 +82,15 @@ function SRPage() {
   const [inspectPartnership, setInspectPartnership] = useState<ReplicaPartnership | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
+  const handleServerChange = useCallback((server: string) => {
+    setSelectedServer(server);
+  }, []);
+
   const loadData = async () => {
+    if (!selectedServer) return;
     setLoading(true);
     try {
-      const data = await getReplicaPartnershipsClient(selectedServer === "all" ? "dc01" : selectedServer);
+      const data = await getReplicaPartnershipsClient(selectedServer);
       setPartnerships(data);
     } catch {
       toast.error("Failed to load Storage Replica partnerships");
@@ -100,9 +106,6 @@ function SRPage() {
   // Derived filtered list
   const filteredPartnerships = useMemo(() => {
     return partnerships.filter(p => {
-      if (selectedServer !== "all" && p.sourceServer.toLowerCase() !== selectedServer && p.destServer.toLowerCase() !== selectedServer) {
-        return false;
-      }
       if (selectedStatus !== "all" && p.status.toLowerCase() !== selectedStatus.toLowerCase()) {
         return false;
       }
@@ -119,7 +122,7 @@ function SRPage() {
       }
       return true;
     });
-  }, [partnerships, selectedServer, selectedStatus, selectedMode, searchQuery]);
+  }, [partnerships, selectedStatus, selectedMode, searchQuery]);
 
   // Metrics
   const stats = useMemo(() => {
@@ -263,6 +266,9 @@ function SRPage() {
         </div>
       </div>
 
+      {/* Server Selector */}
+      <ServerSelector value={selectedServer} onChange={handleServerChange} />
+
       {/* KPI Stats Panel */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="nx-card p-4 flex items-center justify-between border-l-4 border-l-[var(--teal)]">
@@ -320,23 +326,6 @@ function SRPage() {
       {/* Control Bar: Filters, Search, View Mode */}
       <div className="nx-card p-4 mb-6 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
-          {/* Server Selector */}
-          <div className="flex items-center gap-2 bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-1.5">
-            <Server size={14} className="text-[var(--text-sub)]" />
-            <select
-              value={selectedServer}
-              onChange={(e) => setSelectedServer(e.target.value)}
-              className="bg-transparent text-xs font-mono text-[var(--text)] focus:outline-none"
-            >
-              <option value="all">All Servers</option>
-              <option value="dc01">DC01</option>
-              <option value="fs01">FS01</option>
-              <option value="fs02">FS02</option>
-              <option value="sql01">SQL01</option>
-              <option value="sql02">SQL02</option>
-            </select>
-          </div>
-
           {/* Status Filter */}
           <div className="flex items-center gap-2 bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-1.5">
             <span className="text-xs font-mono text-[var(--text-sub)] uppercase">Status:</span>

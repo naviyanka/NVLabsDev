@@ -97,10 +97,46 @@ public class PowerShellController : ControllerBase
 
             await Response.WriteAsync($"data: {System.Text.Json.JsonSerializer.Serialize(new { type = "end", sessionId })}\n\n");
         }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("Maximum concurrent sessions"))
+        {
+            await Response.WriteAsync($"data: {System.Text.Json.JsonSerializer.Serialize(new { type = "error", content = ex.Message })}\n\n");
+            await Response.WriteAsync($"data: {System.Text.Json.JsonSerializer.Serialize(new { type = "end" })}\n\n");
+        }
         catch (Exception ex)
         {
             await Response.WriteAsync($"data: {System.Text.Json.JsonSerializer.Serialize(new { type = "error", content = ex.Message })}\n\n");
             await Response.WriteAsync($"data: {System.Text.Json.JsonSerializer.Serialize(new { type = "end" })}\n\n");
         }
+    }
+
+    /// <summary>
+    /// List all active PowerShell sessions with metadata.
+    /// </summary>
+    [HttpGet("sessions")]
+    public IActionResult GetActiveSessions()
+    {
+        var sessions = _sessionManager.GetActiveSessions();
+        return Ok(new
+        {
+            count = sessions.Count,
+            sessions = sessions.Select(s => new
+            {
+                sessionId = s.SessionId,
+                serverId = s.ServerId,
+                lastUsed = s.LastUsed,
+                createdAt = s.CreatedAt,
+                idleSeconds = (int)(DateTime.UtcNow - s.LastUsed).TotalSeconds
+            })
+        });
+    }
+
+    /// <summary>
+    /// Force cleanup of all expired/idle sessions.
+    /// </summary>
+    [HttpDelete("sessions/expired")]
+    public IActionResult CleanupExpiredSessions()
+    {
+        var cleaned = _sessionManager.ForceCleanupExpiredSessions();
+        return Ok(new { cleaned, message = $"Removed {cleaned} expired session(s)." });
     }
 }
