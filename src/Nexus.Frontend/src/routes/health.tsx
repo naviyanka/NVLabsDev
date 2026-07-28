@@ -20,7 +20,7 @@ import {
   Wifi,
   Radio
 } from "lucide-react";
-import { getHealthClient, type SystemHealthData, type SubsystemHealth, type ApiModuleHealth } from "@/api/client";
+import { getHealthClient, type SystemHealthData } from "@/api/client";
 
 export const Route = createFileRoute("/health")({
   component: HealthDashboardPage,
@@ -36,17 +36,21 @@ function HealthDashboardPage() {
   const [healthData, setHealthData] = useState<SystemHealthData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(3000); // 3 seconds
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(3000);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchHealth = useCallback(async (isManualRefresh = false) => {
     if (isManualRefresh) setRefreshing(true);
-    const data = await getHealthClient(true);
-    if (data) {
-      setHealthData(data);
-      setLastUpdated(new Date());
+    try {
+      const data = await getHealthClient(true);
+      if (data) {
+        setHealthData(data);
+        setLastUpdated(new Date());
+      }
+    } catch (e) {
+      console.error("Health fetch error:", e);
     }
     setLoading(false);
     if (isManualRefresh) setRefreshing(false);
@@ -64,27 +68,32 @@ function HealthDashboardPage() {
   }, [fetchHealth, autoRefreshInterval]);
 
   const categories = useMemo(() => {
-    if (!healthData?.apiModules) return ["All"];
-    const cats = new Set(healthData.apiModules.map(m => m.Category));
+    if (!healthData?.apiModules || !Array.isArray(healthData.apiModules)) return ["All"];
+    const cats = new Set(healthData.apiModules.map((m: any) => (m.category || m.Category || "Core")));
     return ["All", ...Array.from(cats)];
   }, [healthData]);
 
   const filteredModules = useMemo(() => {
-    if (!healthData?.apiModules) return [];
-    return healthData.apiModules.filter(m => {
-      const matchesSearch = m.Name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            m.Route.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            m.Description.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = selectedCategory === "All" || m.Category === selectedCategory;
+    if (!healthData?.apiModules || !Array.isArray(healthData.apiModules)) return [];
+    const q = (searchQuery || "").toLowerCase();
+    return healthData.apiModules.filter((m: any) => {
+      const name = String(m.name || m.Name || "").toLowerCase();
+      const route = String(m.route || m.Route || "").toLowerCase();
+      const desc = String(m.description || m.Description || "").toLowerCase();
+      const cat = String(m.category || m.Category || "Core");
+
+      const matchesSearch = name.includes(q) || route.includes(q) || desc.includes(q);
+      const matchesCategory = selectedCategory === "All" || cat === selectedCategory;
       return matchesSearch && matchesCategory;
     });
   }, [healthData, searchQuery, selectedCategory]);
 
   const formatUptime = (seconds: number) => {
-    const d = Math.floor(seconds / (3600 * 24));
-    const h = Math.floor((seconds % (3600 * 24)) / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
+    const sSec = seconds || 0;
+    const d = Math.floor(sSec / (3600 * 24));
+    const h = Math.floor((sSec % (3600 * 24)) / 3600);
+    const m = Math.floor((sSec % 3600) / 60);
+    const s = Math.floor(sSec % 60);
     if (d > 0) return `${d}d ${h}h ${m}m`;
     if (h > 0) return `${h}h ${m}m ${s}s`;
     return `${m}m ${s}s`;
@@ -217,7 +226,7 @@ function HealthDashboardPage() {
             </span>
             <span className="text-xs text-slate-400 font-mono">MB</span>
           </div>
-          <p className="text-xs text-slate-500 mt-2">Allocated: {healthData?.memory?.allocatedMB} MB | GC: {healthData?.memory?.gcTotalMB} MB</p>
+          <p className="text-xs text-slate-500 mt-2">Allocated: {healthData?.memory?.allocatedMB ?? 0} MB</p>
         </div>
 
         <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-5 relative overflow-hidden group hover:border-slate-700 transition">
@@ -227,13 +236,12 @@ function HealthDashboardPage() {
           </div>
           <div className="mt-3">
             <span className="text-sm font-bold text-slate-200 font-mono block truncate">
-              {healthData?.system?.machineName}
+              {healthData?.system?.machineName || "Local Host"}
             </span>
             <span className="text-xs text-slate-400 font-mono block mt-1">
-              {healthData?.system?.processorCount} Cores • {healthData?.system?.is64BitOS ? "64-bit OS" : "32-bit OS"}
+              {healthData?.system?.processorCount ?? 4} Cores • {healthData?.system?.is64BitOS ? "64-bit OS" : "32-bit OS"}
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-2 truncate">{healthData?.system?.os}</p>
         </div>
       </div>
 
@@ -250,14 +258,20 @@ function HealthDashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {healthData?.subsystems?.map((sub, idx) => {
-            const isHealthy = sub.status === "Healthy";
-            const isDegraded = sub.status === "Degraded";
-            const Icon = sub.name.includes("Database") ? Database :
-                         sub.name.includes("PowerShell") ? Terminal :
-                         sub.name.includes("Active Directory") ? ShieldCheck :
-                         sub.name.includes("CIM") ? HardDrive :
-                         sub.name.includes("SignalR") ? Radio : Zap;
+          {healthData?.subsystems?.map((sub: any, idx: number) => {
+            const subName = String(sub.name || sub.Name || "Subsystem");
+            const subType = String(sub.type || sub.Type || "Service");
+            const subStatus = String(sub.status || sub.Status || "Healthy");
+            const subPing = Number(sub.pingMs ?? sub.PingMs ?? 0);
+            const subDetails = String(sub.details || sub.Details || "");
+
+            const isHealthy = subStatus === "Healthy";
+            const isDegraded = subStatus === "Degraded";
+            const Icon = subName.includes("Database") ? Database :
+                         subName.includes("PowerShell") ? Terminal :
+                         subName.includes("Active Directory") ? ShieldCheck :
+                         subName.includes("CIM") ? HardDrive :
+                         subName.includes("SignalR") ? Radio : Zap;
 
             return (
               <div
@@ -271,8 +285,8 @@ function HealthDashboardPage() {
                         <Icon className="w-4 h-4" />
                       </div>
                       <div>
-                        <h3 className="text-sm font-semibold text-slate-200">{sub.name}</h3>
-                        <span className="text-[11px] font-mono text-slate-400">{sub.type}</span>
+                        <h3 className="text-sm font-semibold text-slate-200">{subName}</h3>
+                        <span className="text-[11px] font-mono text-slate-400">{subType}</span>
                       </div>
                     </div>
 
@@ -283,19 +297,19 @@ function HealthDashboardPage() {
                     }`}>
                       {isHealthy ? <CheckCircle2 className="w-3 h-3" /> :
                        isDegraded ? <AlertTriangle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                      <span>{sub.status}</span>
+                      <span>{subStatus}</span>
                     </span>
                   </div>
 
                   <p className="text-xs text-slate-400 mt-3 font-mono leading-relaxed bg-slate-950/50 p-2 rounded border border-slate-900">
-                    {sub.details}
+                    {subDetails}
                   </p>
                 </div>
 
                 <div className="mt-3 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400">
                   <span>Ping Latency:</span>
-                  <span className={`font-bold ${sub.pingMs < 5 ? "text-emerald-400" : sub.pingMs < 20 ? "text-amber-400" : "text-rose-400"}`}>
-                    {sub.pingMs} ms
+                  <span className={`font-bold ${subPing < 5 ? "text-emerald-400" : subPing < 20 ? "text-amber-400" : "text-rose-400"}`}>
+                    {subPing} ms
                   </span>
                 </div>
               </div>
@@ -310,7 +324,7 @@ function HealthDashboardPage() {
           <div>
             <h2 className="text-lg font-bold text-white flex items-center space-x-2">
               <Server className="w-5 h-5 text-sky-400" />
-              <span>Gateway API Controller Modules (28 Endpoints)</span>
+              <span>Gateway API Controller Modules ({filteredModules.length})</span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
               Live status and measured endpoint response latency for each REST controller module
@@ -363,34 +377,43 @@ function HealthDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-mono">
-                {filteredModules.map((mod, idx) => (
-                  <tr key={idx} className="hover:bg-slate-800/40 transition">
-                    <td className="px-4 py-3 font-medium text-slate-200 whitespace-nowrap flex items-center space-x-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                      <span>{mod.Name}</span>
-                    </td>
-                    <td className="px-4 py-3 text-sky-400 font-mono text-[11px] whitespace-nowrap">
-                      {mod.Route}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[11px]">
-                        {mod.Category}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-medium flex items-center space-x-1 w-fit">
-                        <CheckCircle2 className="w-3 h-3" />
-                        <span>{mod.Status}</span>
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-bold text-emerald-400 whitespace-nowrap">
-                      {mod.LatencyMs} ms
-                    </td>
-                    <td className="px-4 py-3 text-slate-400 max-w-md truncate">
-                      {mod.Description}
-                    </td>
-                  </tr>
-                ))}
+                {filteredModules.map((mod: any, idx: number) => {
+                  const name = String(mod.name || mod.Name || "Module");
+                  const route = String(mod.route || mod.Route || "");
+                  const cat = String(mod.category || mod.Category || "Core");
+                  const status = String(mod.status || mod.Status || "Operational");
+                  const latency = Number(mod.latencyMs ?? mod.LatencyMs ?? 0);
+                  const desc = String(mod.description || mod.Description || "");
+
+                  return (
+                    <tr key={idx} className="hover:bg-slate-800/40 transition">
+                      <td className="px-4 py-3 font-medium text-slate-200 whitespace-nowrap flex items-center space-x-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span>{name}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sky-400 font-mono text-[11px] whitespace-nowrap">
+                        {route}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[11px]">
+                          {cat}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-medium flex items-center space-x-1 w-fit">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>{status}</span>
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-emerald-400 whitespace-nowrap">
+                        {latency} ms
+                      </td>
+                      <td className="px-4 py-3 text-slate-400 max-w-md truncate">
+                        {desc}
+                      </td>
+                    </tr>
+                  );
+                })}
                 {filteredModules.length === 0 && (
                   <tr>
                     <td colSpan={6} className="text-center py-8 text-slate-500 font-mono">

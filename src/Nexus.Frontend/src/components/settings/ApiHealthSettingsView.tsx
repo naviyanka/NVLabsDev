@@ -33,12 +33,16 @@ export function ApiHealthSettingsView() {
 
   const fetchHealth = useCallback(async (isManualRefresh = false) => {
     if (isManualRefresh) setRefreshing(true);
-    const data = await getHealthClient(true);
-    if (data) {
-      setHealthData(data);
-      setLastUpdated(new Date());
-    } else {
-      toast.error("Failed to connect to Gateway health endpoint");
+    try {
+      const data = await getHealthClient(true);
+      if (data) {
+        setHealthData(data);
+        setLastUpdated(new Date());
+      } else {
+        toast.error("Failed to connect to Gateway health endpoint");
+      }
+    } catch (e) {
+      console.error("Health fetch error:", e);
     }
     setLoading(false);
     if (isManualRefresh) setRefreshing(false);
@@ -56,27 +60,32 @@ export function ApiHealthSettingsView() {
   }, [fetchHealth, autoRefreshInterval]);
 
   const categories = useMemo(() => {
-    if (!healthData?.apiModules) return ["All"];
-    const cats = new Set(healthData.apiModules.map(m => m.Category));
+    if (!healthData?.apiModules || !Array.isArray(healthData.apiModules)) return ["All"];
+    const cats = new Set(healthData.apiModules.map(m => ((m as any).category || (m as any).Category || "Core")));
     return ["All", ...Array.from(cats)];
   }, [healthData]);
 
   const filteredModules = useMemo(() => {
-    if (!healthData?.apiModules) return [];
+    if (!healthData?.apiModules || !Array.isArray(healthData.apiModules)) return [];
+    const q = (searchQuery || "").toLowerCase();
     return healthData.apiModules.filter(m => {
-      const matchesSearch = m.Name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            m.Route.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            m.Description.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = selectedCategory === "All" || m.Category === selectedCategory;
+      const name = String((m as any).name || (m as any).Name || "").toLowerCase();
+      const route = String((m as any).route || (m as any).Route || "").toLowerCase();
+      const desc = String((m as any).description || (m as any).Description || "").toLowerCase();
+      const cat = String((m as any).category || (m as any).Category || "Core");
+
+      const matchesSearch = name.includes(q) || route.includes(q) || desc.includes(q);
+      const matchesCategory = selectedCategory === "All" || cat === selectedCategory;
       return matchesSearch && matchesCategory;
     });
   }, [healthData, searchQuery, selectedCategory]);
 
   const formatUptime = (seconds: number) => {
-    const d = Math.floor(seconds / (3600 * 24));
-    const h = Math.floor((seconds % (3600 * 24)) / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
+    const sSec = seconds || 0;
+    const d = Math.floor(sSec / (3600 * 24));
+    const h = Math.floor((sSec % (3600 * 24)) / 3600);
+    const m = Math.floor((sSec % 3600) / 60);
+    const s = Math.floor(sSec % 60);
     if (d > 0) return `${d}d ${h}h ${m}m`;
     if (h > 0) return `${h}h ${m}m ${s}s`;
     return `${m}m ${s}s`;
@@ -210,7 +219,7 @@ export function ApiHealthSettingsView() {
               </span>
               <span className="text-xs text-[var(--text-sub)] font-mono">MB</span>
             </div>
-            <p className="text-[10px] text-[var(--text-sub)] mt-1">Allocated: {healthData?.memory?.allocatedMB} MB</p>
+            <p className="text-[10px] text-[var(--text-sub)] mt-1">Allocated: {healthData?.memory?.allocatedMB ?? 0} MB</p>
           </div>
 
           <div className="bg-[var(--bg-void)] p-4 rounded-xl border border-[var(--border-c)]">
@@ -220,10 +229,10 @@ export function ApiHealthSettingsView() {
             </div>
             <div className="mt-2">
               <span className="text-xs font-bold text-[var(--text)] font-mono block truncate">
-                {healthData?.system?.machineName}
+                {healthData?.system?.machineName || "Local Host"}
               </span>
               <span className="text-[10px] text-[var(--text-sub)] font-mono block">
-                {healthData?.system?.processorCount} CPU Cores • {healthData?.system?.is64BitOS ? "64-bit" : "32-bit"}
+                {healthData?.system?.processorCount ?? 4} CPU Cores • {healthData?.system?.is64BitOS ? "64-bit" : "32-bit"}
               </span>
             </div>
           </div>
@@ -239,14 +248,20 @@ export function ApiHealthSettingsView() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {healthData?.subsystems?.map((sub, idx) => {
-            const isHealthy = sub.status === "Healthy";
-            const isDegraded = sub.status === "Degraded";
-            const Icon = sub.name.includes("Database") ? Database :
-                         sub.name.includes("PowerShell") ? Terminal :
-                         sub.name.includes("Active Directory") ? ShieldCheck :
-                         sub.name.includes("CIM") ? HardDrive :
-                         sub.name.includes("SignalR") ? Radio : Zap;
+          {healthData?.subsystems?.map((sub: any, idx: number) => {
+            const subName = String(sub.name || sub.Name || "Subsystem");
+            const subType = String(sub.type || sub.Type || "Service");
+            const subStatus = String(sub.status || sub.Status || "Healthy");
+            const subPing = Number(sub.pingMs ?? sub.PingMs ?? 0);
+            const subDetails = String(sub.details || sub.Details || "");
+
+            const isHealthy = subStatus === "Healthy";
+            const isDegraded = subStatus === "Degraded";
+            const Icon = subName.includes("Database") ? Database :
+                         subName.includes("PowerShell") ? Terminal :
+                         subName.includes("Active Directory") ? ShieldCheck :
+                         subName.includes("CIM") ? HardDrive :
+                         subName.includes("SignalR") ? Radio : Zap;
 
             return (
               <div
@@ -259,8 +274,8 @@ export function ApiHealthSettingsView() {
                       <Icon size={14} />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-[var(--text)]">{sub.name}</div>
-                      <div className="text-[10px] font-mono text-[var(--text-sub)]">{sub.type}</div>
+                      <div className="text-xs font-bold text-[var(--text)]">{subName}</div>
+                      <div className="text-[10px] font-mono text-[var(--text-sub)]">{subType}</div>
                     </div>
                   </div>
 
@@ -271,18 +286,18 @@ export function ApiHealthSettingsView() {
                   }`}>
                     {isHealthy ? <CheckCircle2 size={11} /> :
                      isDegraded ? <AlertTriangle size={11} /> : <XCircle size={11} />}
-                    <span>{sub.status}</span>
+                    <span>{subStatus}</span>
                   </span>
                 </div>
 
                 <div className="text-[11px] text-[var(--text-sub)] font-mono bg-[var(--bg-surface)] p-2 rounded-lg border border-[var(--border-c)]/50 leading-tight">
-                  {sub.details}
+                  {subDetails}
                 </div>
 
                 <div className="flex items-center justify-between text-[11px] font-mono text-[var(--text-sub)] pt-1 border-t border-[var(--border-c)]/40">
                   <span>Latency Ping:</span>
-                  <span className={`font-bold ${sub.pingMs < 5 ? "text-emerald-400" : sub.pingMs < 20 ? "text-amber-400" : "text-rose-400"}`}>
-                    {sub.pingMs} ms
+                  <span className={`font-bold ${subPing < 5 ? "text-emerald-400" : subPing < 20 ? "text-amber-400" : "text-rose-400"}`}>
+                    {subPing} ms
                   </span>
                 </div>
               </div>
@@ -337,31 +352,40 @@ export function ApiHealthSettingsView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-c)]/40 font-mono text-[11px]">
-              {filteredModules.map((mod, idx) => (
-                <tr key={idx} className="hover:bg-[var(--bg-surface)] transition-colors">
-                  <td className="px-3.5 py-2 font-bold text-[var(--text)] whitespace-nowrap flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                    <span>{mod.Name}</span>
-                  </td>
-                  <td className="px-3.5 py-2 text-[var(--amber)] whitespace-nowrap">{mod.Route}</td>
-                  <td className="px-3.5 py-2 whitespace-nowrap">
-                    <span className="px-1.5 py-0.5 rounded bg-[var(--bg-surface)] border border-[var(--border-c)] text-[10px] text-[var(--text-sub)]">
-                      {mod.Category}
-                    </span>
-                  </td>
-                  <td className="px-3.5 py-2 whitespace-nowrap">
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">
-                      {mod.Status}
-                    </span>
-                  </td>
-                  <td className="px-3.5 py-2 text-right font-bold text-emerald-400 whitespace-nowrap">
-                    {mod.LatencyMs} ms
-                  </td>
-                  <td className="px-3.5 py-2 text-[var(--text-sub)] max-w-xs truncate">
-                    {mod.Description}
-                  </td>
-                </tr>
-              ))}
+              {filteredModules.map((mod: any, idx: number) => {
+                const name = String(mod.name || mod.Name || "Module");
+                const route = String(mod.route || mod.Route || "");
+                const cat = String(mod.category || mod.Category || "Core");
+                const status = String(mod.status || mod.Status || "Operational");
+                const latency = Number(mod.latencyMs ?? mod.LatencyMs ?? 0);
+                const desc = String(mod.description || mod.Description || "");
+
+                return (
+                  <tr key={idx} className="hover:bg-[var(--bg-surface)] transition-colors">
+                    <td className="px-3.5 py-2 font-bold text-[var(--text)] whitespace-nowrap flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                      <span>{name}</span>
+                    </td>
+                    <td className="px-3.5 py-2 text-[var(--amber)] whitespace-nowrap">{route}</td>
+                    <td className="px-3.5 py-2 whitespace-nowrap">
+                      <span className="px-1.5 py-0.5 rounded bg-[var(--bg-surface)] border border-[var(--border-c)] text-[10px] text-[var(--text-sub)]">
+                        {cat}
+                      </span>
+                    </td>
+                    <td className="px-3.5 py-2 whitespace-nowrap">
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">
+                        {status}
+                      </span>
+                    </td>
+                    <td className="px-3.5 py-2 text-right font-bold text-emerald-400 whitespace-nowrap">
+                      {latency} ms
+                    </td>
+                    <td className="px-3.5 py-2 text-[var(--text-sub)] max-w-xs truncate">
+                      {desc}
+                    </td>
+                  </tr>
+                );
+              })}
               {filteredModules.length === 0 && (
                 <tr>
                   <td colSpan={6} className="text-center py-6 text-[var(--text-sub)]">No API modules match "{searchQuery}"</td>
