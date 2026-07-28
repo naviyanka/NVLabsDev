@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Sparkles, Send, X, Bot, User, Copy, CheckCircle2, RefreshCw } from "lucide-react";
 import { getFrontendSettings } from "@/lib/frontendSettings";
-import { sendGeminiChatFn } from "@/lib/geminiServerFns";
+import { sendCopilotChatFn } from "@/lib/copilotServerFns";
 import { getApiUrl } from "@/lib/backend";
 
 interface Message {
@@ -11,7 +11,7 @@ interface Message {
   timestamp: string;
 }
 
-interface GeminiCopilotDrawerProps {
+interface CopilotDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   initialPrompt?: string;
@@ -25,7 +25,7 @@ const SUGGESTED_PROMPTS = [
   "Check Hyper-V virtual switch health",
 ];
 
-export const GeminiCopilotDrawer: React.FC<GeminiCopilotDrawerProps> = ({
+export const CopilotDrawer: React.FC<CopilotDrawerProps> = ({
   isOpen,
   onClose,
   initialPrompt,
@@ -81,7 +81,7 @@ export const GeminiCopilotDrawer: React.FC<GeminiCopilotDrawerProps> = ({
       const authToken = typeof window !== "undefined" ? localStorage.getItem("nexus_token") || "" : "";
       const rawApiUrl = getApiUrl(""); // e.g. "http://host:5010/api"
       const backendBaseUrl = rawApiUrl.replace(/\/api\/?$/, ""); // strip trailing /api
-      const data = await sendGeminiChatFn({
+      const data = await sendCopilotChatFn({
         data: {
           message: text,
           history: messages.map((m) => ({ role: m.role, content: m.content })),
@@ -111,7 +111,7 @@ export const GeminiCopilotDrawer: React.FC<GeminiCopilotDrawerProps> = ({
         {
           id: (Date.now() + 1).toString(),
           role: "model",
-          content: `⚠️ Error contacting AI Gateway: ${err.message || "Network error"}`,
+          content: `\u26a0\ufe0f Error contacting AI Gateway: ${err.message || "Network error"}`,
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         },
       ]);

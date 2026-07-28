@@ -178,11 +178,24 @@ interface AnalyzePayload {
   backendBaseUrl?: string;
 }
 
+// ─── Check if an error indicates tools/functions are not supported ──────────
+function isToolNotSupportedError(errorText: string): boolean {
+  const lower = errorText.toLowerCase();
+  return (
+    lower.includes("tool") ||
+    lower.includes("function") ||
+    lower.includes("does not support") ||
+    lower.includes("not supported") ||
+    lower.includes("unknown parameter") ||
+    lower.includes("unrecognized request argument")
+  );
+}
+
 // ─── OpenAI-compatible agentic call (Custom / Ollama / OpenAI) ─────────────
 async function callOpenAICompatibleAgentic({
   baseUrl = "http://localhost:11434/v1",
   apiKey,
-  model = "qwen2.5:0.5b",
+  model,
   messages,
   systemPrompt,
   backendBaseUrl,
@@ -190,7 +203,7 @@ async function callOpenAICompatibleAgentic({
 }: {
   baseUrl?: string;
   apiKey?: string;
-  model?: string;
+  model: string;
   messages: Array<{ role: string; content: string }>;
   systemPrompt: string;
   backendBaseUrl?: string;
@@ -217,7 +230,7 @@ async function callOpenAICompatibleAgentic({
 
   // ── Pass 1: Send message with tool definitions ──
   const body: any = {
-    model: model || "qwen2.5:0.5b",
+    model,
     messages: formattedMessages,
     temperature: 0.3,
     stream: false,
@@ -227,14 +240,47 @@ async function callOpenAICompatibleAgentic({
     body.tool_choice = "auto";
   }
 
-  const res = await fetch(cleanUrl, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(cleanUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+  } catch (err: any) {
+    throw new Error(`Failed to connect to AI Gateway: ${err.message || "Network error"}`);
+  }
 
+  // ── Graceful tool-calling fallback ──
+  // If the API returns an error that indicates tools are not supported,
+  // retry the request without tools/tool_choice
   if (!res.ok) {
     const errText = await res.text();
+    if ((res.status === 400 || res.status === 422) && tools && isToolNotSupportedError(errText)) {
+      // Retry without tools
+      const fallbackBody: any = {
+        model,
+        messages: formattedMessages,
+        temperature: 0.3,
+        stream: false,
+      };
+      const fallbackRes = await fetch(cleanUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(fallbackBody),
+      });
+      if (!fallbackRes.ok) {
+        const fallbackErr = await fallbackRes.text();
+        throw new Error(`AI Gateway returned HTTP ${fallbackRes.status}: ${fallbackErr.slice(0, 300)}`);
+      }
+      const fallbackRaw = await fallbackRes.text();
+      const ct = fallbackRes.headers.get("content-type") || "";
+      if (ct.includes("text/event-stream") || fallbackRaw.trimStart().startsWith("data: ")) {
+        return parseSSEResponse(fallbackRaw) || "No response received from AI model.";
+      }
+      const fallbackJson = JSON.parse(fallbackRaw);
+      return fallbackJson.choices?.[0]?.message?.content || "No response received from AI model.";
+    }
     throw new Error(`AI Gateway returned HTTP ${res.status}: ${errText.slice(0, 300)}`);
   }
 
@@ -285,7 +331,7 @@ async function callOpenAICompatibleAgentic({
     method: "POST",
     headers,
     body: JSON.stringify({
-      model: model || "qwen2.5:0.5b",
+      model,
       messages: pass2Messages,
       temperature: 0.3,
       stream: false,
@@ -409,8 +455,8 @@ async function callGeminiAgenticEndpoint({
 }
 
 // ─── Server Functions ──────────────────────────────────────────────────────
-export const sendGeminiChatFn = createServerFn({ method: "POST" })
-  .validator((data: ChatPayload) => data)
+export const sendCopilotChatFn = createServerFn({ method: "POST" })
+  .inputValidator((data: ChatPayload) => data)
   .handler(async ({ data }) => {
     const {
       message,
@@ -429,7 +475,7 @@ export const sendGeminiChatFn = createServerFn({ method: "POST" })
       try {
         const reply = await callOpenAICompatibleAgentic({
           baseUrl: provider === "openai" ? "https://api.openai.com/v1" : baseUrl,
-          apiKey: customKey || (provider === "gemini" ? geminiApiKey : ""),
+          apiKey: customKey || "",
           model: model || (provider === "ollama" ? "llama3.2:1b" : "gpt-4o-mini"),
           messages: [...history, { role: "user", content: message }],
           systemPrompt: NEXUS_COPILOT_SYSTEM_PROMPT,
@@ -439,7 +485,7 @@ export const sendGeminiChatFn = createServerFn({ method: "POST" })
         return { reply };
       } catch (err: any) {
         console.error("OpenAI/Ollama Chat Error:", err);
-        return { reply: `⚠️ [${provider.toUpperCase()}] Endpoint error: ${err.message || "Failed to reach AI model gateway"}` };
+        return { reply: `\u26a0\ufe0f [${provider.toUpperCase()}] Endpoint error: ${err.message || "Failed to reach AI model gateway"}` };
       }
     }
 
@@ -472,12 +518,12 @@ export const sendGeminiChatFn = createServerFn({ method: "POST" })
       return { reply };
     } catch (err: any) {
       console.error("Gemini Chat Error:", err);
-      return { reply: `⚠️ [GEMINI] Error: ${err.message || "Failed to query Gemini AI"}` };
+      return { reply: `\u26a0\ufe0f [GEMINI] Error: ${err.message || "Failed to query Gemini AI"}` };
     }
   });
 
-export const runGeminiAnalyzeFn = createServerFn({ method: "POST" })
-  .validator((data: AnalyzePayload) => data)
+export const runCopilotAnalyzeFn = createServerFn({ method: "POST" })
+  .inputValidator((data: AnalyzePayload) => data)
   .handler(async ({ data }) => {
     const {
       type,
@@ -519,7 +565,7 @@ export const runGeminiAnalyzeFn = createServerFn({ method: "POST" })
         return { analysis };
       } catch (err: any) {
         console.error("OpenAI/Ollama Analyze Error:", err);
-        return { analysis: `⚠️ [${provider.toUpperCase()}] Analysis error: ${err.message || "Failed to analyze data"}` };
+        return { analysis: `\u26a0\ufe0f [${provider.toUpperCase()}] Analysis error: ${err.message || "Failed to analyze data"}` };
       }
     }
 
