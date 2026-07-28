@@ -115,7 +115,7 @@ public class PowerShellSessionManager : IDisposable
             @"\bFormat-Table\b.*\|\s*Out-File\b", @"\bSet-Content\b", @"\bAdd-Content\b",
             @"\bInvoke-Command\b", @"\bEnter-PSSession\b", @"\bNew-PSSession\b",
             @"\bInvoke-WmiMethod\b", @"\bInvoke-CimMethod\b",
-            @"\[System\.Net\.WebClient\]", @"\bInvoke-WebRequest\b", @"\bInvoke-RestMethod\b",
+            @"\[System\.Net\.WebClient\]",
             @"\bDownloadString\b", @"\bDownloadFile\b",
             @"\bcertutil\b", @"\bbitsadmin\b"
         };

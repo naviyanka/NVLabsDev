@@ -243,7 +243,7 @@ public class HealthController : ControllerBase
                 catch
                 {
                     sw.Stop();
-                    result = new SubsystemHealthDto { Name = "PowerShell Core Service", Type = "Execution Engine", Status = "Healthy", PingMs = Math.Round(sw.Elapsed.TotalMilliseconds, 2), Details = "PowerShell execution service initialized" };
+                    result = new SubsystemHealthDto { Name = "PowerShell Core Service", Type = "Execution Engine", Status = "Degraded", PingMs = Math.Round(sw.Elapsed.TotalMilliseconds, 2), Details = "PowerShell execution service initialized" };
                 }
 
                 lock (CacheLock) { _cachedPsHealth = result; _lastPsCheck = DateTime.UtcNow; }
@@ -267,7 +267,7 @@ public class HealthController : ControllerBase
                 catch
                 {
                     sw.Stop();
-                    result = new SubsystemHealthDto { Name = "CIM / WMI Management Service", Type = "Hardware & Telemetry", Status = "Healthy", PingMs = Math.Round(sw.Elapsed.TotalMilliseconds, 2), Details = "WMI Provider active" };
+                    result = new SubsystemHealthDto { Name = "CIM / WMI Management Service", Type = "Hardware & Telemetry", Status = "Degraded", PingMs = Math.Round(sw.Elapsed.TotalMilliseconds, 2), Details = "WMI Provider active" };
                 }
 
                 lock (CacheLock) { _cachedCimHealth = result; _lastCimCheck = DateTime.UtcNow; }
@@ -291,7 +291,7 @@ public class HealthController : ControllerBase
                 catch
                 {
                     sw.Stop();
-                    result = new SubsystemHealthDto { Name = "Active Directory Domain Service", Type = "Identity & Auth", Status = "Healthy", PingMs = Math.Round(sw.Elapsed.TotalMilliseconds, 2), Details = "Active Directory Service initialized" };
+                    result = new SubsystemHealthDto { Name = "Active Directory Domain Service", Type = "Identity & Auth", Status = "Degraded", PingMs = Math.Round(sw.Elapsed.TotalMilliseconds, 2), Details = "Active Directory Service initialized" };
                 }
 
                 lock (CacheLock) { _cachedAdHealth = result; _lastAdCheck = DateTime.UtcNow; }

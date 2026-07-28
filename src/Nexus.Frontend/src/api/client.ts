@@ -1129,7 +1129,7 @@ export async function toggleUserLockoutClient(serverId: string, username: string
   }
 }
 
-// Aliases for compatibility
+// Backward-compatibility aliases for older UI components
 export const setUserStatusClient = toggleUserStatusClient;
 export const setUserLockoutClient = toggleUserLockoutClient;
 
@@ -1299,6 +1299,7 @@ export async function getNetworkAdaptersClient(serverId: string): Promise<any[]>
   return [];
 }
 
+// Alias: some components reference getNetworksClient instead of getNetworkAdaptersClient
 export const getNetworksClient = getNetworkAdaptersClient;
 
 export async function updateNetworkAdapterClient(serverId: string, adapterId: string, settings: any): Promise<boolean> {
@@ -1551,6 +1552,7 @@ export async function detachVmFromSwitchClient(serverId: string, switchId: strin
   }
 }
 
+// Backward-compatibility aliases using longer naming convention
 export const attachVmToVirtualSwitchClient = attachVmToSwitchClient;
 export const detachVmFromVirtualSwitchClient = detachVmFromSwitchClient;
 
@@ -2140,6 +2142,7 @@ export async function searchRegistryClient(serverId: string, rootPath: string, q
   return [];
 }
 
+// Legacy alias from when this function used mock data
 export const searchMockRegistry = searchRegistryClient;
 
 export async function generateRegFileExport(serverId: string, keyPath: string): Promise<string> {

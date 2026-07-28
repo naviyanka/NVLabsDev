@@ -89,7 +89,7 @@ public class PowerShellController : ControllerBase
             await foreach (var chunk in _sessionManager.ExecuteStreamAsync(sessionId, req.Command, HttpContext.RequestAborted))
             {
                 bool isErr = chunk.StartsWith("ERR:");
-                string content = isErr ? chunk.Substring(4) : chunk.Substring(4);
+                string content = chunk.Substring(4);
                 
                 await Response.WriteAsync($"data: {System.Text.Json.JsonSerializer.Serialize(new { type = isErr ? "error" : "output", content })}\n\n");
                 await Response.Body.FlushAsync();

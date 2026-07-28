@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Nexus.Gateway.Data;
 using Nexus.Gateway.Services;
 
@@ -37,7 +38,7 @@ public class TelemetryBackgroundService : BackgroundService
                 using var scope = _serviceProvider.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<NexusContext>();
                 
-                var servers = db.Servers.ToList();
+                var servers = await db.Servers.ToListAsync();
 
                 foreach (var server in servers)
                 {
@@ -55,7 +56,7 @@ public class TelemetryBackgroundService : BackgroundService
                         }
 
                         var procs = await _cimService.GetProcessesAsync(server.Ip);
-                        var existingProcs = db.Processes.Where(p => p.ServerIp == server.Ip).ToList();
+                        var existingProcs = await db.Processes.Where(p => p.ServerIp == server.Ip).ToListAsync();
                         db.Processes.RemoveRange(existingProcs);
                         
                         foreach (var p in procs)
@@ -67,7 +68,7 @@ public class TelemetryBackgroundService : BackgroundService
                 }
                 
                 var cutoff = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - 300000;
-                var oldSamples = db.PerfSamples.Where(s => s.T < cutoff).ToList();
+                var oldSamples = await db.PerfSamples.Where(s => s.T < cutoff).ToListAsync();
                 db.PerfSamples.RemoveRange(oldSamples);
 
                 await db.SaveChangesAsync(stoppingToken);
