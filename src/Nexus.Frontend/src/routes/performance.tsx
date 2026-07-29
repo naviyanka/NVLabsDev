@@ -1,11 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { NxCard } from "@/components/ui/NxCard";
 import { ServerSelector } from "@/components/ui/ServerSelector";
+import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
 import { getPerformanceHistoryClient, getProcessesClient, type PerfSample, type Process } from "@/api/client";
+import { useSignalR } from "@/lib/signalr";
+import { useServerContext } from "@/lib/serverContext";
 import { AiIntelligenceCard } from "@/components/ai/AiIntelligenceCard";
 
 export const Route = createFileRoute("/performance")({
@@ -14,13 +17,67 @@ export const Route = createFileRoute("/performance")({
 });
 
 function Performance() {
-  const [server, setServer] = useState("");
+  const { server: sharedServer, setServer: setSharedServer } = useServerContext();
+  const [server, setServerLocal] = useState(sharedServer);
   const [data, setData] = useState<PerfSample[]>([]);
   const [procs, setProcs] = useState<Process[]>([]);
+  const prevServerRef = useRef<string>("");
+  const { connectionState, on, invoke } = useSignalR();
 
+  // Sync from shared context on mount (pick up server selected on another page)
   useEffect(() => {
+    if (sharedServer && sharedServer !== server) {
+      setServerLocal(sharedServer);
+    }
+  }, [sharedServer]);
+
+  // When user changes server on this page, update both local and shared state
+  const setServer = useCallback((value: string) => {
+    setServerLocal(value);
+    setSharedServer(value);
+  }, [setSharedServer]);
+
+  const isLive = connectionState === "connected";
+
+  // Handle SignalR real-time performance data
+  useEffect(() => {
+    if (!server || !isLive) return;
+
+    // Join the server group for streaming
+    invoke("JoinServerGroup", server);
+
+    const unsubscribe = on("ReceivePerformanceData", (sample: unknown) => {
+      const s = sample as PerfSample;
+      setData((prev) => {
+        const updated = [...prev, s];
+        // Keep last 100 samples to avoid memory growth
+        return updated.length > 100 ? updated.slice(-100) : updated;
+      });
+    });
+
+    return () => {
+      unsubscribe();
+      invoke("LeaveServerGroup", server);
+    };
+  }, [server, isLive, on, invoke]);
+
+  // Handle server changes: leave old group, join new group
+  useEffect(() => {
+    const prevServer = prevServerRef.current;
+    if (prevServer && prevServer !== server && isLive) {
+      invoke("LeaveServerGroup", prevServer);
+    }
+    prevServerRef.current = server;
+  }, [server, isLive, invoke]);
+
+  // Fallback REST polling when SignalR is disconnected
+  useEffect(() => {
+    if (!server) return;
+    if (isLive) return; // SignalR is handling updates
+
     let id: number | undefined;
     let mounted = true;
+
     async function tick() {
       if (!server) return;
       const [d, p] = await Promise.all([getPerformanceHistoryClient(server), getProcessesClient(server)]);
@@ -28,11 +85,46 @@ function Performance() {
       if (d) setData(d);
       if (p) setProcs(p);
     }
-    setData([]); setProcs([]);
+
     tick();
     id = window.setInterval(tick, 3000);
     return () => { mounted = false; if (id) window.clearInterval(id); };
-  }, [server]);
+  }, [server, isLive]);
+
+  // Periodically refresh processes (SignalR only streams perf data)
+  useEffect(() => {
+    if (!server) return;
+    if (!isLive) return; // REST fallback handles this
+
+    let id: number | undefined;
+    let mounted = true;
+
+    async function fetchProcs() {
+      const p = await getProcessesClient(server);
+      if (!mounted) return;
+      if (p) setProcs(p);
+    }
+
+    fetchProcs();
+    id = window.setInterval(fetchProcs, 5000);
+    return () => { mounted = false; if (id) window.clearInterval(id); };
+  }, [server, isLive]);
+
+  // Initial data load when server changes
+  const loadInitialData = useCallback(async (serverId: string) => {
+    if (!serverId) return;
+    const [d, p] = await Promise.all([getPerformanceHistoryClient(serverId), getProcessesClient(serverId)]);
+    if (d) setData(d);
+    if (p) setProcs(p);
+  }, []);
+
+  useEffect(() => {
+    setData([]);
+    setProcs([]);
+    if (server) {
+      loadInitialData(server);
+    }
+  }, [server, loadInitialData]);
 
   const last = data.at(-1);
   const avg = (k: keyof PerfSample) => data.length ? Math.round(data.reduce((s, d) => s + (d[k] as number), 0) / data.length) : 0;
@@ -41,8 +133,11 @@ function Performance() {
 
   return (
     <PageWrapper>
-      <PageHeader eyebrow="Telemetry" title="Performance Monitor" subtitle="Real-time metric streams refreshing every 3 seconds" />
-      <ServerSelector value={server} onChange={setServer} />
+      <PageHeader eyebrow="Telemetry" title="Performance Monitor" subtitle={isLive ? "Real-time SignalR streaming" : "Polling every 3 seconds (fallback)"} />
+      <div className="flex items-center justify-between gap-4">
+        <ServerSelector value={server} onChange={setServer} />
+        <ConnectionStatus state={connectionState} />
+      </div>
       
       <AiIntelligenceCard
         title="Performance Bottleneck Intelligence"
@@ -50,7 +145,7 @@ function Performance() {
         dataToAnalyze={{
           selectedServer: server,
           latestMetrics: last,
-          averages: { cpu: avg("cpu"), memory: avg("mem"), disk: avg("disk"), network: avg("net") },
+          averages: { cpu: avg("cpu"), memory: avg("mem"), disk: avg("disk"), network: avg("netIn") },
           topProcesses: procs.slice(0, 5),
         }}
         contextMessage="Analyze current telemetry stream and top running processes. Identify memory leaks, CPU spikes, or disk I/O bottlenecks."
@@ -87,8 +182,8 @@ function Performance() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard label="Disk I/O" value={last ? Math.round(last.diskR + last.diskW) : 0} unit=" MB/s"
-          stats={{ min: 0, max: max("diskR") + max("diskW"), avg: avg("diskR") + avg("diskW") }}>
+        <ChartCard label="Disk I/O" value={last ? Math.round((last as any).diskR + (last as any).diskW) : 0} unit=" MB/s"
+          stats={{ min: 0, max: max("diskR" as keyof PerfSample) + max("diskW" as keyof PerfSample), avg: avg("diskR" as keyof PerfSample) + avg("diskW" as keyof PerfSample) }}>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={data}>
               <CartesianGrid stroke="var(--border-dim)" strokeDasharray="2 4" />

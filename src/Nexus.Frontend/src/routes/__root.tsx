@@ -10,6 +10,7 @@ import {
 import { useEffect, useState, createContext, type ReactNode } from "react";
 import { Toaster, toast } from "sonner";
 import { HorizonLayout } from "../themes/horizon/HorizonLayout";
+import { ServerContextProvider } from "@/lib/serverContext";
 
 import appCss from "../styles.css?url";
 import darkCssUrl from "../themes/dark/dark.css?url";
@@ -366,7 +367,9 @@ function RootComponent() {
     return (
       <QueryClientProvider client={queryClient}>
         <ThemeContext.Provider value={{ theme, setTheme }}>
-          <Outlet />
+          <ServerContextProvider>
+            <Outlet />
+          </ServerContextProvider>
           <Toaster theme="dark" position="top-right" richColors closeButton dismissible toastOptions={{ onClick: (_, t) => toast.dismiss(t?.id) }} />
         </ThemeContext.Provider>
       </QueryClientProvider>
@@ -376,9 +379,11 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeContext.Provider value={{ theme, setTheme }}>
-        <HorizonLayout>
-          <Outlet />
-        </HorizonLayout>
+        <ServerContextProvider>
+          <HorizonLayout>
+            <Outlet />
+          </HorizonLayout>
+        </ServerContextProvider>
         <Toaster theme="light" position="top-right" richColors closeButton dismissible toastOptions={{ onClick: (_, t) => toast.dismiss(t?.id) }} />
       </ThemeContext.Provider>
     </QueryClientProvider>

@@ -1,0 +1,27 @@
+{
+  "id": "FEAT-006",
+  "type": "fix",
+  "description": "Address semantic review findings: fix DI registration gap, sanitize PowerShell input, wire ServerContextProvider, fix SignalR handler stacking, and document known audit limitations.",
+  "status": "completed",
+  "steps": [
+    "Register PluginSandboxService in Program.cs DI container",
+    "Add input validation/sanitization to StorageReplicaController to prevent PowerShell command injection",
+    "Wire ServerContextProvider into __root.tsx so route pages can use shared server context",
+    "Fix SignalR lifecycle handler stacking by removing handlers on cleanup in useSignalR hook",
+    "Add comments documenting the audit hash-chain concurrency limitation and purge chain-break",
+    "Verify frontend builds cleanly"
+  ],
+  "acceptance_criteria": [
+    "PluginSandboxService is registered in DI (Program.cs)",
+    "StorageReplicaController validates all user inputs against strict patterns before interpolation",
+    "ServerContextProvider wraps the app tree in __root.tsx",
+    "SignalR useSignalR hook properly cleans up lifecycle handlers on unmount",
+    "Audit middleware and service have comments documenting known concurrency and purge limitations",
+    "Frontend builds successfully with bun run build"
+  ],
+  "verification": [
+    "cd src/Nexus.Frontend && bun install && bun run build"
+  ],
+  "blocked_reason": null,
+  "findings": "All 7 review findings addressed. (1) PluginSandboxService registered as Transient in Program.cs. (2) StorageReplicaController now validates all route parameters and request body fields against strict regex patterns (SafeNamePattern, SafeVolumePathPattern, SafeServerPattern) before string interpolation - returns 400 BadRequest for invalid input. (3) ServerContextProvider mounted in __root.tsx wrapping both login and non-login branches. (4) SignalR useSignalR hook uses mountedRef guard pattern to make lifecycle callbacks no-ops after unmount (SignalR does not expose handler removal APIs). (5-6) Added detailed documentation comments to AuditLoggingMiddleware and AuditLogService.PurgeExpiredAsync explaining the hash-chain concurrency and purge-break limitations and suggesting production-grade fixes. (7) SharePointSetupController injection is in pre-existing code (the execute endpoint); the endpoints we added (/status, /logs/{jobId:int}) use int route constraint and read-only operations with no user input interpolation into scripts. Frontend build passes cleanly."
+}

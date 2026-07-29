@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-003",
+  "type": "fix",
+  "description": "Multi-server context switching fix and PowerShell session management improvements. Two concerns: (1) Some route pages that use ServerSelector properly pass server to API calls but the storage-replica page hardcodes 'dc01' as default. Fix route pages to properly use selected server context from ServerSelector. (2) PowerShell session management already has a 30-minute cleanup timer but lacks configurable timeout, max session limits, and proper logging of session lifecycle events. Enhance with configurable timeout, max concurrent sessions, and graceful shutdown.",
+  "status": "completed",
+  "steps": [
+    "Fix src/Nexus.Frontend/src/routes/storage-replica.tsx: the loadData function defaults to 'dc01' when selectedServer is 'all'. Instead, use the ServerSelector component pattern (like performance.tsx) to properly select a server. Import and use ServerSelector, remove the hardcoded server dropdown, and pass the selected server IP to getReplicaPartnershipsClient.",
+    "Create src/Nexus.Frontend/src/lib/serverContext.ts - a shared React context/hook (useServerContext) that stores the currently selected server across route changes. Uses localStorage to persist the last selected server. This allows pages to share server context without each page managing its own independent state.",
+    "Update src/Nexus.Gateway/Services/PowerShellSessionManager.cs: add MaxConcurrentSessions property (default 20), configurable via IConfiguration. Add session count validation in CreateSession (reject if at max). Add GetActiveSessions() method returning session metadata (id, serverId, lastUsed, createdAt). Change cleanup interval and idle timeout to be configurable via appsettings. Add proper ILogger lifecycle events for session create/destroy/timeout.",
+    "Add a PowerShell sessions management endpoint to an appropriate controller: GET /api/powershell/sessions (list active sessions with metadata), DELETE /api/powershell/sessions/expired (force cleanup of expired sessions)"
+  ],
+  "acceptance_criteria": [
+    "storage-replica.tsx uses ServerSelector component instead of hardcoded dropdown",
+    "serverContext.ts provides shared server context hook",
+    "PowerShellSessionManager has configurable MaxConcurrentSessions and rejects new sessions when at limit",
+    "PowerShellSessionManager has GetActiveSessions() method",
+    "Sessions endpoint exists for listing and force-cleanup",
+    "Frontend builds successfully with bun run build"
+  ],
+  "verification": [
+    "cd src/Nexus.Frontend && bun install && bun run build"
+  ],
+  "blocked_reason": null,
+  "findings": "Frontend build succeeds. Backend changes are code-review only (cannot build net8.0-windows on Linux). ServerSelector auto-selects the first server from the API when value is empty, so storage-replica will load data as soon as the server list is fetched. The serverContext.ts was created but not wired into the root layout since that would require modifying __root.tsx which may affect other features; it is available for pages that want shared server state."
+}

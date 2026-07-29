@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useContext } from "react";
-import { Play, Terminal as TerminalIcon, CheckSquare, Square, StopCircle, Server as ServerIcon } from "lucide-react";
+import { Play, Terminal as TerminalIcon, CheckSquare, Square, StopCircle, Server as ServerIcon, Shield, Info, AlertTriangle } from "lucide-react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { getServersClient as getServers, type Server } from "@/api/client";
 import { getApiUrl } from "@/lib/backend";
@@ -10,6 +10,29 @@ import { PluginEntity } from "./plugins";
 export const Route = createFileRoute("/plugin/$id")({
   component: PluginRunnerPage,
 });
+
+interface PluginManifest {
+  id: string;
+  name: string;
+  description: string;
+  version: string;
+  author: string;
+  apiVersion: string;
+  minGatewayVersion: string;
+  capabilities: string[];
+  permissions: { resource: string; actions: string[]; justification: string }[];
+  lifecycleHooks: Record<string, string>;
+  entryPoint: string;
+  sandboxPolicy: string;
+  dependsOn: string[];
+}
+
+interface PluginValidationResult {
+  pluginId: string;
+  isValid: boolean;
+  violations: { rule: string; pattern: string; capability?: string; message: string }[];
+  messages: string[];
+}
 
 interface JobState {
   pluginId: string;
@@ -91,6 +114,9 @@ function PluginRunnerPage() {
   const [serverIps, setServerIps] = useState<string[]>([]);
   const [jobs, setJobs] = useState<JobState[]>([]);
   const [selectedTabIp, setSelectedTabIp] = useState<string>("");
+  const [manifest, setManifest] = useState<PluginManifest | null>(null);
+  const [validation, setValidation] = useState<PluginValidationResult | null>(null);
+  const [showSdkInfo, setShowSdkInfo] = useState(false);
 
   useEffect(() => {
     fetch(getApiUrl(`/plugins`))
@@ -111,6 +137,18 @@ function PluginRunnerPage() {
         toast.error("Failed to load plugin details");
         setError("Plugin data unavailable (backend offline)");
       });
+  }, [id]);
+
+  useEffect(() => {
+    fetch(getApiUrl(`/plugins/${id}/manifest`))
+      .then(r => { if (!r.ok) throw new Error(""); return r.json(); })
+      .then(setManifest)
+      .catch(() => {});
+
+    fetch(getApiUrl(`/plugins/${id}/validate`), { method: "POST" })
+      .then(r => { if (!r.ok) throw new Error(""); return r.json(); })
+      .then(setValidation)
+      .catch(() => {});
   }, [id]);
 
   function fetchJobs() {
@@ -186,6 +224,123 @@ function PluginRunnerPage() {
   return (
     <PageWrapper>
       <PageHeader eyebrow="Extension" title={plugin.name} subtitle={plugin.description} />
+
+      {/* SDK Info Section */}
+      <div className="nx-card p-4 mb-4">
+        <button
+          onClick={() => setShowSdkInfo(!showSdkInfo)}
+          className="flex items-center gap-2 w-full text-left"
+        >
+          <Info size={14} className="text-[var(--amber)]" />
+          <span className="text-[12px] font-semibold text-[var(--text)]">SDK Info &amp; Permissions</span>
+          <span className="ml-auto text-[11px] text-[var(--text-sub)]">{showSdkInfo ? "Hide" : "Show"}</span>
+        </button>
+
+        {showSdkInfo && manifest && (
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Version & Metadata */}
+            <div className="flex flex-col gap-2">
+              <span className="eyebrow">Metadata</span>
+              <div className="flex flex-col gap-1 text-[11px]">
+                <div className="flex justify-between"><span className="text-[var(--text-sub)]">Version</span><span className="mono text-[var(--text)]">{manifest.version}</span></div>
+                <div className="flex justify-between"><span className="text-[var(--text-sub)]">API Version</span><span className="mono text-[var(--text)]">{manifest.apiVersion}</span></div>
+                <div className="flex justify-between"><span className="text-[var(--text-sub)]">Min Gateway</span><span className="mono text-[var(--text)]">{manifest.minGatewayVersion}</span></div>
+                <div className="flex justify-between"><span className="text-[var(--text-sub)]">Entry Point</span><span className="mono text-[var(--text)]">{manifest.entryPoint}</span></div>
+                <div className="flex justify-between"><span className="text-[var(--text-sub)]">Author</span><span className="text-[var(--text)]">{manifest.author}</span></div>
+              </div>
+            </div>
+
+            {/* Sandbox Policy */}
+            <div className="flex flex-col gap-2">
+              <span className="eyebrow">Sandbox Policy</span>
+              <div className="flex items-center gap-2">
+                <Shield size={14} className={manifest.sandboxPolicy === "Strict" ? "text-[var(--ok)]" : manifest.sandboxPolicy === "Standard" ? "text-[var(--amber)]" : "text-[var(--crit)]"} />
+                <span className="text-[12px] font-medium text-[var(--text)]">{manifest.sandboxPolicy}</span>
+              </div>
+              {validation && (
+                <div className={`flex items-center gap-2 mt-1 text-[11px] ${validation.isValid ? "text-[var(--ok)]" : "text-[var(--crit)]"}`}>
+                  {validation.isValid ? (
+                    <><Shield size={12} /> Script passes validation</>
+                  ) : (
+                    <><AlertTriangle size={12} /> {validation.violations.length} violation(s) found</>
+                  )}
+                </div>
+              )}
+              {validation && !validation.isValid && (
+                <div className="mt-2 flex flex-col gap-1">
+                  {validation.violations.map((v, i) => (
+                    <div key={i} className="text-[10px] text-[var(--crit)] bg-[var(--crit)]/5 border border-[var(--crit)]/20 rounded px-2 py-1">
+                      {v.message}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Capabilities */}
+            <div className="flex flex-col gap-2">
+              <span className="eyebrow">Capabilities</span>
+              <div className="flex flex-wrap gap-1.5">
+                {manifest.capabilities.length === 0 && (
+                  <span className="text-[11px] text-[var(--text-sub)]">No capabilities declared</span>
+                )}
+                {manifest.capabilities.map((cap) => (
+                  <span key={cap} className="rounded-md border border-[var(--border-c)] bg-[var(--bg-surface)] px-2 py-0.5 text-[10px] mono text-[var(--text-sub)]">
+                    {cap}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Permissions */}
+            <div className="flex flex-col gap-2">
+              <span className="eyebrow">Permissions</span>
+              <div className="flex flex-col gap-1.5">
+                {manifest.permissions.length === 0 && (
+                  <span className="text-[11px] text-[var(--text-sub)]">No permissions required</span>
+                )}
+                {manifest.permissions.map((perm, i) => (
+                  <div key={i} className="text-[11px] border border-[var(--border-c)] rounded-md px-2 py-1.5 bg-[var(--bg-surface)]">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-[var(--text)]">{perm.resource}</span>
+                      <span className="text-[var(--text-sub)]">[{perm.actions.join(", ")}]</span>
+                    </div>
+                    <div className="text-[10px] text-[var(--text-sub)] mt-0.5">{perm.justification}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Lifecycle Hooks */}
+            {Object.keys(manifest.lifecycleHooks).length > 0 && (
+              <div className="flex flex-col gap-2 md:col-span-2">
+                <span className="eyebrow">Lifecycle Hooks</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.keys(manifest.lifecycleHooks).map((hook) => (
+                    <span key={hook} className="rounded-md border border-[var(--amber)]/30 bg-[var(--amber-low)] px-2 py-0.5 text-[10px] mono text-[var(--amber)]">
+                      {hook}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Dependencies */}
+            {manifest.dependsOn.length > 0 && (
+              <div className="flex flex-col gap-2 md:col-span-2">
+                <span className="eyebrow">Dependencies</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {manifest.dependsOn.map((dep) => (
+                    <span key={dep} className="rounded-md border border-[var(--border-c)] bg-[var(--bg-surface)] px-2 py-0.5 text-[10px] mono text-[var(--text-sub)]">
+                      {dep}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="nx-card p-6 mb-6">
         <div className="flex flex-wrap gap-4 items-end justify-between">

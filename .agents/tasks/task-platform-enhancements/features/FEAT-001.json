@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Plugin System SDK, Lifecycle Hooks, Capability Descriptors, and Sandboxing. Extend PluginEntity model with lifecycle hooks (onInstall, onActivate, onDeactivate, onUninstall), capability descriptors (requiredPermissions, supportedPlatforms, minVersion), and a sandboxing/permission model. Create a Plugin SDK specification document. Add backend validation of plugin permissions. Update frontend plugin pages to show SDK info and permissions.",
+  "status": "completed",
+  "steps": [
+    "Extend src/Nexus.Gateway/Models/PluginEntity.cs with new fields: Version, MinGatewayVersion, RequiredCapabilities (JSON string list like 'filesystem', 'network', 'registry', 'activedirectory'), SandboxLevel ('full', 'restricted', 'minimal'), LifecycleHooks (JSON object with OnInstall, OnActivate, OnDeactivate, OnUninstall script content), DependsOn (comma-separated plugin IDs), ApiVersion string",
+    "Create src/Nexus.Gateway/Models/PluginManifest.cs with a PluginManifest class that defines the SDK contract: Id, Name, Description, Version, Author, ApiVersion, Capabilities (list of PluginCapability enum), Permissions (list of PluginPermission objects with Resource, Actions, Justification), LifecycleHooks (dictionary of hook name to script), EntryPoint, SandboxPolicy (enum: Unrestricted, Standard, Strict)",
+    "Create src/Nexus.Gateway/Services/PluginSandboxService.cs that validates plugin script content against its declared permissions before execution. If a plugin declares only 'filesystem' capability but tries to use network commands, block it. Validate against BlockedPatterns similar to PowerShellSessionManager but filtered by capability set.",
+    "Update src/Nexus.Gateway/Controllers/PluginsController.cs: add GET /api/plugins/{id}/manifest endpoint returning the plugin's manifest, add POST /api/plugins/{id}/validate endpoint that runs the sandbox validator on the script, add lifecycle hook execution in the run endpoint (call OnActivate before running, OnDeactivate after)",
+    "Update src/Nexus.Frontend/src/routes/plugin.$id.tsx to display plugin manifest info (capabilities, permissions, sandbox level, version, API version) in a new 'SDK Info' section",
+    "Create src/Nexus.Gateway/Docs/PLUGIN_SDK.md documenting the plugin contract: manifest format, lifecycle hooks, available capabilities, permission model, how to develop third-party plugins, sandboxing rules"
+  ],
+  "acceptance_criteria": [
+    "PluginEntity model has Version, RequiredCapabilities, SandboxLevel, LifecycleHooks fields",
+    "PluginManifest model exists with full SDK contract definition",
+    "PluginSandboxService validates script content against declared capabilities",
+    "PluginsController has /manifest and /validate endpoints",
+    "Frontend plugin page shows SDK metadata section",
+    "PLUGIN_SDK.md documentation exists with complete developer guide",
+    "Frontend builds successfully with bun run build"
+  ],
+  "verification": [
+    "cd src/Nexus.Frontend && bun install && bun run build"
+  ],
+  "blocked_reason": null,
+  "findings": "Frontend build passes successfully. Backend cannot be compiled (net8.0-windows on Linux), validated via code review. The INVALID_ANNOTATION warnings from @microsoft/signalr are pre-existing and do not affect the build."
+}

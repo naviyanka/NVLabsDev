@@ -62,35 +62,6 @@ public class VmsController : ControllerBase
         public string Status { get; set; } = "Up";
     }
 
-    public class ReplicaPartnershipDto
-    {
-        [JsonPropertyName("id")]
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-
-        [JsonPropertyName("sourceServer")]
-        public string SourceServer { get; set; } = string.Empty;
-
-        [JsonPropertyName("targetServer")]
-        public string TargetServer { get; set; } = string.Empty;
-
-        [JsonPropertyName("replicationGroup")]
-        public string ReplicationGroup { get; set; } = "RG01";
-
-        [JsonPropertyName("status")]
-        public string Status { get; set; } = "Synchronized";
-
-        [JsonPropertyName("replicationType")]
-        public string ReplicationType { get; set; } = "Asynchronous";
-
-        [JsonPropertyName("logSizeGB")]
-        public double LogSizeGB { get; set; } = 8.0;
-
-        [JsonPropertyName("lastSyncTime")]
-        public string LastSyncTime { get; set; } = DateTime.Now.ToString("g");
-
-        [JsonPropertyName("rpoSeconds")]
-        public int RpoSeconds { get; set; } = 30;
-    }
 
     [HttpGet("vms")]
     public IActionResult GetVms([FromRoute] string serverId)
@@ -235,10 +206,5 @@ public class VmsController : ControllerBase
         return Ok(switches);
     }
 
-    [HttpGet("storage-replica")]
-    public IActionResult GetStorageReplica([FromRoute] string serverId)
-    {
-        var list = new List<ReplicaPartnershipDto>();
-        return Ok(list);
-    }
+
 }

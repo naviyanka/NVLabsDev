@@ -187,13 +187,22 @@ export interface VirtualSwitch {
 export interface ReplicaPartnership {
   id: string;
   sourceServer: string;
-  targetServer: string;
+  destServer: string;
+  sourceVol: string;
+  destVol: string;
+  sourceLogVol: string;
+  destLogVol: string;
+  mode: "Synchronous" | "Asynchronous";
+  status: string;
+  progress: number;
+  bytes: number;
+  latencyMs: number;
+  transferRateMbps: number;
+  name: string;
   replicationGroup: string;
-  status: "Synchronized" | "Replicating" | "Paused" | "Error" | "InitialSyncRequired";
-  replicationType: "Synchronous" | "Asynchronous";
-  logSizeGB: number;
-  lastSyncTime: string;
-  rpoSeconds: number;
+  logSizeGb: number;
+  encryption: boolean;
+  autoFailover: boolean;
 }
 
 export interface WindowsRole {

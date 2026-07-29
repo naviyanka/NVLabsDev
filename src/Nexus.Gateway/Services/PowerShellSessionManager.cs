@@ -4,6 +4,7 @@ using System.Threading.Channels;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Configuration;
 
 namespace Nexus.Gateway.Services;
 
@@ -16,14 +17,30 @@ public class PowerShellSessionManager : IDisposable
     private readonly ILogger<PowerShellSessionManager> _logger;
     private readonly ConcurrentDictionary<string, PsSession> _sessions = new();
     private readonly Timer _cleanupTimer;
-
     private readonly IPowerShellExecutionService _executionService;
 
-    public PowerShellSessionManager(ILogger<PowerShellSessionManager> logger, IPowerShellExecutionService executionService)
+    private readonly int _maxConcurrentSessions;
+    private readonly int _idleTimeoutMinutes;
+    private readonly int _cleanupIntervalMinutes;
+
+    public PowerShellSessionManager(ILogger<PowerShellSessionManager> logger, IPowerShellExecutionService executionService, IConfiguration configuration)
     {
         _logger = logger;
         _executionService = executionService;
-        _cleanupTimer = new Timer(CleanupIdleSessions, null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
+
+        _maxConcurrentSessions = configuration.GetValue("PowerShell:MaxConcurrentSessions", 20);
+        _idleTimeoutMinutes = configuration.GetValue("PowerShell:IdleTimeoutMinutes", 30);
+        _cleanupIntervalMinutes = configuration.GetValue("PowerShell:CleanupIntervalMinutes", 5);
+
+        _logger.LogInformation(
+            "PowerShell session manager initialized: MaxSessions={Max}, IdleTimeout={Timeout}min, CleanupInterval={Interval}min",
+            _maxConcurrentSessions, _idleTimeoutMinutes, _cleanupIntervalMinutes);
+
+        _cleanupTimer = new Timer(
+            CleanupIdleSessions,
+            null,
+            TimeSpan.FromMinutes(_cleanupIntervalMinutes),
+            TimeSpan.FromMinutes(_cleanupIntervalMinutes));
     }
 
     private class PsSession : IDisposable
@@ -33,6 +50,7 @@ public class PowerShellSessionManager : IDisposable
         public string ServerId { get; }
         public SemaphoreSlim Lock { get; } = new(1, 1);
         public DateTime LastUsed { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; } = DateTime.UtcNow;
 
         public PsSession(string serverId, IPowerShellExecutionService executionService, ILogger logger)
         {
@@ -98,11 +116,17 @@ public class PowerShellSessionManager : IDisposable
 
     public string CreateSession(string serverId)
     {
+        if (_sessions.Count >= _maxConcurrentSessions)
+        {
+            _logger.LogWarning("Max concurrent sessions ({Max}) reached. Rejecting new session for {Server}.", _maxConcurrentSessions, serverId);
+            throw new InvalidOperationException($"Maximum concurrent sessions ({_maxConcurrentSessions}) reached. Please close existing sessions before creating new ones.");
+        }
+
         var sessionId = Guid.NewGuid().ToString("N")[..12];
         var session = new PsSession(serverId, _executionService, _logger);
         _sessions[sessionId] = session;
 
-        _logger.LogInformation("Native PS runspace {Id} created for {Server}", sessionId, serverId);
+        _logger.LogInformation("Native PS runspace {Id} created for {Server}. Active sessions: {Count}/{Max}", sessionId, serverId, _sessions.Count, _maxConcurrentSessions);
         return sessionId;
     }
 
@@ -210,8 +234,9 @@ public class PowerShellSessionManager : IDisposable
     {
         if (_sessions.TryRemove(sessionId, out var session))
         {
+            var duration = DateTime.UtcNow - session.CreatedAt;
             session.Dispose();
-            _logger.LogInformation("Destroyed native PS session {Id}", sessionId);
+            _logger.LogInformation("Destroyed native PS session {Id} for {Server}. Lifetime: {Duration}. Remaining: {Count}", sessionId, session.ServerId, duration, _sessions.Count);
         }
     }
 
@@ -222,7 +247,36 @@ public class PowerShellSessionManager : IDisposable
 
     private void CleanupIdleSessions(object? state)
     {
-        var cutoff = DateTime.UtcNow.AddMinutes(-30);
+        var cutoff = DateTime.UtcNow.AddMinutes(-_idleTimeoutMinutes);
+        var cleanedCount = 0;
+        foreach (var kvp in _sessions)
+        {
+            if (kvp.Value.LastUsed < cutoff)
+            {
+                if (_sessions.TryRemove(kvp.Key, out var s))
+                {
+                    var duration = DateTime.UtcNow - s.CreatedAt;
+                    s.Dispose();
+                    cleanedCount++;
+                    _logger.LogInformation("Cleaned idle native PS session {Id} for {Server}. Idle for >{Timeout}min. Lifetime: {Duration}", kvp.Key, s.ServerId, _idleTimeoutMinutes, duration);
+                }
+            }
+        }
+
+        if (cleanedCount > 0)
+        {
+            _logger.LogInformation("Session cleanup complete: removed {Cleaned} idle sessions. Remaining: {Count}", cleanedCount, _sessions.Count);
+        }
+    }
+
+    /// <summary>
+    /// Force cleanup of all expired/idle sessions regardless of the timer schedule.
+    /// Returns the number of sessions cleaned up.
+    /// </summary>
+    public int ForceCleanupExpiredSessions()
+    {
+        var cutoff = DateTime.UtcNow.AddMinutes(-_idleTimeoutMinutes);
+        var cleanedCount = 0;
         foreach (var kvp in _sessions)
         {
             if (kvp.Value.LastUsed < cutoff)
@@ -230,10 +284,36 @@ public class PowerShellSessionManager : IDisposable
                 if (_sessions.TryRemove(kvp.Key, out var s))
                 {
                     s.Dispose();
-                    _logger.LogInformation("Cleaned idle native PS session {Id}", kvp.Key);
+                    cleanedCount++;
+                    _logger.LogInformation("Force-cleaned expired PS session {Id} for {Server}", kvp.Key, s.ServerId);
                 }
             }
         }
+
+        _logger.LogInformation("Force cleanup complete: removed {Cleaned} expired sessions. Remaining: {Count}", cleanedCount, _sessions.Count);
+        return cleanedCount;
+    }
+
+    /// <summary>
+    /// Returns metadata about all active sessions for monitoring purposes.
+    /// </summary>
+    public IReadOnlyList<SessionInfo> GetActiveSessions()
+    {
+        return _sessions.Select(kvp => new SessionInfo
+        {
+            SessionId = kvp.Key,
+            ServerId = kvp.Value.ServerId,
+            LastUsed = kvp.Value.LastUsed,
+            CreatedAt = kvp.Value.CreatedAt
+        }).ToList().AsReadOnly();
+    }
+
+    public class SessionInfo
+    {
+        public string SessionId { get; set; } = string.Empty;
+        public string ServerId { get; set; } = string.Empty;
+        public DateTime LastUsed { get; set; }
+        public DateTime CreatedAt { get; set; }
     }
 
     public void Dispose()
