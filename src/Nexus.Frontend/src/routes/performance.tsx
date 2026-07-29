@@ -233,6 +233,9 @@ function Performance() {
           </table>
         </NxCard>
       </div>
+
+      {/* Historical Telemetry Chart */}
+      <HistoryChart server={server} />
     </PageWrapper>
   );
 }
@@ -260,6 +263,64 @@ function ChartCard({ label, value, unit, trend = 0, stats, children }: {
       <div className="mono mt-3 flex justify-end gap-4 text-[10px] text-[var(--text-sub)]">
         <span>MIN {stats.min}</span><span>AVG {stats.avg}</span><span>MAX {stats.max}</span>
       </div>
+    </div>
+  );
+}
+
+function HistoryChart({ server }: { server: string }) {
+  const [history, setHistory] = useState<{ t: string; cpu: number; mem: number; disk: number }[]>([]);
+  const [hours, setHours] = useState(24);
+
+  useEffect(() => {
+    if (!server) return;
+    fetch(`/api/performance/${encodeURIComponent(server)}/history?hours=${hours}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setHistory(Array.isArray(data) ? data : []))
+      .catch(() => setHistory([]));
+  }, [server, hours]);
+
+  if (history.length === 0) return null;
+
+  const formatted = history.map(h => ({
+    ...h,
+    time: new Date(h.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+  }));
+
+  return (
+    <div className="mt-6">
+      <NxCard eyebrow="Historical Telemetry" title={`Last ${hours} hours`}>
+        <div className="flex items-center gap-2 mb-4">
+          {[1, 6, 12, 24, 72, 168].map(h => (
+            <button
+              key={h}
+              onClick={() => setHours(h)}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${hours === h ? "bg-[var(--amber)] text-black" : "bg-[var(--bg-void)] text-[var(--text-sub)] hover:text-[var(--text)]"}`}
+            >
+              {h < 24 ? `${h}h` : `${h / 24}d`}
+            </button>
+          ))}
+        </div>
+        <ResponsiveContainer width="100%" height={250}>
+          <AreaChart data={formatted}>
+            <defs>
+              <linearGradient id="cpuHist" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--amber)" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="var(--amber)" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="memHist" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--teal)" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="var(--teal)" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke="var(--border-dim)" strokeDasharray="2 4" />
+            <XAxis dataKey="time" tick={{ fontSize: 10, fill: "var(--text-sub)" }} interval="preserveStartEnd" />
+            <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "var(--text-sub)" }} />
+            <Tooltip contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border-c)", fontSize: 11 }} />
+            <Area type="monotone" dataKey="cpu" stroke="var(--amber)" fill="url(#cpuHist)" strokeWidth={2} name="CPU %" />
+            <Area type="monotone" dataKey="mem" stroke="var(--teal)" fill="url(#memHist)" strokeWidth={2} name="RAM %" />
+          </AreaChart>
+        </ResponsiveContainer>
+      </NxCard>
     </div>
   );
 }

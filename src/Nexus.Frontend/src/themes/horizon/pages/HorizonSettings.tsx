@@ -11,6 +11,7 @@ import { SettingsImportExport } from "@/components/settings/SettingsImportExport
 import { SoftwareRepoManager } from "@/components/apps/SoftwareRepoManager";
 import { ApiHealthSettingsView } from "@/components/settings/ApiHealthSettingsView";
 import { OllamaManager } from "@/components/settings/OllamaManager";
+import { AlertRulesManager } from "@/components/settings/AlertRulesManager";
 
 
 interface AppSettings {
@@ -646,6 +647,7 @@ export function HorizonSettings() {
           {/* CATEGORY 5: DIAGNOSTICS & TELEMETRY */}
           {activeSection === "diagnostics" && (
             <div className="space-y-6">
+              <AlertRulesManager />
               <BackgroundJobsView />
             </div>
           )}

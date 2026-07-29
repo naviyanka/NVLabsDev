@@ -16,9 +16,13 @@ public class ServersController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Server>>> GetServers()
+    public async Task<ActionResult<IEnumerable<Server>>> GetServers([FromQuery] string? group = null)
     {
         var servers = await _serverService.GetServersAsync();
+        if (!string.IsNullOrWhiteSpace(group))
+        {
+            servers = servers.Where(s => s.Group.Equals(group, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
         return Ok(servers);
     }
 
@@ -75,4 +79,64 @@ public class ServersController : ControllerBase
         var disks = await cimService.GetDisksAsync(ip);
         return Ok(disks);
     }
+
+    [HttpPost("bulk-action")]
+    public async Task<IActionResult> BulkAction([FromBody] BulkActionRequest request, [FromServices] IPowerShellExecutionService ps)
+    {
+        if (request.ServerIps == null || request.ServerIps.Count == 0)
+            return BadRequest(new { error = "At least one server IP is required." });
+
+        var results = new List<object>();
+
+        foreach (var ip in request.ServerIps.Take(20)) // ponytail: cap at 20, pagination if fleet grows past that
+        {
+            try
+            {
+                string output;
+                if (request.Action == "restart-service" && !string.IsNullOrWhiteSpace(request.ServiceName))
+                {
+                    var cmd = ip == "127.0.0.1" || ip == "localhost"
+                        ? $"-NoProfile -Command \"Restart-Service -Name '{request.ServiceName}' -Force\""
+                        : $"-NoProfile -Command \"Invoke-Command -ComputerName {ip} -ScriptBlock {{ Restart-Service -Name '{request.ServiceName}' -Force }}\"";
+                    var res = await ps.ExecuteAsync(cmd, HttpContext.RequestAborted, 30000);
+                    output = res.ExitCode == 0 ? "OK" : res.StandardError;
+                }
+                else if (request.Action == "run-script" && !string.IsNullOrWhiteSpace(request.Script))
+                {
+                    var encoded = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(request.Script));
+                    var cmd = ip == "127.0.0.1" || ip == "localhost"
+                        ? $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encoded}"
+                        : $"-NoProfile -ExecutionPolicy Bypass -Command \"Invoke-Command -ComputerName {ip} -ScriptBlock {{ [System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String('{encoded}')) | Invoke-Expression }}\"";
+                    var res = await ps.ExecuteAsync(cmd, HttpContext.RequestAborted, 60000);
+                    output = string.IsNullOrWhiteSpace(res.StandardOutput) ? (res.ExitCode == 0 ? "OK" : res.StandardError) : res.StandardOutput;
+                }
+                else if (request.Action == "restart-server")
+                {
+                    var cimService = HttpContext.RequestServices.GetRequiredService<CimService>();
+                    var ok = await cimService.RestartServerAsync(ip);
+                    output = ok ? "Restart initiated" : "Failed";
+                }
+                else
+                {
+                    output = "Unknown action";
+                }
+
+                results.Add(new { ip, success = true, output = output.Trim() });
+            }
+            catch (Exception ex)
+            {
+                results.Add(new { ip, success = false, output = ex.Message });
+            }
+        }
+
+        return Ok(new { action = request.Action, results });
+    }
+}
+
+public class BulkActionRequest
+{
+    public List<string> ServerIps { get; set; } = new();
+    public string Action { get; set; } = ""; // restart-service, run-script, restart-server
+    public string? ServiceName { get; set; }
+    public string? Script { get; set; }
 }
