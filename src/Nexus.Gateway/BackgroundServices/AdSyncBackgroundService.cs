@@ -32,6 +32,13 @@ public class AdSyncBackgroundService : BackgroundService
                 var setting = await db.AppSettings.FirstOrDefaultAsync(s => s.Id == "global", cancellationToken: stoppingToken);
                 int intervalMinutes = setting?.AdSyncInterval > 0 ? setting.AdSyncInterval : 60;
 
+                // Skip AD sync entirely if not using domain login
+                if (setting == null || !setting.AppLoginMethod.Equals("Domain", StringComparison.OrdinalIgnoreCase))
+                {
+                    await Task.Delay(TimeSpan.FromMinutes(intervalMinutes), stoppingToken);
+                    continue;
+                }
+
                 _logger.LogInformation("Starting background AD computer sync.");
 
                 var adServers = await adService.GetDomainComputersAsync();

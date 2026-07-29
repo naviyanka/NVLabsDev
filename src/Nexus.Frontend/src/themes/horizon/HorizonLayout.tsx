@@ -168,13 +168,10 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
     const originalSuccess = toast.success;
     const originalError = toast.error;
     
-    // @ts-ignore
+    // @ts-ignore — track in local notification panel without posting back to backend
     toast.success = (msg: string, data?: any) => {
       setNotifications(prev => [{ id: Math.random().toString(), msg, time: new Date() }, ...prev]);
       const id = data?.id || Math.random().toString();
-      if ((window as any).__nexus_backend_online !== false && id !== "backend-offline" && id !== "backend-action-failed" && !msg.includes("Backend connection restored")) {
-        fetch(getApiUrl('/notifications/custom'), { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ type: 'Success', message: msg }) }).catch(()=>{});
-      }
       originalSuccess(msg, { 
         id,
         ...data, 
@@ -187,9 +184,6 @@ export function HorizonLayout({ children }: { children: ReactNode }) {
     toast.error = (msg: string, data?: any) => {
       setNotifications(prev => [{ id: Math.random().toString(), msg, time: new Date() }, ...prev]);
       const id = data?.id || Math.random().toString();
-      if ((window as any).__nexus_backend_online !== false && id !== "backend-offline" && id !== "backend-action-failed" && !msg.includes("Connection to backend lost")) {
-        fetch(getApiUrl('/notifications/custom'), { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ type: 'Error', message: msg }) }).catch(()=>{});
-      }
       originalError(msg, { 
         id,
         ...data, 

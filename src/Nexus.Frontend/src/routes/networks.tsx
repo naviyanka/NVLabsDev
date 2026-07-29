@@ -60,7 +60,7 @@ export const Route = createFileRoute("/networks")({
 type TabType = "Adapters" | "Routes" | "DNS" | "Diagnostics";
 
 function NetworksPage() {
-  const [server, setServer] = useState("dc01");
+  const [server, setServer] = useState("127.0.0.1");
   const [adapters, setAdapters] = useState<NetworkAdapter[]>([]);
   const [routes, setRoutes] = useState<NetworkRoute[]>([]);
   const [dnsCache, setDnsCache] = useState<DnsCacheEntry[]>([]);

@@ -55,7 +55,7 @@ export const Route = createFileRoute("/tasks")({
 });
 
 function TasksPage() {
-  const [server, setServer] = useState("dc01");
+  const [server, setServer] = useState("127.0.0.1");
   const [tasks, setTasks] = useState<ScheduledTask[]>([]);
   const [sel, setSel] = useState<ScheduledTask | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<string>("ALL");

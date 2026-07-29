@@ -62,7 +62,7 @@ type CategoryFilter = "ALL" | "Security" | "Critical" | "Cumulative" | "Definiti
 type SeverityFilter = "ALL" | "Critical" | "Important" | "Moderate" | "Low" | "Optional";
 
 function UpdatesPage() {
-  const [server, setServer] = useState("dc01");
+  const [server, setServer] = useState("127.0.0.1");
   const [serverInfo, setServerInfo] = useState<Server | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("pending");
 

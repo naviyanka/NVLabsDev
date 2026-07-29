@@ -277,7 +277,7 @@ public class HealthController : ControllerBase
             // Subsystem 4: Active Directory Service Task
             var adTask = Task.Run(async () =>
             {
-                if (_cachedAdHealth != null && (now - _lastAdCheck).TotalSeconds < 10)
+                if (_cachedAdHealth != null && (now - _lastAdCheck).TotalSeconds < 60)
                     return _cachedAdHealth;
 
                 var sw = Stopwatch.StartNew();

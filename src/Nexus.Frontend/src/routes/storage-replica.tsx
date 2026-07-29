@@ -915,7 +915,7 @@ function PartnershipGridCard({
    CREATION WIZARD MODAL COMPONENT
    ========================================================================= */
 function CreatePartnershipModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [sourceServer, setSourceServer] = useState("DC01");
+  const [sourceServer, setSourceServer] = useState("NAVI");
   const [sourceVol, setSourceVol] = useState("G:");
   const [sourceLogVol, setSourceLogVol] = useState("L:");
 
@@ -1003,7 +1003,7 @@ function CreatePartnershipModal({ onClose, onCreated }: { onClose: () => void; o
                   onChange={(e) => setSourceServer(e.target.value)}
                   className="w-full rounded-xl border border-[var(--border-c)] bg-[var(--bg-card)] px-3 py-2 text-xs font-mono text-[var(--text)] focus:border-[var(--amber)] focus:outline-none"
                 >
-                  <option value="DC01">DC01 (Domain Controller)</option>
+                  <option value="NAVI">NAVI (Local Server)</option>
                   <option value="FS01">FS01 (File Server 01)</option>
                   <option value="SQL01">SQL01 (Database Server 01)</option>
                   <option value="NEXUS01">NEXUS01 (Hyper-V Host)</option>

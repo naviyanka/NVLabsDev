@@ -10,6 +10,9 @@ import fs from 'fs';
 
 export default defineConfig({
   vite: {
+    ssr: {
+      noExternal: ["@xterm/xterm", "@xterm/addon-fit"],
+    },
     optimizeDeps: {
       exclude: ["@google/genai"],
     },

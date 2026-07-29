@@ -85,6 +85,11 @@ if ($null -eq $failed) { $failed = 0 }
             var result = await _ps.ExecuteAsync($"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {base64}", HttpContext.RequestAborted);
             var output = result.StandardOutput;
 
+            if (string.IsNullOrWhiteSpace(output))
+            {
+                return StatusCode(503, new { error = $"No response from server {ip}. It may be unreachable." });
+            }
+
             using var doc = JsonDocument.Parse(output);
             var root = doc.RootElement;
 

@@ -274,7 +274,7 @@ function SharePointSetupPage() {
   const [dbPrefix, setDbPrefix] = useState("SP");
   const [useExistingShare, setUseExistingShare] = useState(false);
   const [fileSharePath, setFileSharePath] = useState("C:\\NexusDeploy\\SharePoint");
-  const [fileShareUrl, setFileShareUrl] = useState("\\\\DC01\\SPSetup");
+  const [fileShareUrl, setFileShareUrl] = useState("\\\\NAVI\\SPSetup");
 
   const [execution, setExecution] = useState({
     downloadSql: true,
@@ -539,7 +539,7 @@ function SharePointSetupPage() {
   const triggerAutomatorScript = async () => {
     toast.info("Injecting SMB Share & Windows Firewall Rules via WinRM...");
     setTimeout(() => {
-      toast.success(`SMB Share ${useExistingShare ? fileShareUrl : "\\\\DC01\\SPSetup"} provisioned with ACL permissions.`);
+      toast.success(`SMB Share ${useExistingShare ? fileShareUrl : "\\\\NAVI\\SPSetup"} provisioned with ACL permissions.`);
     }, 1300);
   };
 

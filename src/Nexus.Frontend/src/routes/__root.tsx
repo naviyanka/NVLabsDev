@@ -32,8 +32,10 @@ if (typeof window !== "undefined") {
     const wasOnline = (window as any).__nexus_backend_online;
     (window as any).__nexus_backend_online = false;
     
+    // Only show toast on the first transition to offline — use Infinity duration so it stays
+    // until explicitly dismissed by __nexus_set_backend_online. The stable id prevents duplicates.
     if (wasOnline) {
-      toast.error("Connection to backend lost. Running in offline mode.", { id: "backend-offline" });
+      toast.error("Connection to backend lost. Running in offline mode.", { id: "backend-offline", duration: Infinity });
     } else if (method && method.toUpperCase() !== "GET") {
       toast.error("Backend is dead/unreachable. Action failed.", { id: "backend-action-failed" });
     }
@@ -46,7 +48,9 @@ if (typeof window !== "undefined") {
     (window as any).__nexus_backend_online = true;
     
     if (wasOffline) {
-      toast.success("Backend connection restored.");
+      toast.dismiss("backend-offline");
+      toast.dismiss("backend-action-failed");
+      toast.success("Backend connection restored.", { id: "backend-restored" });
     }
     
     window.dispatchEvent(new CustomEvent("nexus-backend-status", { detail: { online: true } }));
@@ -370,7 +374,7 @@ function RootComponent() {
           <ServerContextProvider>
             <Outlet />
           </ServerContextProvider>
-          <Toaster theme="dark" position="top-right" richColors closeButton dismissible toastOptions={{ onClick: (_, t) => toast.dismiss(t?.id) }} />
+          <Toaster theme="dark" position="top-right" richColors closeButton dismissible duration={2000} toastOptions={{ onClick: (_, t) => toast.dismiss(t?.id) }} />
         </ThemeContext.Provider>
       </QueryClientProvider>
     );
@@ -384,7 +388,7 @@ function RootComponent() {
             <Outlet />
           </HorizonLayout>
         </ServerContextProvider>
-        <Toaster theme="light" position="top-right" richColors closeButton dismissible toastOptions={{ onClick: (_, t) => toast.dismiss(t?.id) }} />
+        <Toaster theme="light" position="top-right" richColors closeButton dismissible duration={2000} toastOptions={{ onClick: (_, t) => toast.dismiss(t?.id) }} />
       </ThemeContext.Provider>
     </QueryClientProvider>
   );

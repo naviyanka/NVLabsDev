@@ -29,7 +29,7 @@ type ViewMode = "table" | "grouped" | "heatmap";
 type CategoryFilter = "all" | "high_cpu" | "high_mem" | "System" | "Service" | "Application" | "Database";
 
 function ProcessesPage() {
-  const [server, setServer] = useState("dc01");
+  const [server, setServer] = useState("127.0.0.1");
   const [procs, setProcs] = useState<Process[]>([]);
   const [sysCpu, setSysCpu] = useState<number>(0);
   const [sysMem, setSysMem] = useState<number>(0);

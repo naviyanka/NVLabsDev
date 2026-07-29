@@ -51,7 +51,7 @@ type SortColumn = "name" | "publisher" | "version" | "installDate" | "sizeMB";
 type SortOrder = "asc" | "desc";
 
 function AppsPage() {
-  const [server, setServer] = useState("dc01");
+  const [server, setServer] = useState("127.0.0.1");
   const [apps, setApps] = useState<InstalledApp[]>([]);
   const [selApp, setSelApp] = useState<InstalledApp | null>(null);
   const [searchQuery, setSearchQuery] = useState("");

@@ -20,19 +20,15 @@ public class ActiveDirectoryService
     public async Task<List<Server>> GetDomainComputersAsync()
     {
         var servers = new List<Server>();
-        var domainName = "nvlabs.com";
-        try
+
+        // Skip AD entirely if login method is not domain-based
+        var setting = await _db.AppSettings.FirstOrDefaultAsync(s => s.Id == "global");
+        if (setting == null || !setting.AppLoginMethod.Equals("Domain", StringComparison.OrdinalIgnoreCase))
         {
-            var setting = await _db.AppSettings.FirstOrDefaultAsync(s => s.Id == "global");
-            if (setting != null && !string.IsNullOrEmpty(setting.DefaultDomainName))
-            {
-                domainName = setting.DefaultDomainName;
-            }
+            return servers;
         }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to load DefaultDomainName from AppSettings. Using fallback nvlabs.com.");
-        }
+
+        var domainName = !string.IsNullOrEmpty(setting.DefaultDomainName) ? setting.DefaultDomainName : "nvlabs.com";
 
         try
         {
@@ -84,16 +80,15 @@ public class ActiveDirectoryService
     public async Task<List<string>> SearchUsersAsync(string query)
     {
         var users = new List<string>();
-        var domainName = "nvlabs.com";
-        try
+
+        // Skip AD entirely if login method is not domain-based
+        var setting = await _db.AppSettings.FirstOrDefaultAsync(s => s.Id == "global");
+        if (setting == null || !setting.AppLoginMethod.Equals("Domain", StringComparison.OrdinalIgnoreCase))
         {
-            var setting = await _db.AppSettings.FirstOrDefaultAsync(s => s.Id == "global");
-            if (setting != null && !string.IsNullOrEmpty(setting.DefaultDomainName))
-            {
-                domainName = setting.DefaultDomainName;
-            }
+            return users;
         }
-        catch { }
+
+        var domainName = !string.IsNullOrEmpty(setting.DefaultDomainName) ? setting.DefaultDomainName : "nvlabs.com";
 
         try
         {
