@@ -238,7 +238,20 @@ async function callOpenAICompatibleAgentic({
   ];
 
   const hasBackend = backendBaseUrl && authToken;
-  const tools = hasBackend ? buildOpenAITools() : undefined;
+
+  // Small models hallucinate tool JSON into content instead of using tool_calls properly.
+  // Only enable tools for models known to support function calling.
+  const TOOL_CAPABLE_MODELS = [
+    "gpt-4", "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo",
+    "llama3.1", "llama3.2:3b", "llama3.3",
+    "qwen2.5:3b", "qwen2.5:7b", "qwen2.5:14b", "qwen2.5:32b", "qwen2.5:72b",
+    "qwen2.5-coder:7b", "qwen2.5-coder:14b", "qwen2.5-coder:32b",
+    "mistral", "mixtral", "command-r", "phi3:medium",
+    "deepseek-r1:7b", "deepseek-r1:8b", "deepseek-r1:14b", "deepseek-r1:32b",
+  ];
+  const modelLower = (model || "").toLowerCase();
+  const supportsTools = TOOL_CAPABLE_MODELS.some(m => modelLower.includes(m));
+  const tools = (hasBackend && supportsTools) ? buildOpenAITools() : undefined;
 
   // ── Pass 1: Send message with tool definitions ──
   const body: any = {
@@ -310,7 +323,15 @@ async function callOpenAICompatibleAgentic({
 
   // If no tool calls, return the direct response
   if (!firstChoice?.message?.tool_calls || firstChoice.message.tool_calls.length === 0) {
-    return firstChoice?.message?.content || "No response received from AI model.";
+    let content = firstChoice?.message?.content || "No response received from AI model.";
+    // Safety: strip hallucinated tool JSON if model dumped it into content
+    if (content.includes('"type":"function"') && content.includes('"parameters"')) {
+      content = content.replace(/\{"type":"function"[^}]*\}(\s*\{"type":"function"[^}]*\})*/g, '').trim();
+      if (!content || content.length < 10) {
+        content = "I can help with that. Please note: tool-calling requires a larger AI model (3B+ parameters). Try switching to llama3.2:3b or phi3:mini in Settings for richer infrastructure queries.";
+      }
+    }
+    return content;
   }
 
   // ── Execute tool calls against NEXUS backend ──
