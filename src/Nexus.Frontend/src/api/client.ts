@@ -15,6 +15,7 @@ export interface Server {
   disk: number;
   uptime: string;
   site: string;
+  group: string;
 }
 
 export interface Process {

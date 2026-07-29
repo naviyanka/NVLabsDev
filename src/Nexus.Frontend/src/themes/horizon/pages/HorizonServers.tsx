@@ -17,6 +17,8 @@ export function HorizonServers() {
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [groupFilter, setGroupFilter] = useState<string>("");
+  const [bulkScript, setBulkScript] = useState("");
 
   const navigate = useNavigate();
 
@@ -74,16 +76,41 @@ export function HorizonServers() {
         s.name.toLowerCase().includes(q) ||
         s.ip.includes(q) ||
         s.os.toLowerCase().includes(q) ||
-        s.role.toLowerCase().includes(q);
-      return matchesFilter && matchesSearch;
+        s.role.toLowerCase().includes(q) ||
+        (s.group && s.group.toLowerCase().includes(q));
+      const matchesGroup = !groupFilter || s.group === groupFilter;
+      return matchesFilter && matchesSearch && matchesGroup;
     });
-  }, [servers, filter, searchQuery]);
+  }, [servers, filter, searchQuery, groupFilter]);
 
   const filterCounts = {
     all: servers.length,
     online: servers.filter(s => s.status === "online").length,
     warning: servers.filter(s => s.status === "warning").length,
     critical: servers.filter(s => s.status === "critical").length,
+  };
+
+  const groups = useMemo(() => {
+    const set = new Set(servers.map(s => s.group).filter(Boolean));
+    return Array.from(set).sort();
+  }, [servers]);
+
+  const handleBulkRunScript = async () => {
+    if (selectedIps.length === 0 || !bulkScript.trim()) return;
+    toast.info(`Running script on ${selectedIps.length} server(s)...`);
+    try {
+      const res = await fetch(getApiUrl("/servers/bulk-action"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ serverIps: selectedIps, action: "run-script", script: bulkScript }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const ok = data.results.filter((r: any) => r.success).length;
+        toast.success(`Script executed on ${ok}/${selectedIps.length} servers`);
+      }
+    } catch { toast.error("Bulk script execution failed"); }
+    setBulkScript("");
   };
 
   const toggleSelectAll = () => {
@@ -263,28 +290,65 @@ export function HorizonServers() {
             </button>
           ))}
         </div>
+
+        {/* Group Filter Chips */}
+        {groups.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-bold text-[var(--text-sub)] uppercase tracking-wider mr-1">Group:</span>
+            <button
+              onClick={() => setGroupFilter("")}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${!groupFilter ? "bg-[var(--teal)] text-black" : "bg-[var(--bg-surface)] border border-[var(--border-c)] text-[var(--text-sub)] hover:text-[var(--text)]"}`}
+            >All</button>
+            {groups.map(g => (
+              <button
+                key={g}
+                onClick={() => setGroupFilter(g)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${groupFilter === g ? "bg-[var(--teal)] text-black" : "bg-[var(--bg-surface)] border border-[var(--border-c)] text-[var(--text-sub)] hover:text-[var(--text)]"}`}
+              >{g}</button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Batch Action Bar (Triggers when 1+ items selected) */}
       {selectedIps.length > 0 && (
-        <div className="flex items-center justify-between bg-[var(--amber-low)] border border-[var(--amber)]/40 p-3 px-5 rounded-xl shadow-md animate-in fade-in slide-in-from-top-2">
-          <div className="text-xs font-bold text-[var(--amber)] flex items-center gap-2">
-            <CheckSquare size={16} /> {selectedIps.length} server(s) selected
+        <div className="flex flex-col gap-3 bg-[var(--amber-low)] border border-[var(--amber)]/40 p-4 px-5 rounded-xl shadow-md animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-bold text-[var(--amber)] flex items-center gap-2">
+              <CheckSquare size={16} /> {selectedIps.length} server(s) selected
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleBatchRestart}
+                className="flex items-center gap-1 px-3 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-c)] hover:border-[var(--amber)] rounded-lg text-xs font-semibold text-[var(--text)] transition-colors cursor-pointer"
+              >
+                <RefreshCw size={13} className="text-[var(--amber)]" /> Batch Restart
+              </button>
+              <button
+                onClick={() => setBulkScript(bulkScript ? "" : "Get-Service | Select-Object -First 5")}
+                className="flex items-center gap-1 px-3 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-c)] hover:border-[var(--amber)] rounded-lg text-xs font-semibold text-[var(--text)] transition-colors cursor-pointer"
+              >
+                <Terminal size={13} className="text-[var(--teal)]" /> Run Script
+              </button>
+              <button
+                onClick={handleDeleteSelected}
+                className="flex items-center gap-1 px-3 py-1.5 bg-[var(--crit)] text-white rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer"
+              >
+                <Trash2 size={13} /> Remove Selected
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleBatchRestart}
-              className="flex items-center gap-1 px-3 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-c)] hover:border-[var(--amber)] rounded-lg text-xs font-semibold text-[var(--text)] transition-colors cursor-pointer"
-            >
-              <RefreshCw size={13} className="text-[var(--amber)]" /> Batch Restart
-            </button>
-            <button
-              onClick={handleDeleteSelected}
-              className="flex items-center gap-1 px-3 py-1.5 bg-[var(--crit)] text-white rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer"
-            >
-              <Trash2 size={13} /> Remove Selected
-            </button>
-          </div>
+          {bulkScript !== "" && (
+            <div className="flex items-center gap-2">
+              <input
+                value={bulkScript}
+                onChange={e => setBulkScript(e.target.value)}
+                placeholder="Enter PowerShell script to run on selected servers..."
+                className="flex-1 bg-[var(--bg-surface)] border border-[var(--border-c)] rounded-lg px-3 py-2 text-xs font-mono text-[var(--text)] focus:border-[var(--amber)] focus:outline-none"
+              />
+              <button onClick={handleBulkRunScript} className="px-3 py-2 bg-[var(--amber)] text-black rounded-lg text-xs font-bold hover:brightness-110 cursor-pointer">Execute</button>
+            </div>
+          )}
         </div>
       )}
 
