@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Nexus.Gateway.Data;
 using Nexus.Gateway.Services;
+using Nexus.Gateway.Models;
 
 namespace Nexus.Gateway.BackgroundServices;
 
@@ -72,6 +73,9 @@ public class TelemetryBackgroundService : BackgroundService
                 db.PerfSamples.RemoveRange(oldSamples);
 
                 await db.SaveChangesAsync(stoppingToken);
+
+                // ─── Alert Rules Evaluation ───
+                await EvaluateAlertRules(db, servers, stoppingToken);
             }
             catch (Exception ex)
             {
@@ -79,6 +83,87 @@ public class TelemetryBackgroundService : BackgroundService
             }
 
             await Task.Delay(3000, stoppingToken);
+        }
+    }
+
+    private async Task EvaluateAlertRules(NexusContext db, List<Server> servers, CancellationToken ct)
+    {
+        var rules = await db.AlertRules.Where(r => r.Enabled).ToListAsync(ct);
+        if (rules.Count == 0) return;
+
+        var now = DateTime.UtcNow;
+        var notificationService = _serviceProvider.CreateScope().ServiceProvider.GetRequiredService<NotificationService>();
+
+        foreach (var rule in rules)
+        {
+            // Cooldown: don't re-fire within DurationSeconds
+            if (rule.LastFiredAt.HasValue && (now - rule.LastFiredAt.Value).TotalSeconds < rule.DurationSeconds)
+                continue;
+
+            var targets = rule.ServerIp == "*" ? servers : servers.Where(s => s.Ip == rule.ServerIp).ToList();
+
+            foreach (var srv in targets)
+            {
+                double value = rule.Metric switch
+                {
+                    "cpu" => srv.Cpu,
+                    "ram" => srv.Mem,
+                    "disk" => srv.Disk,
+                    _ => 0
+                };
+
+                bool triggered = rule.Comparison switch
+                {
+                    "gt" => value > rule.Threshold,
+                    "lt" => value < rule.Threshold,
+                    "eq" => Math.Abs(value - rule.Threshold) < 0.5,
+                    _ => false
+                };
+
+                if (triggered)
+                {
+                    rule.LastFiredAt = now;
+                    var msg = $"Alert '{rule.Name}': {rule.Metric.ToUpper()} is {value:F1}% on {srv.Name} ({rule.Comparison} {rule.Threshold}%)";
+                    await notificationService.AddAndBroadcastNotificationAsync("Warning", msg, srv.Ip);
+
+                    // Webhook dispatch
+                    await DispatchWebhook(db, rule, msg);
+                }
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private async Task DispatchWebhook(NexusContext db, AlertRule rule, string message)
+    {
+        if (rule.Channel == "notification") return; // already handled via NotificationService
+
+        var settings = await db.AppSettings.FirstOrDefaultAsync(s => s.Id == "global");
+        if (settings == null) return;
+
+        string? url = rule.Channel switch
+        {
+            "discord" => settings.DiscordWebhookUrl,
+            "slack" => settings.SlackWebhookUrl,
+            "webhook" => settings.WebhookUrl,
+            _ => null
+        };
+
+        if (string.IsNullOrWhiteSpace(url)) return;
+
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+            var body = rule.Channel == "discord"
+                ? System.Text.Json.JsonSerializer.Serialize(new { content = $"⚠️ {message}" })
+                : System.Text.Json.JsonSerializer.Serialize(new { text = $"⚠️ {message}" });
+
+            await client.PostAsync(url, new StringContent(body, System.Text.Encoding.UTF8, "application/json"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to dispatch alert webhook to {Channel}", rule.Channel);
         }
     }
 }
