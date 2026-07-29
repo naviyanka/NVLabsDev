@@ -54,6 +54,16 @@ public class TelemetryBackgroundService : BackgroundService
                             var m = metrics[0];
                             m.ServerIp = server.Ip;
                             db.PerfSamples.Add(m);
+
+                            // Persist for history charts (one sample per poll cycle per server)
+                            db.TelemetryHistory.Add(new TelemetryHistory
+                            {
+                                ServerIp = server.Ip,
+                                Cpu = server.Cpu,
+                                Mem = server.Mem,
+                                Disk = server.Disk,
+                                Timestamp = DateTime.UtcNow
+                            });
                         }
 
                         var procs = await _cimService.GetProcessesAsync(server.Ip);
@@ -71,6 +81,13 @@ public class TelemetryBackgroundService : BackgroundService
                 var cutoff = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - 300000;
                 var oldSamples = await db.PerfSamples.Where(s => s.T < cutoff).ToListAsync();
                 db.PerfSamples.RemoveRange(oldSamples);
+
+                // Purge old telemetry history based on retention setting
+                var setting = await db.AppSettings.FirstOrDefaultAsync(s => s.Id == "global");
+                var retentionDays = setting?.TelemetryRetentionDays ?? 7;
+                var historyCutoff = DateTime.UtcNow.AddDays(-retentionDays);
+                var oldHistory = await db.TelemetryHistory.Where(h => h.Timestamp < historyCutoff).ToListAsync();
+                if (oldHistory.Count > 0) db.TelemetryHistory.RemoveRange(oldHistory);
 
                 await db.SaveChangesAsync(stoppingToken);
 

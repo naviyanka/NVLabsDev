@@ -89,4 +89,20 @@ public class PerformanceController : ControllerBase
         if (success) return Ok();
         return StatusCode(500, "Failed to terminate process.");
     }
+
+    [HttpGet("{id}/history")]
+    public async Task<IActionResult> GetTelemetryHistory(string id, [FromQuery] int hours = 24)
+    {
+        var server = await _db.Servers.FindAsync(id);
+        var targetIp = server != null ? server.Ip : id;
+
+        var since = DateTime.UtcNow.AddHours(-hours);
+        var data = await _db.TelemetryHistory
+            .Where(h => h.ServerIp == targetIp && h.Timestamp >= since)
+            .OrderBy(h => h.Timestamp)
+            .Select(h => new { t = h.Timestamp, cpu = h.Cpu, mem = h.Mem, disk = h.Disk })
+            .ToListAsync();
+
+        return Ok(data);
+    }
 }

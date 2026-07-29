@@ -22,6 +22,7 @@ public class NexusContext : DbContext
     public DbSet<PluginEntity> Plugins { get; set; } = null!;
     public DbSet<BackgroundJob> BackgroundJobs { get; set; } = null!;
     public DbSet<AlertRule> AlertRules { get; set; } = null!;
+    public DbSet<TelemetryHistory> TelemetryHistory { get; set; } = null!;
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<PerfSample>().HasIndex(p => new { p.ServerIp, p.T });
