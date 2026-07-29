@@ -250,7 +250,7 @@ function MapShareDialog({ isOpen, onConfirm, onCancel }: { isOpen: boolean; onCo
 
 function FilesPage() {
   const { path: queryPath } = Route.useSearch();
-  const [server, setServer] = useState("dc01");
+  const [server, setServer] = useState("127.0.0.1");
   const [sources, setSources] = useState<FileSource[]>([]);
   const [path, setPath] = useState<string[]>(queryPath ? queryPath.split("\\").filter(Boolean) : []);
   const [pathInput, setPathInput] = useState("");

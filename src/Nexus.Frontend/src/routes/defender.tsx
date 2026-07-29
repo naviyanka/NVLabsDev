@@ -36,7 +36,7 @@ export const Route = createFileRoute("/defender")({
 });
 
 function DefenderPage() {
-  const [server, setServer] = useState("dc01");
+  const [server, setServer] = useState("127.0.0.1");
   const [status, setStatus] = useState<DefenderStatus | null>(null);
   const [threats, setThreats] = useState<DefenderThreat[]>([]);
   const [exclusions, setExclusions] = useState<DefenderExclusion[]>([]);

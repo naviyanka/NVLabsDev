@@ -34,7 +34,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
   const items: CommandItem[] = [
     // Navigation
     { id: "nav-dash", title: "Dashboard", category: "Navigation", icon: LayoutDashboard, action: () => navigate({ to: "/" }), keywords: "home main topology" },
-    { id: "nav-srv", title: "Server Fleet", category: "Navigation", icon: Server, action: () => navigate({ to: "/servers" }), keywords: "nodes hosts ip dc01" },
+    { id: "nav-srv", title: "Server Fleet", category: "Navigation", icon: Server, action: () => navigate({ to: "/servers" }), keywords: "nodes hosts ip" },
     { id: "nav-fw", title: "Firewall & Security", category: "Navigation", icon: Shield, action: () => navigate({ to: "/firewall" }), keywords: "rules profiles port" },
     { id: "nav-vm", title: "Virtual Machines (Hyper-V)", category: "Navigation", icon: Cpu, action: () => navigate({ to: "/vms" }), keywords: "hyperv compute vms" },
     { id: "nav-evt", title: "Events & Logs", category: "Navigation", icon: Activity, action: () => navigate({ to: "/events" }), keywords: "logs errors warning stream" },
@@ -57,7 +57,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
 
     // Server Actions
     { id: "act-rdp", title: "Connect via Remote Desktop", category: "Server Actions", icon: Monitor, action: () => navigate({ to: "/remote-desktop" }), keywords: "rdp connection session" },
-    { id: "act-ps-dc", title: "Launch PowerShell on DC01", category: "Server Actions", icon: Terminal, action: () => navigate({ to: "/powershell", search: { serverIp: "10.0.0.10" } as any }), keywords: "dc01 terminal" },
+    { id: "act-ps-dc", title: "Launch PowerShell on Local Server", category: "Server Actions", icon: Terminal, action: () => navigate({ to: "/powershell", search: { serverIp: "127.0.0.1" } as any }), keywords: "local terminal" },
     { id: "act-restart-svc", title: "Manage Server Services", category: "Server Actions", icon: RefreshCw, action: () => navigate({ to: "/services" }), keywords: "restart services" },
 
     // System Tools

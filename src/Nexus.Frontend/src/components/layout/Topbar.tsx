@@ -50,17 +50,13 @@ export function Topbar() {
     const lastRead = Number(localStorage.getItem("nexus_notifications_read") || "0");
     setUnreadCount(data.filter(n => new Date(n.timestamp).getTime() > lastRead).length);
 
-    // Check for new notifications to pop toast
+    // Check for new notifications to pop toast — only for Critical/Error
     if (seenIds.current.size > 0) {
       data.forEach(n => {
         if (!seenIds.current.has(n.id)) {
           seenIds.current.add(n.id);
-          if (n.type === "Success") {
-            toast.success(n.message);
-          } else if (n.type === "Error") {
+          if (n.type === "Error" || n.type === "Critical") {
             toast.error(n.message);
-          } else {
-            toast.info(n.message);
           }
         }
       });
@@ -92,13 +88,10 @@ export function Topbar() {
         setUnreadCount(prev => prev + 1);
       }
 
-      // Pop Toast
+      // Pop Toast — only for errors/critical, rest go to notification panel silently
       if (!seenIds.current.has(n.id)) {
         seenIds.current.add(n.id);
-        if (n.type === "Success") toast.success(n.message);
-        else if (n.type === "Error" || n.type === "Critical") toast.error(n.message);
-        else if (n.type === "Warning") toast.warning(n.message);
-        else toast.info(n.message);
+        if (n.type === "Error" || n.type === "Critical") toast.error(n.message);
       }
     });
 

@@ -97,7 +97,7 @@ type TabType = "launcher" | "web_console" | "sessions" | "saved" | "security";
 function RDPPage() {
   const [servers, setServers] = useState<Server[]>([]);
   const [loadingServers, setLoadingServers] = useState(true);
-  const [selectedIp, setSelectedIp] = useState<string>("dc01");
+  const [selectedIp, setSelectedIp] = useState<string>("127.0.0.1");
   const [adhoc, setAdhoc] = useState("");
   const [activeTab, setActiveTab] = useState<TabType>("launcher");
 
@@ -171,7 +171,7 @@ function RDPPage() {
     [servers, selectedIp]
   );
 
-  const activeHost = adhoc.trim() || selectedServer?.ip || "dc01";
+  const activeHost = adhoc.trim() || selectedServer?.ip || "127.0.0.1";
 
   // Fetch active sessions and RDP config when switching tabs or server
   useEffect(() => {

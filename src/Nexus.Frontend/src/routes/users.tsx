@@ -55,7 +55,7 @@ export const Route = createFileRoute("/users")({
 type FilterStatus = "all" | "enabled" | "disabled" | "admins" | "locked";
 
 function UsersPage() {
-  const [server, setServer] = useState("dc01");
+  const [server, setServer] = useState("127.0.0.1");
   const [users, setUsers] = useState<LocalUser[]>([]);
   const [groups, setGroups] = useState<LocalGroup[]>([]);
   const [activeTab, setActiveTab] = useState<"Users" | "Groups" | "Audit">("Users");

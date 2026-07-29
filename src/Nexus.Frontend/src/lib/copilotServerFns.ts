@@ -57,7 +57,9 @@ function buildOpenAITools() {
       description: t.description,
       parameters: {
         type: "object",
-        properties: t.parameters || {},
+        properties: Object.fromEntries(
+          Object.entries(t.parameters || {}).map(([k, v]) => [k, { type: v.type, description: v.description }])
+        ),
         required: Object.entries(t.parameters || {})
           .filter(([, v]) => v.required)
           .map(([k]) => k),

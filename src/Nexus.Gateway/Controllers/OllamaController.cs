@@ -403,7 +403,7 @@ public class OllamaController : ControllerBase
                         Process.Start(new ProcessStartInfo
                         {
                             FileName = exePath,
-                            Arguments = "apphost",
+                            Arguments = "serve",
                             UseShellExecute = false,
                             CreateNoWindow = true
                         });
@@ -433,7 +433,7 @@ public class OllamaController : ControllerBase
                         }
                         $ollama = Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'
                         if (Test-Path $ollama) {
-                            Start-Process -FilePath $ollama -ArgumentList 'apphost' -WindowStyle Hidden -ErrorAction SilentlyContinue
+                            Start-Process -FilePath $ollama -ArgumentList 'serve' -WindowStyle Hidden -ErrorAction SilentlyContinue
                         } else {
                             Start-Process -FilePath 'ollama' -ArgumentList 'serve' -WindowStyle Hidden -ErrorAction SilentlyContinue
                         }
@@ -442,6 +442,25 @@ public class OllamaController : ControllerBase
                     string wrapped = WrapScript(remoteScript, serverIp);
                     var encoded = EncodeScript(wrapped);
                     await _ps.ExecuteAsync($"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encoded}", CancellationToken.None, 600000);
+                }
+
+                // Wait for Ollama HTTP server to come online after install
+                lock (_progressLock)
+                {
+                    _progress.Percent = 95;
+                    _progress.Message = "Waiting for Ollama service to start...";
+                }
+
+                for (int i = 0; i < 10; i++)
+                {
+                    await Task.Delay(2000);
+                    try
+                    {
+                        using var checkClient = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+                        var checkResp = await checkClient.GetAsync("http://localhost:11434/api/tags");
+                        if (checkResp.IsSuccessStatusCode) break;
+                    }
+                    catch { }
                 }
 
                 lock (_progressLock)
@@ -563,6 +582,38 @@ public class OllamaController : ControllerBase
                         process.StartInfo.EnvironmentVariables["OLLAMA_KEEP_ALIVE"] = "24h";
 
                         process.Start();
+
+                        // Read stderr to parse progress (ollama writes progress to stderr)
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                string? line;
+                                while ((line = await process.StandardError.ReadLineAsync()) != null)
+                                {
+                                    // Strip ANSI escape codes
+                                    var clean = System.Text.RegularExpressions.Regex.Replace(line, @"\x1b\[[^@-~]*[@-~]|\x1b\[[\?]?\d*[a-zA-Z]", "").Trim();
+                                    if (string.IsNullOrWhiteSpace(clean)) continue;
+
+                                    lock (_progressLock)
+                                    {
+                                        _progress.Message = clean.Length > 120 ? clean.Substring(0, 120) : clean;
+
+                                        // Try to extract percentage from output like "pulling abc123... 45%"
+                                        var percentMatch = System.Text.RegularExpressions.Regex.Match(clean, @"(\d{1,3})%");
+                                        if (percentMatch.Success && int.TryParse(percentMatch.Groups[1].Value, out int pct))
+                                        {
+                                            _progress.Percent = Math.Clamp(pct, 1, 99);
+                                        }
+                                    }
+                                }
+                            }
+                            catch { }
+                        });
+
+                        // Also drain stdout to prevent deadlock
+                        _ = process.StandardOutput.ReadToEndAsync();
+
                         await process.WaitForExitAsync();
 
                         if (process.ExitCode == 0)

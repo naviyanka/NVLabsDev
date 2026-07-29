@@ -17,10 +17,12 @@ export interface PtySession {
 function sanitizePtyStream(input: string): string {
   if (!input) return input;
   // Strip VT100 DEC graphic box drawing initial noise (e.g. jjjjh... lines, \x1b(0 sequences, and resize symbol artifacts)
+  // Also strip PowerShell module-loading progress bar (lines of >>>> characters)
   return input
     .replace(/\x1b\(0[jhqkmlxq]+\x1b\(B/gi, "")
     .replace(/^j{3,}[h]{3,}\r?\n?/gm, "")
-    .replace(/^[\u2921\u2922\u2197\u2198\u2196\u2199\s\/\.\\]*(?=Windows|PS\s|\x1b)/m, "");
+    .replace(/^[\u2921\u2922\u2197\u2198\u2196\u2199\s\/\.\\]*(?=Windows|PS\s|\x1b)/m, "")
+    .replace(/^>{4,}\s*\r?\n?/gm, "");
 }
 
 export interface TerminalPalette {

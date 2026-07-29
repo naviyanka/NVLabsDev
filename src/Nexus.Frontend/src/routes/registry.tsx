@@ -60,7 +60,7 @@ const DEFAULT_BOOKMARKS = [
 ];
 
 function RegistryPage() {
-  const [server, setServer] = useState("dc01");
+  const [server, setServer] = useState("127.0.0.1");
   const [path, setPath] = useState("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion");
   const [inputPath, setInputPath] = useState(path);
   const [content, setContent] = useState<RegistryContent>({ subKeys: [], values: [] });

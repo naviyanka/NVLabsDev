@@ -1,15 +1,14 @@
-import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { 
-  Terminal as TermIcon, Trash2, Plus, X, Download, Sliders, Shield, 
-  FileText, Play, ZoomIn, ZoomOut, TerminalIcon, Maximize2, Minimize2, 
-  Code, BookOpen, Copy, Check, Search, Palette, ServerIcon
+  Terminal as TermIcon, Trash2, Plus, X, Download, 
+  Maximize2, Minimize2, Code, BookOpen, Copy, Check, ZoomIn, ZoomOut
 } from "lucide-react";
 
 import { getServersClient, type Server } from "@/api/client";
 import { getFrontendSettings } from "@/lib/frontendSettings";
 import { 
-  terminalStore, getActiveTerminalTheme, TERMINAL_PALETTES, 
+  terminalStore, getActiveTerminalTheme, 
   type PtySession, type TerminalPalette 
 } from "@/lib/terminalStore";
 import { toast } from "sonner";
@@ -100,13 +99,10 @@ export function HorizonPowerShell() {
 
     if (active?.ws && active.ws.readyState === WebSocket.OPEN) {
       active.ws.send(formattedCmd);
-      toast.success("Script dispatched to live WebSocket session");
     } else if (active?.simulatedEngine) {
       active.simulatedEngine.runCommand(formattedCmd);
-      toast.success("Executed command in interactive PTY shell");
     } else if (active?.xterm) {
       active.xterm.write(formattedCmd);
-      toast.success("Dispatched to terminal");
     } else {
       toast.error("No active terminal session available");
     }
@@ -135,7 +131,6 @@ export function HorizonPowerShell() {
     link.href = url;
     link.download = `nexus-powershell-${active.serverId}-${new Date().toISOString().slice(0,10)}.log`;
     link.click();
-    toast.success("Terminal session log exported!");
   };
 
   const copyTerminalBuffer = () => {
@@ -148,7 +143,6 @@ export function HorizonPowerShell() {
     }
     navigator.clipboard.writeText(text);
     setCopiedBuffer(true);
-    toast.success("Terminal buffer copied to clipboard!");
     setTimeout(() => setCopiedBuffer(false), 2000);
   };
 
@@ -216,20 +210,6 @@ export function HorizonPowerShell() {
             <BookOpen size={14} /> Cheat Sheet
           </button>
 
-          {/* Theme Selector */}
-          <div className="flex items-center gap-1 bg-[var(--bg-void)] border border-[var(--border-c)] p-1 rounded-xl text-xs">
-            <Palette size={14} className="text-[var(--text-sub)] ml-1" />
-            <select
-              value={theme.id}
-              onChange={(e) => terminalStore.setTheme(e.target.value)}
-              className="mono text-xs bg-transparent border-none text-[var(--text)] focus:outline-none cursor-pointer pr-1 font-bold"
-            >
-              {Object.values(TERMINAL_PALETTES).map(p => (
-                <option key={p.id} value={p.id} className="bg-[var(--bg-card)] text-[var(--text)]">{p.name}</option>
-              ))}
-            </select>
-          </div>
-
           {/* Zoom Font Controls */}
           <div className="flex items-center gap-1 bg-[var(--bg-void)] border border-[var(--border-c)] p-1 rounded-xl text-xs">
             <button
@@ -286,13 +266,6 @@ export function HorizonPowerShell() {
         {/* Window Top Navigation Bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0 select-none bg-black/30">
           <div className="flex items-center gap-3">
-            {/* macOS Style Window Controls */}
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-rose-500/80 shadow-sm" />
-              <div className="w-3 h-3 rounded-full bg-amber-500/80 shadow-sm" />
-              <div className="w-3 h-3 rounded-full bg-emerald-500/80 shadow-sm" />
-            </div>
-
             <span className="text-xs font-semibold flex items-center gap-1.5 opacity-80" style={{ color: theme.output }}>
               <TermIcon size={13} /> PS C:\WINDOWS\system32&gt; [{active?.serverId || "nexus01"}]
             </span>
@@ -357,17 +330,6 @@ export function HorizonPowerShell() {
             >
               <Trash2 size={14} />
             </button>
-
-            <span 
-              className="text-[10px] uppercase font-extrabold tracking-wider px-2.5 py-1 rounded-lg border shadow-sm hidden sm:inline-block"
-              style={{ 
-                color: theme.prompt, 
-                backgroundColor: theme.prompt + "18", 
-                borderColor: theme.prompt + "40" 
-              }}
-            >
-              {theme.name}
-            </span>
           </div>
         </div>
 

@@ -60,7 +60,7 @@ function getExpiryInfo(toDateStr: string) {
 }
 
 function CertificatesPage() {
-  const [server, setServer] = useState("dc01");
+  const [server, setServer] = useState("127.0.0.1");
   const [store, setStore] = useState("Personal");
   const [allCerts, setAllCerts] = useState<Certificate[]>([]);
   const [certs, setCerts] = useState<Certificate[]>([]);

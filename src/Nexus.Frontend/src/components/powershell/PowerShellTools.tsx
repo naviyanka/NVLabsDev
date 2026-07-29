@@ -347,7 +347,6 @@ export function CmdletCheatSheetDrawer({
                   <button
                     onClick={() => {
                       onRunCmd(item.cmd.endsWith("\r") ? item.cmd : item.cmd + "\r");
-                      toast.success(`Ran cmdlet: ${item.cmd}`);
                     }}
                     className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--amber)]/10 text-[var(--amber)] font-mono text-[10px] font-bold hover:bg-[var(--amber)] hover:text-black transition-colors"
                   >

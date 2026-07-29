@@ -41,7 +41,7 @@ export function SoftwareRepoManager({ onSelectDeploy, isModal = false }: Softwar
   const [repoFeedUrl, setRepoFeedUrl] = useState("https://repo.nexuslab.local/winget");
   const [syncInterval, setSyncInterval] = useState("Daily");
   const [autoApproveUpdates, setAutoApproveUpdates] = useState(true);
-  const [cacheSharePath, setCacheSharePath] = useState("\\\\dc01.nexuslab.local\\NEXUS_SoftwareRepo");
+  const [cacheSharePath, setCacheSharePath] = useState("\\\\localhost\\NEXUS_SoftwareRepo");
   const [defaultMsiFlags, setDefaultMsiFlags] = useState("/qn /norestart");
 
   // Editing / Adding state
@@ -58,8 +58,8 @@ export function SoftwareRepoManager({ onSelectDeploy, isModal = false }: Softwar
   const [formSilentArgs, setFormSilentArgs] = useState("/qn /norestart");
   const [formPackageId, setFormPackageId] = useState("");
 
-  const refreshCatalog = () => {
-    const data = getSoftwareCatalog();
+  const refreshCatalog = async () => {
+    const data = await getSoftwareCatalog();
     setCatalog(data);
   };
 

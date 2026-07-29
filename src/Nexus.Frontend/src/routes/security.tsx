@@ -57,7 +57,7 @@ type TabType = "Overview" | "Events" | "Ports" | "Admins" | "Compliance";
 type LevelFilter = "All" | "Critical" | "Error" | "Warning" | "Information";
 
 function SecurityPage() {
-  const [server, setServer] = useState("dc01");
+  const [server, setServer] = useState("127.0.0.1");
   const [data, setData] = useState<SecurityData | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>("Overview");
