@@ -88,10 +88,14 @@ public class ServersController : ControllerBase
             var adServers = await adService.GetDomainComputersAsync();
             int added = 0;
 
+            // Load existing server IDs once to avoid repeated DB queries
+            var existingIds = (await _serverService.GetServersAsync())
+                .Select(s => s.Id)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
             foreach (var adServer in adServers)
             {
-                var existing = await _serverService.GetServersAsync();
-                if (!existing.Any(s => s.Id == adServer.Id))
+                if (!existingIds.Contains(adServer.Id))
                 {
                     adServer.IsAdFetched = true;
                     await _serverService.AddDiscoveredServerAsync(adServer);

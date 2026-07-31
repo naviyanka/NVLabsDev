@@ -18,8 +18,6 @@ namespace Nexus.Gateway.Controllers
     {
         private readonly IConfiguration _config;
         private readonly NexusContext _db;
-        private readonly ActiveDirectoryService _adService;
-        private readonly CimService _cimService;
         private readonly ILogger<AuthController> _logger;
         private readonly IServiceProvider _serviceProvider;
 
@@ -27,12 +25,10 @@ namespace Nexus.Gateway.Controllers
         private const int MaxAttempts = 5;
         private static readonly TimeSpan RateLimitWindow = TimeSpan.FromMinutes(15);
 
-        public AuthController(IConfiguration config, NexusContext db, ActiveDirectoryService adService, CimService cimService, ILogger<AuthController> logger, IServiceProvider serviceProvider)
+        public AuthController(IConfiguration config, NexusContext db, ILogger<AuthController> logger, IServiceProvider serviceProvider)
         {
             _config = config;
             _db = db;
-            _adService = adService;
-            _cimService = cimService;
             _logger = logger;
             _serviceProvider = serviceProvider;
         }
