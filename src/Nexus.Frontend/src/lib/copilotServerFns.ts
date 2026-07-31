@@ -308,14 +308,13 @@ async function callOpenAICompatibleAgentic({
   // Only enable tools for models known to support function calling.
   const TOOL_CAPABLE_PATTERNS = [
     "gpt-4", "gpt-3.5-turbo",
-    "llama3.1", "llama3.2:3b", "llama3.2:8b", "llama3.3",
-    "qwen2.5:3b", "qwen2.5:7b", "qwen2.5:14b", "qwen2.5:32b", "qwen2.5:72b",
-    "qwen2.5-coder:7b", "qwen2.5-coder:14b", "qwen2.5-coder:32b",
-    "mistral", "mixtral", "command-r", "phi3:medium", "phi3:mini",
-    "deepseek-r1:7b", "deepseek-r1:8b", "deepseek-r1:14b", "deepseek-r1:32b",
-    "gemma2:9b", "gemma2:27b",
+    "llama3.1", "llama3.2", "llama3.3", "llama-3",
+    "qwen2.5", "qwen2.5-coder",
+    "mistral", "mixtral", "command-r", "phi3", "phi-3",
+    "deepseek-r1", "deepseek-v",
+    "gemma2", "gemma-2",
   ];
-  const modelLower = (model || "").toLowerCase();
+  const modelLower = (model || "").toLowerCase().replace(/[._]/g, "-");
   const supportsTools = TOOL_CAPABLE_PATTERNS.some(m => modelLower.includes(m));
   const tools = (hasBackend && supportsTools) ? buildOpenAITools() : undefined;
 

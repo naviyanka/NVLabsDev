@@ -109,7 +109,8 @@ public class TelemetryBackgroundService : BackgroundService
         if (rules.Count == 0) return;
 
         var now = DateTime.UtcNow;
-        var notificationService = _serviceProvider.CreateScope().ServiceProvider.GetRequiredService<NotificationService>();
+        using var alertScope = _serviceProvider.CreateScope();
+        var notificationService = alertScope.ServiceProvider.GetRequiredService<NotificationService>();
 
         foreach (var rule in rules)
         {

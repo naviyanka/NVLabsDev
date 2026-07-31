@@ -5,6 +5,7 @@ import { ArrowUp, ArrowDown } from "lucide-react";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { NxCard } from "@/components/ui/NxCard";
 import { ServerSelector } from "@/components/ui/ServerSelector";
+import { getApiUrl } from "@/lib/backend";
 import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
 import { getPerformanceHistoryClient, getProcessesClient, type PerfSample, type Process } from "@/api/client";
 import { useSignalR } from "@/lib/signalr";
@@ -273,7 +274,7 @@ function HistoryChart({ server }: { server: string }) {
 
   useEffect(() => {
     if (!server) return;
-    fetch(`/api/performance/${encodeURIComponent(server)}/history?hours=${hours}`)
+    fetch(getApiUrl(`/performance/${encodeURIComponent(server)}/history?hours=${hours}`))
       .then(r => r.ok ? r.json() : [])
       .then(data => setHistory(Array.isArray(data) ? data : []))
       .catch(() => setHistory([]));

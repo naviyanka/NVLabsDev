@@ -125,13 +125,15 @@ public class ServersController : ControllerBase
             try
             {
                 string output;
+                bool success;
                 if (request.Action == "restart-service" && !string.IsNullOrWhiteSpace(request.ServiceName))
                 {
                     var cmd = ip == "127.0.0.1" || ip == "localhost"
                         ? $"-NoProfile -Command \"Restart-Service -Name '{request.ServiceName}' -Force\""
                         : $"-NoProfile -Command \"Invoke-Command -ComputerName {ip} -ScriptBlock {{ Restart-Service -Name '{request.ServiceName}' -Force }}\"";
                     var res = await ps.ExecuteAsync(cmd, HttpContext.RequestAborted, 30000);
-                    output = res.ExitCode == 0 ? "OK" : res.StandardError;
+                    success = res.ExitCode == 0;
+                    output = success ? "OK" : res.StandardError;
                 }
                 else if (request.Action == "run-script" && !string.IsNullOrWhiteSpace(request.Script))
                 {
@@ -140,20 +142,23 @@ public class ServersController : ControllerBase
                         ? $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encoded}"
                         : $"-NoProfile -ExecutionPolicy Bypass -Command \"Invoke-Command -ComputerName {ip} -ScriptBlock {{ [System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String('{encoded}')) | Invoke-Expression }}\"";
                     var res = await ps.ExecuteAsync(cmd, HttpContext.RequestAborted, 60000);
-                    output = string.IsNullOrWhiteSpace(res.StandardOutput) ? (res.ExitCode == 0 ? "OK" : res.StandardError) : res.StandardOutput;
+                    success = res.ExitCode == 0;
+                    output = string.IsNullOrWhiteSpace(res.StandardOutput) ? (success ? "OK" : res.StandardError) : res.StandardOutput;
                 }
                 else if (request.Action == "restart-server")
                 {
                     var cimService = HttpContext.RequestServices.GetRequiredService<CimService>();
                     var ok = await cimService.RestartServerAsync(ip);
+                    success = ok;
                     output = ok ? "Restart initiated" : "Failed";
                 }
                 else
                 {
+                    success = false;
                     output = "Unknown action";
                 }
 
-                results.Add(new { ip, success = true, output = output.Trim() });
+                results.Add(new { ip, success, output = output.Trim() });
             }
             catch (Exception ex)
             {

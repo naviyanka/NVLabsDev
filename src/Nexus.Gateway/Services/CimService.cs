@@ -63,6 +63,22 @@ public class CimService : IDisposable
                     }
                 }
 
+                // Disk usage: calculate % used from logical disks
+                var diskInstances = session.QueryInstances(@"root\cimv2", "WQL", "SELECT Size, FreeSpace FROM Win32_LogicalDisk WHERE DriveType=3").ToList();
+                if (diskInstances.Any())
+                {
+                    double totalSize = 0, totalFree = 0;
+                    foreach (var d in diskInstances)
+                    {
+                        if (double.TryParse(d.CimInstanceProperties["Size"]?.Value?.ToString(), out var sz)) totalSize += sz;
+                        if (double.TryParse(d.CimInstanceProperties["FreeSpace"]?.Value?.ToString(), out var fs)) totalFree += fs;
+                    }
+                    if (totalSize > 0)
+                    {
+                        server.Disk = Math.Round(((totalSize - totalFree) / totalSize) * 100, 1);
+                    }
+                }
+
                 if (server.Cpu > 90 || server.Mem > 90) server.Status = "critical";
                 else if (server.Cpu > 75 || server.Mem > 75) server.Status = "warning";
             }

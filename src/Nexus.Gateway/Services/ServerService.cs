@@ -89,7 +89,10 @@ public class ServerService
             }
         }
         server.Role = dto.Role;
-        server.Group = dto.Group;
+        if (!string.IsNullOrEmpty(dto.Group))
+        {
+            server.Group = dto.Group;
+        }
 
         await _db.SaveChangesAsync();
         return server;

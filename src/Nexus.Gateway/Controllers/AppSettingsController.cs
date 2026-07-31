@@ -99,6 +99,12 @@ public class AppSettingsController : ControllerBase
         node = getProp("WebhookUrl");
         if (node != null) settings.WebhookUrl = node.ToString();
 
+        node = getProp("DiscordWebhookUrl");
+        if (node != null) settings.DiscordWebhookUrl = node.ToString();
+
+        node = getProp("SlackWebhookUrl");
+        if (node != null) settings.SlackWebhookUrl = node.ToString();
+
         node = getProp("TelemetryRetentionDays");
         if (node != null) settings.TelemetryRetentionDays = node.GetValue<int>();
 
