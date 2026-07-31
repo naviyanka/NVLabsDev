@@ -32,10 +32,13 @@ import { Route as PluginsRouteImport } from './routes/plugins'
 import { Route as PerformanceRouteImport } from './routes/performance'
 import { Route as NetworksRouteImport } from './routes/networks'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as IisRouteImport } from './routes/iis'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as FirewallRouteImport } from './routes/firewall'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as EventsRouteImport } from './routes/events'
+import { Route as DnsRouteImport } from './routes/dns'
+import { Route as DhcpRouteImport } from './routes/dhcp'
 import { Route as DevicesRouteImport } from './routes/devices'
 import { Route as DefenderRouteImport } from './routes/defender'
 import { Route as DashboardCustomRouteImport } from './routes/dashboard-custom'
@@ -160,6 +163,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const IisRoute = IisRouteImport.update({
+  id: '/iis',
+  path: '/iis',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HealthRoute = HealthRouteImport.update({
   id: '/health',
   path: '/health',
@@ -178,6 +186,16 @@ const FilesRoute = FilesRouteImport.update({
 const EventsRoute = EventsRouteImport.update({
   id: '/events',
   path: '/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DnsRoute = DnsRouteImport.update({
+  id: '/dns',
+  path: '/dns',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DhcpRoute = DhcpRouteImport.update({
+  id: '/dhcp',
+  path: '/dhcp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DevicesRoute = DevicesRouteImport.update({
@@ -229,10 +247,13 @@ export interface FileRoutesByFullPath {
   '/dashboard-custom': typeof DashboardCustomRoute
   '/defender': typeof DefenderRoute
   '/devices': typeof DevicesRoute
+  '/dhcp': typeof DhcpRoute
+  '/dns': typeof DnsRoute
   '/events': typeof EventsRoute
   '/files': typeof FilesRoute
   '/firewall': typeof FirewallRoute
   '/health': typeof HealthRoute
+  '/iis': typeof IisRoute
   '/login': typeof LoginRoute
   '/networks': typeof NetworksRoute
   '/performance': typeof PerformanceRoute
@@ -266,10 +287,13 @@ export interface FileRoutesByTo {
   '/dashboard-custom': typeof DashboardCustomRoute
   '/defender': typeof DefenderRoute
   '/devices': typeof DevicesRoute
+  '/dhcp': typeof DhcpRoute
+  '/dns': typeof DnsRoute
   '/events': typeof EventsRoute
   '/files': typeof FilesRoute
   '/firewall': typeof FirewallRoute
   '/health': typeof HealthRoute
+  '/iis': typeof IisRoute
   '/login': typeof LoginRoute
   '/networks': typeof NetworksRoute
   '/performance': typeof PerformanceRoute
@@ -304,10 +328,13 @@ export interface FileRoutesById {
   '/dashboard-custom': typeof DashboardCustomRoute
   '/defender': typeof DefenderRoute
   '/devices': typeof DevicesRoute
+  '/dhcp': typeof DhcpRoute
+  '/dns': typeof DnsRoute
   '/events': typeof EventsRoute
   '/files': typeof FilesRoute
   '/firewall': typeof FirewallRoute
   '/health': typeof HealthRoute
+  '/iis': typeof IisRoute
   '/login': typeof LoginRoute
   '/networks': typeof NetworksRoute
   '/performance': typeof PerformanceRoute
@@ -343,10 +370,13 @@ export interface FileRouteTypes {
     | '/dashboard-custom'
     | '/defender'
     | '/devices'
+    | '/dhcp'
+    | '/dns'
     | '/events'
     | '/files'
     | '/firewall'
     | '/health'
+    | '/iis'
     | '/login'
     | '/networks'
     | '/performance'
@@ -380,10 +410,13 @@ export interface FileRouteTypes {
     | '/dashboard-custom'
     | '/defender'
     | '/devices'
+    | '/dhcp'
+    | '/dns'
     | '/events'
     | '/files'
     | '/firewall'
     | '/health'
+    | '/iis'
     | '/login'
     | '/networks'
     | '/performance'
@@ -417,10 +450,13 @@ export interface FileRouteTypes {
     | '/dashboard-custom'
     | '/defender'
     | '/devices'
+    | '/dhcp'
+    | '/dns'
     | '/events'
     | '/files'
     | '/firewall'
     | '/health'
+    | '/iis'
     | '/login'
     | '/networks'
     | '/performance'
@@ -455,10 +491,13 @@ export interface RootRouteChildren {
   DashboardCustomRoute: typeof DashboardCustomRoute
   DefenderRoute: typeof DefenderRoute
   DevicesRoute: typeof DevicesRoute
+  DhcpRoute: typeof DhcpRoute
+  DnsRoute: typeof DnsRoute
   EventsRoute: typeof EventsRoute
   FilesRoute: typeof FilesRoute
   FirewallRoute: typeof FirewallRoute
   HealthRoute: typeof HealthRoute
+  IisRoute: typeof IisRoute
   LoginRoute: typeof LoginRoute
   NetworksRoute: typeof NetworksRoute
   PerformanceRoute: typeof PerformanceRoute
@@ -648,6 +687,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/iis': {
+      id: '/iis'
+      path: '/iis'
+      fullPath: '/iis'
+      preLoaderRoute: typeof IisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/health': {
       id: '/health'
       path: '/health'
@@ -674,6 +720,20 @@ declare module '@tanstack/react-router' {
       path: '/events'
       fullPath: '/events'
       preLoaderRoute: typeof EventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dns': {
+      id: '/dns'
+      path: '/dns'
+      fullPath: '/dns'
+      preLoaderRoute: typeof DnsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dhcp': {
+      id: '/dhcp'
+      path: '/dhcp'
+      fullPath: '/dhcp'
+      preLoaderRoute: typeof DhcpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/devices': {
@@ -743,10 +803,13 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardCustomRoute: DashboardCustomRoute,
   DefenderRoute: DefenderRoute,
   DevicesRoute: DevicesRoute,
+  DhcpRoute: DhcpRoute,
+  DnsRoute: DnsRoute,
   EventsRoute: EventsRoute,
   FilesRoute: FilesRoute,
   FirewallRoute: FirewallRoute,
   HealthRoute: HealthRoute,
+  IisRoute: IisRoute,
   LoginRoute: LoginRoute,
   NetworksRoute: NetworksRoute,
   PerformanceRoute: PerformanceRoute,

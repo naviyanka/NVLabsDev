@@ -75,7 +75,10 @@ public class NexusContext : DbContext
 
             new PluginEntity { Id = "builtin-powershell", Name = "PowerShell", Description = "Interactive Terminal", Icon = "terminal", Category = "Advanced", IsBuiltIn = true, IsActive = true, TargetRoute = "/powershell" },
             new PluginEntity { Id = "builtin-events", Name = "Event Viewer", Description = "Windows Event Logs", Icon = "scroll-text", Category = "Advanced", IsBuiltIn = true, IsActive = true, TargetRoute = "/events" },
-            new PluginEntity { Id = "builtin-runbooks", Name = "Runbooks", Description = "Scheduled PowerShell Automation", Icon = "clock", Category = "Advanced", IsBuiltIn = true, IsActive = true, TargetRoute = "/runbooks" }
+            new PluginEntity { Id = "builtin-runbooks", Name = "Runbooks", Description = "Scheduled PowerShell Automation", Icon = "clock", Category = "Advanced", IsBuiltIn = true, IsActive = true, TargetRoute = "/runbooks" },
+            new PluginEntity { Id = "builtin-dns", Name = "DNS Manager", Description = "DNS Zones & Records", Icon = "globe", Category = "Infrastructure", IsBuiltIn = true, IsActive = true, TargetRoute = "/dns" },
+            new PluginEntity { Id = "builtin-dhcp", Name = "DHCP Monitor", Description = "DHCP Scopes & Leases", Icon = "wifi", Category = "Infrastructure", IsBuiltIn = true, IsActive = true, TargetRoute = "/dhcp" },
+            new PluginEntity { Id = "builtin-iis", Name = "IIS Manager", Description = "Web Sites & App Pools", Icon = "globe", Category = "Management", IsBuiltIn = true, IsActive = true, TargetRoute = "/iis" }
         );
     }
 }
