@@ -42,6 +42,7 @@ import { Route as DhcpRouteImport } from './routes/dhcp'
 import { Route as DevicesRouteImport } from './routes/devices'
 import { Route as DefenderRouteImport } from './routes/defender'
 import { Route as DashboardCustomRouteImport } from './routes/dashboard-custom'
+import { Route as ComplianceRouteImport } from './routes/compliance'
 import { Route as CertificatesRouteImport } from './routes/certificates'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as AppsRouteImport } from './routes/apps'
@@ -213,6 +214,11 @@ const DashboardCustomRoute = DashboardCustomRouteImport.update({
   path: '/dashboard-custom',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ComplianceRoute = ComplianceRouteImport.update({
+  id: '/compliance',
+  path: '/compliance',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CertificatesRoute = CertificatesRouteImport.update({
   id: '/certificates',
   path: '/certificates',
@@ -244,6 +250,7 @@ export interface FileRoutesByFullPath {
   '/apps': typeof AppsRoute
   '/audit': typeof AuditRoute
   '/certificates': typeof CertificatesRoute
+  '/compliance': typeof ComplianceRoute
   '/dashboard-custom': typeof DashboardCustomRoute
   '/defender': typeof DefenderRoute
   '/devices': typeof DevicesRoute
@@ -284,6 +291,7 @@ export interface FileRoutesByTo {
   '/apps': typeof AppsRoute
   '/audit': typeof AuditRoute
   '/certificates': typeof CertificatesRoute
+  '/compliance': typeof ComplianceRoute
   '/dashboard-custom': typeof DashboardCustomRoute
   '/defender': typeof DefenderRoute
   '/devices': typeof DevicesRoute
@@ -325,6 +333,7 @@ export interface FileRoutesById {
   '/apps': typeof AppsRoute
   '/audit': typeof AuditRoute
   '/certificates': typeof CertificatesRoute
+  '/compliance': typeof ComplianceRoute
   '/dashboard-custom': typeof DashboardCustomRoute
   '/defender': typeof DefenderRoute
   '/devices': typeof DevicesRoute
@@ -367,6 +376,7 @@ export interface FileRouteTypes {
     | '/apps'
     | '/audit'
     | '/certificates'
+    | '/compliance'
     | '/dashboard-custom'
     | '/defender'
     | '/devices'
@@ -407,6 +417,7 @@ export interface FileRouteTypes {
     | '/apps'
     | '/audit'
     | '/certificates'
+    | '/compliance'
     | '/dashboard-custom'
     | '/defender'
     | '/devices'
@@ -447,6 +458,7 @@ export interface FileRouteTypes {
     | '/apps'
     | '/audit'
     | '/certificates'
+    | '/compliance'
     | '/dashboard-custom'
     | '/defender'
     | '/devices'
@@ -488,6 +500,7 @@ export interface RootRouteChildren {
   AppsRoute: typeof AppsRoute
   AuditRoute: typeof AuditRoute
   CertificatesRoute: typeof CertificatesRoute
+  ComplianceRoute: typeof ComplianceRoute
   DashboardCustomRoute: typeof DashboardCustomRoute
   DefenderRoute: typeof DefenderRoute
   DevicesRoute: typeof DevicesRoute
@@ -757,6 +770,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCustomRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/compliance': {
+      id: '/compliance'
+      path: '/compliance'
+      fullPath: '/compliance'
+      preLoaderRoute: typeof ComplianceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/certificates': {
       id: '/certificates'
       path: '/certificates'
@@ -800,6 +820,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppsRoute: AppsRoute,
   AuditRoute: AuditRoute,
   CertificatesRoute: CertificatesRoute,
+  ComplianceRoute: ComplianceRoute,
   DashboardCustomRoute: DashboardCustomRoute,
   DefenderRoute: DefenderRoute,
   DevicesRoute: DevicesRoute,
