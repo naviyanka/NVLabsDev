@@ -21,18 +21,20 @@ namespace Nexus.Gateway.Controllers
         private readonly ActiveDirectoryService _adService;
         private readonly CimService _cimService;
         private readonly ILogger<AuthController> _logger;
+        private readonly IServiceProvider _serviceProvider;
 
         private static readonly ConcurrentDictionary<string, (int Count, DateTime WindowStart)> _loginAttempts = new();
         private const int MaxAttempts = 5;
         private static readonly TimeSpan RateLimitWindow = TimeSpan.FromMinutes(15);
 
-        public AuthController(IConfiguration config, NexusContext db, ActiveDirectoryService adService, CimService cimService, ILogger<AuthController> logger)
+        public AuthController(IConfiguration config, NexusContext db, ActiveDirectoryService adService, CimService cimService, ILogger<AuthController> logger, IServiceProvider serviceProvider)
         {
             _config = config;
             _db = db;
             _adService = adService;
             _cimService = cimService;
             _logger = logger;
+            _serviceProvider = serviceProvider;
         }
 
         [HttpPost("login")]
@@ -180,16 +182,22 @@ namespace Nexus.Gateway.Controllers
             try
             {
                 _logger.LogInformation("Triggering immediate AD computer sync after domain login.");
-                var adServers = await _adService.GetDomainComputersAsync();
+
+                using var scope = _serviceProvider.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<NexusContext>();
+                var adService = scope.ServiceProvider.GetRequiredService<ActiveDirectoryService>();
+                var cimService = scope.ServiceProvider.GetRequiredService<CimService>();
+
+                var adServers = await adService.GetDomainComputersAsync();
 
                 foreach (var adServer in adServers)
                 {
-                    var existing = await _db.Servers.FirstOrDefaultAsync(s => s.Id == adServer.Id);
+                    var existing = await db.Servers.FirstOrDefaultAsync(s => s.Id == adServer.Id);
                     if (existing == null)
                     {
                         adServer.IsAdFetched = true;
-                        _db.Servers.Add(adServer);
-                        _ = Task.Run(() => _cimService.EnableWinRmAsync(adServer.Ip));
+                        db.Servers.Add(adServer);
+                        _ = Task.Run(() => cimService.EnableWinRmAsync(adServer.Ip));
                     }
                     else
                     {
@@ -199,7 +207,7 @@ namespace Nexus.Gateway.Controllers
                         }
                     }
                 }
-                await _db.SaveChangesAsync();
+                await db.SaveChangesAsync();
                 _logger.LogInformation("Immediate AD sync completed. Found {Count} domain computers.", adServers.Count);
             }
             catch (Exception ex)
