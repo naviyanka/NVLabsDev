@@ -30,7 +30,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         if (string.IsNullOrEmpty(jwtKey))
             jwtKey = Environment.GetEnvironmentVariable("JWT_KEY");
         if (string.IsNullOrEmpty(jwtKey) || jwtKey.Length < 32)
-            throw new InvalidOperationException("JWT signing key must be configured via 'Jwt:Key' in appsettings.json, user-secrets, or the JWT_KEY environment variable. Key must be at least 32 characters.");
+        {
+            if (builder.Environment.IsDevelopment())
+                jwtKey = "NexusDevOnlyFallbackKey_32chars!!";
+            else
+                throw new InvalidOperationException("JWT signing key must be configured via 'Jwt:Key' in appsettings.json, user-secrets, or the JWT_KEY environment variable. Key must be at least 32 characters.");
+        }
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
