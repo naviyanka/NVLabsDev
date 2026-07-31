@@ -23,6 +23,7 @@ import { Route as ServersRouteImport } from './routes/servers'
 import { Route as SecurityRouteImport } from './routes/security'
 import { Route as RunbooksRouteImport } from './routes/runbooks'
 import { Route as RolesRouteImport } from './routes/roles'
+import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as RemoteDesktopRouteImport } from './routes/remote-desktop'
 import { Route as RegistryRouteImport } from './routes/registry'
 import { Route as ProcessesRouteImport } from './routes/processes'
@@ -111,6 +112,11 @@ const RunbooksRoute = RunbooksRouteImport.update({
 const RolesRoute = RolesRouteImport.update({
   id: '/roles',
   path: '/roles',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RemoteDesktopRoute = RemoteDesktopRouteImport.update({
@@ -228,6 +234,7 @@ export interface FileRoutesByFullPath {
   '/processes': typeof ProcessesRoute
   '/registry': typeof RegistryRoute
   '/remote-desktop': typeof RemoteDesktopRoute
+  '/reports': typeof ReportsRoute
   '/roles': typeof RolesRoute
   '/runbooks': typeof RunbooksRoute
   '/security': typeof SecurityRoute
@@ -263,6 +270,7 @@ export interface FileRoutesByTo {
   '/processes': typeof ProcessesRoute
   '/registry': typeof RegistryRoute
   '/remote-desktop': typeof RemoteDesktopRoute
+  '/reports': typeof ReportsRoute
   '/roles': typeof RolesRoute
   '/runbooks': typeof RunbooksRoute
   '/security': typeof SecurityRoute
@@ -299,6 +307,7 @@ export interface FileRoutesById {
   '/processes': typeof ProcessesRoute
   '/registry': typeof RegistryRoute
   '/remote-desktop': typeof RemoteDesktopRoute
+  '/reports': typeof ReportsRoute
   '/roles': typeof RolesRoute
   '/runbooks': typeof RunbooksRoute
   '/security': typeof SecurityRoute
@@ -336,6 +345,7 @@ export interface FileRouteTypes {
     | '/processes'
     | '/registry'
     | '/remote-desktop'
+    | '/reports'
     | '/roles'
     | '/runbooks'
     | '/security'
@@ -371,6 +381,7 @@ export interface FileRouteTypes {
     | '/processes'
     | '/registry'
     | '/remote-desktop'
+    | '/reports'
     | '/roles'
     | '/runbooks'
     | '/security'
@@ -406,6 +417,7 @@ export interface FileRouteTypes {
     | '/processes'
     | '/registry'
     | '/remote-desktop'
+    | '/reports'
     | '/roles'
     | '/runbooks'
     | '/security'
@@ -442,6 +454,7 @@ export interface RootRouteChildren {
   ProcessesRoute: typeof ProcessesRoute
   RegistryRoute: typeof RegistryRoute
   RemoteDesktopRoute: typeof RemoteDesktopRoute
+  ReportsRoute: typeof ReportsRoute
   RolesRoute: typeof RolesRoute
   RunbooksRoute: typeof RunbooksRoute
   SecurityRoute: typeof SecurityRoute
@@ -557,6 +570,13 @@ declare module '@tanstack/react-router' {
       path: '/roles'
       fullPath: '/roles'
       preLoaderRoute: typeof RolesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports': {
+      id: '/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof ReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/remote-desktop': {
@@ -714,6 +734,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProcessesRoute: ProcessesRoute,
   RegistryRoute: RegistryRoute,
   RemoteDesktopRoute: RemoteDesktopRoute,
+  ReportsRoute: ReportsRoute,
   RolesRoute: RolesRoute,
   RunbooksRoute: RunbooksRoute,
   SecurityRoute: SecurityRoute,
