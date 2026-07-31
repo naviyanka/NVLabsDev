@@ -307,18 +307,18 @@ export function HorizonPowerShell() {
 
           {/* Active Server Target & Clear Controls (Right) */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Server target switcher for active tab */}
+            {/* Server target switcher - opens a NEW session for selected server */}
             {servers.length > 0 && (
               <select
-                value={active?.serverId || ""}
+                value=""
                 onChange={(e) => {
-                  if (active) {
-                    active.serverId = e.target.value;
+                  if (e.target.value) {
                     terminalStore.createSession(e.target.value);
                   }
                 }}
                 className="mono rounded border border-white/20 bg-black/40 px-2 py-1 text-[10px] uppercase font-bold text-white/80 cursor-pointer focus:outline-none"
               >
+                <option value="" disabled>+ New Session...</option>
                 {servers.map((s) => <option key={s.name} value={s.name} className="bg-neutral-900 text-white">{s.name}</option>)}
               </select>
             )}
