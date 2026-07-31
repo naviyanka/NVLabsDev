@@ -16,6 +16,7 @@ import {
   CustomScriptModal, CmdletCheatSheetDrawer, getStoredScripts, 
   saveStoredScripts, type CustomScript 
 } from "@/components/powershell/PowerShellTools";
+import { AiCommandBar } from "@/components/powershell/AiCommandBar";
 
 const BUILTIN_SCRIPTS = [
   { label: "Audit Local Admins", cmd: "Get-LocalGroupMember -Group 'Administrators'\r" },
@@ -257,6 +258,12 @@ export function HorizonPowerShell() {
           </button>
         </div>
       </div>
+
+      {/* AI Command Bar */}
+      <AiCommandBar
+        serverIp={active?.serverId || "localhost"}
+        onRunCommand={dispatchCommand}
+      />
 
       {/* Main Terminal Window Frame */}
       <div 

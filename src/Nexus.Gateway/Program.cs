@@ -95,6 +95,7 @@ builder.Services.AddHostedService<AdSyncBackgroundService>();
 builder.Services.AddHostedService<PerformanceStreamService>();
 builder.Services.AddHostedService<AuditRetentionService>();
 builder.Services.AddHostedService<RunbookSchedulerService>();
+builder.Services.AddHostedService<AnomalyDetectionService>();
 builder.Services.AddSignalR();
 builder.Services.AddHttpClient();
 
