@@ -21,6 +21,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as ServersRouteImport } from './routes/servers'
 import { Route as SecurityRouteImport } from './routes/security'
+import { Route as RunbooksRouteImport } from './routes/runbooks'
 import { Route as RolesRouteImport } from './routes/roles'
 import { Route as RemoteDesktopRouteImport } from './routes/remote-desktop'
 import { Route as RegistryRouteImport } from './routes/registry'
@@ -100,6 +101,11 @@ const ServersRoute = ServersRouteImport.update({
 const SecurityRoute = SecurityRouteImport.update({
   id: '/security',
   path: '/security',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RunbooksRoute = RunbooksRouteImport.update({
+  id: '/runbooks',
+  path: '/runbooks',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RolesRoute = RolesRouteImport.update({
@@ -223,6 +229,7 @@ export interface FileRoutesByFullPath {
   '/registry': typeof RegistryRoute
   '/remote-desktop': typeof RemoteDesktopRoute
   '/roles': typeof RolesRoute
+  '/runbooks': typeof RunbooksRoute
   '/security': typeof SecurityRoute
   '/servers': typeof ServersRoute
   '/services': typeof ServicesRoute
@@ -257,6 +264,7 @@ export interface FileRoutesByTo {
   '/registry': typeof RegistryRoute
   '/remote-desktop': typeof RemoteDesktopRoute
   '/roles': typeof RolesRoute
+  '/runbooks': typeof RunbooksRoute
   '/security': typeof SecurityRoute
   '/servers': typeof ServersRoute
   '/services': typeof ServicesRoute
@@ -292,6 +300,7 @@ export interface FileRoutesById {
   '/registry': typeof RegistryRoute
   '/remote-desktop': typeof RemoteDesktopRoute
   '/roles': typeof RolesRoute
+  '/runbooks': typeof RunbooksRoute
   '/security': typeof SecurityRoute
   '/servers': typeof ServersRoute
   '/services': typeof ServicesRoute
@@ -328,6 +337,7 @@ export interface FileRouteTypes {
     | '/registry'
     | '/remote-desktop'
     | '/roles'
+    | '/runbooks'
     | '/security'
     | '/servers'
     | '/services'
@@ -362,6 +372,7 @@ export interface FileRouteTypes {
     | '/registry'
     | '/remote-desktop'
     | '/roles'
+    | '/runbooks'
     | '/security'
     | '/servers'
     | '/services'
@@ -396,6 +407,7 @@ export interface FileRouteTypes {
     | '/registry'
     | '/remote-desktop'
     | '/roles'
+    | '/runbooks'
     | '/security'
     | '/servers'
     | '/services'
@@ -431,6 +443,7 @@ export interface RootRouteChildren {
   RegistryRoute: typeof RegistryRoute
   RemoteDesktopRoute: typeof RemoteDesktopRoute
   RolesRoute: typeof RolesRoute
+  RunbooksRoute: typeof RunbooksRoute
   SecurityRoute: typeof SecurityRoute
   ServersRoute: typeof ServersRoute
   ServicesRoute: typeof ServicesRoute
@@ -530,6 +543,13 @@ declare module '@tanstack/react-router' {
       path: '/security'
       fullPath: '/security'
       preLoaderRoute: typeof SecurityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/runbooks': {
+      id: '/runbooks'
+      path: '/runbooks'
+      fullPath: '/runbooks'
+      preLoaderRoute: typeof RunbooksRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/roles': {
@@ -695,6 +715,7 @@ const rootRouteChildren: RootRouteChildren = {
   RegistryRoute: RegistryRoute,
   RemoteDesktopRoute: RemoteDesktopRoute,
   RolesRoute: RolesRoute,
+  RunbooksRoute: RunbooksRoute,
   SecurityRoute: SecurityRoute,
   ServersRoute: ServersRoute,
   ServicesRoute: ServicesRoute,

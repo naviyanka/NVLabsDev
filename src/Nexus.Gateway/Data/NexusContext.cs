@@ -23,6 +23,8 @@ public class NexusContext : DbContext
     public DbSet<BackgroundJob> BackgroundJobs { get; set; } = null!;
     public DbSet<AlertRule> AlertRules { get; set; } = null!;
     public DbSet<TelemetryHistory> TelemetryHistory { get; set; } = null!;
+    public DbSet<Runbook> Runbooks { get; set; } = null!;
+    public DbSet<RunbookExecution> RunbookExecutions { get; set; } = null!;
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<PerfSample>().HasIndex(p => new { p.ServerIp, p.T });
@@ -40,6 +42,9 @@ public class NexusContext : DbContext
         modelBuilder.Entity<SecurityEventLog>().HasIndex(e => new { e.ServerIp, e.TimeCreated });
         
         modelBuilder.Entity<AppSetting>().HasData(new AppSetting { Id = "global", Theme = "horizon", TerminalTheme = "stealth" });
+
+        modelBuilder.Entity<RunbookExecution>().HasIndex(e => e.RunbookId);
+        modelBuilder.Entity<RunbookExecution>().HasIndex(e => e.StartedAt);
 
         modelBuilder.Entity<PluginEntity>().HasData(
             new PluginEntity { Id = "builtin-processes", Name = "Processes", Description = "Manage running processes", Icon = "app-window", Category = "Management", IsBuiltIn = true, IsActive = true, TargetRoute = "/processes" },
@@ -67,7 +72,8 @@ public class NexusContext : DbContext
             new PluginEntity { Id = "builtin-replica", Name = "Storage Replica", Description = "Storage Replica status", Icon = "copy-slash", Category = "Infrastructure", IsBuiltIn = true, IsActive = true, TargetRoute = "/storage-replica" },
 
             new PluginEntity { Id = "builtin-powershell", Name = "PowerShell", Description = "Interactive Terminal", Icon = "terminal", Category = "Advanced", IsBuiltIn = true, IsActive = true, TargetRoute = "/powershell" },
-            new PluginEntity { Id = "builtin-events", Name = "Event Viewer", Description = "Windows Event Logs", Icon = "scroll-text", Category = "Advanced", IsBuiltIn = true, IsActive = true, TargetRoute = "/events" }
+            new PluginEntity { Id = "builtin-events", Name = "Event Viewer", Description = "Windows Event Logs", Icon = "scroll-text", Category = "Advanced", IsBuiltIn = true, IsActive = true, TargetRoute = "/events" },
+            new PluginEntity { Id = "builtin-runbooks", Name = "Runbooks", Description = "Scheduled PowerShell Automation", Icon = "clock", Category = "Advanced", IsBuiltIn = true, IsActive = true, TargetRoute = "/runbooks" }
         );
     }
 }
