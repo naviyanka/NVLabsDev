@@ -1,4 +1,5 @@
 import { Terminal } from "@xterm/xterm";
+import "@xterm/xterm/css/xterm.css";
 import { FitAddon } from "@xterm/addon-fit";
 import { getWsUrl, isBackendConfigured } from "@/lib/backend";
 import { getFrontendSettings } from "@/lib/frontendSettings";
@@ -16,13 +17,25 @@ export interface PtySession {
 
 function sanitizePtyStream(input: string): string {
   if (!input) return input;
-  // Strip VT100 DEC graphic box drawing initial noise (e.g. jjjjh... lines, \x1b(0 sequences, and resize symbol artifacts)
-  // Also strip PowerShell module-loading progress bar (lines of >>>> characters)
   return input
-    .replace(/\x1b\(0[jhqkmlxq]+\x1b\(B/gi, "")
+    // Strip OSC title-setting sequences (\x1b]0;...\x07 or \x1b]0;...\x1b\\)
+    .replace(/\x1b\]0;[^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
+    // Strip any other OSC sequences (e.g. \x1b]9;4;...\x1b\\ for progress)
+    .replace(/\x1b\]\d+;[^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
+    // Strip VT100 DEC graphic box drawing noise (\x1b(0 ... \x1b(B blocks)
+    .replace(/\x1b\(0[^\x1b]*\x1b\(B/g, "")
+    // Strip standalone DEC charset switch sequences
+    .replace(/\x1b\([0AB]/g, "")
+    // Strip PowerShell module-loading progress bar (lines of >>>> characters)
+    .replace(/^>{4,}\s*\r?\n?/gm, "")
+    // Strip conhost box drawing artifact lines (jjjjh... pattern from raw DEC mode)
     .replace(/^j{3,}[h]{3,}\r?\n?/gm, "")
+    // Strip unicode arrow/resize symbol artifacts that precede the PS prompt
     .replace(/^[\u2921\u2922\u2197\u2198\u2196\u2199\s\/\.\\]*(?=Windows|PS\s|\x1b)/m, "")
-    .replace(/^>{4,}\s*\r?\n?/gm, "");
+    // Strip Windows Terminal conpty sequence reporting (\x1bP...\x1b\\)
+    .replace(/\x1bP[^\x1b]*\x1b\\/g, "")
+    // Strip BEL characters that may render as visible glyphs
+    .replace(/\x07/g, "");
 }
 
 export interface TerminalPalette {
