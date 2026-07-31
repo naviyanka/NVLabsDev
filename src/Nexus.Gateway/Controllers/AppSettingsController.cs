@@ -134,6 +134,7 @@ public class AppSettingsController : ControllerBase
     }
 
     [HttpPost("clear-db-cache")]
+    [Microsoft.AspNetCore.Authorization.Authorize(Roles = "SuperAdmin")]
     public async Task<ActionResult<object>> ClearDbCache()
     {
         int totalCleared = 0;
@@ -164,6 +165,7 @@ public class AppSettingsController : ControllerBase
     }
 
     [HttpPost("clear-app-cache")]
+    [Microsoft.AspNetCore.Authorization.Authorize(Roles = "SuperAdmin")]
     public async Task<ActionResult<object>> ClearAppCache([FromServices] NexusLogContext logDb)
     {
         var logCount = await logDb.LogEntries.CountAsync();

@@ -100,8 +100,11 @@ namespace Nexus.Gateway.Controllers
                     // Trigger immediate AD sync in background
                     _ = Task.Run(() => RunImmediateAdSyncAsync());
 
-                    var token = GenerateJwtToken(request.Username, "Domain Admins");
-                    return Ok(new { token });
+                    // Resolve NEXUS role (or create user with default SuperAdmin for Domain Admins)
+                    var nexusRole = await ResolveNexusRole(request.Username, "domain", request.Domain!);
+
+                    var token = GenerateJwtToken(request.Username, nexusRole);
+                    return Ok(new { token, role = nexusRole });
                 }
                 else
                 {
@@ -125,8 +128,12 @@ namespace Nexus.Gateway.Controllers
 
                     // Successful login, reset attempts
                     _loginAttempts.TryRemove(remoteIp, out _);
-                    var token = GenerateJwtToken(request.Username, "Administrators");
-                    return Ok(new { token });
+
+                    // Resolve NEXUS role (or create user with default Admin for local admins)
+                    var nexusRole = await ResolveNexusRole(request.Username, "local", "");
+
+                    var token = GenerateJwtToken(request.Username, nexusRole);
+                    return Ok(new { token, role = nexusRole });
                 }
             }
             catch (Exception ex)
@@ -149,6 +156,44 @@ namespace Nexus.Gateway.Controllers
                     }
                     return (existing.Count + 1, existing.WindowStart);
                 });
+        }
+
+        private async Task<string> ResolveNexusRole(string username, string source, string domain)
+        {
+            try
+            {
+                var normalizedName = username.ToLowerInvariant();
+                var nexusUser = await _db.NexusUsers.FirstOrDefaultAsync(u => u.Username.ToLower() == normalizedName);
+
+                if (nexusUser != null)
+                {
+                    nexusUser.LastLoginAt = DateTime.UtcNow;
+                    await _db.SaveChangesAsync();
+                    return nexusUser.Role;
+                }
+
+                // First-time login: auto-create with default role
+                var defaultRole = source == "domain" ? "SuperAdmin" : "Admin";
+                var newUser = new Models.NexusUser
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Username = username,
+                    Role = defaultRole,
+                    Source = source,
+                    Domain = domain,
+                    CreatedAt = DateTime.UtcNow,
+                    LastLoginAt = DateTime.UtcNow
+                };
+                _db.NexusUsers.Add(newUser);
+                await _db.SaveChangesAsync();
+                _logger.LogInformation("Auto-created NexusUser '{Username}' with role '{Role}'.", username, defaultRole);
+                return defaultRole;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to resolve NexusUser role for '{Username}'. Defaulting to Admin.", username);
+                return source == "domain" ? "SuperAdmin" : "Admin";
+            }
         }
 
         private async Task UpdateAppLoginMethodAsync(string method, string domainName)

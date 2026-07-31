@@ -1,216 +1,116 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Nexus.Gateway.Data;
 using Nexus.Gateway.Models;
-using Nexus.Gateway.Services;
-using System.Text.Json;
 
 namespace Nexus.Gateway.Controllers;
 
 [ApiController]
-[Route("api/servers/{ip}/[controller]")]
+[Route("api/[controller]")]
+[Authorize(Roles = "SuperAdmin")]
 public class UsersController : ControllerBase
 {
-    private readonly IPowerShellExecutionService _ps;
-    private readonly ILogger<UsersController> _logger;
+    private readonly NexusContext _db;
+    private static readonly string[] ValidRoles = { "Viewer", "Operator", "Admin", "SuperAdmin" };
 
-    public UsersController(IPowerShellExecutionService ps, ILogger<UsersController> logger)
+    public UsersController(NexusContext db)
     {
-        _ps = ps;
-        _logger = logger;
+        _db = db;
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<LocalUserModel>>> GetUsers(string ip)
+    public async Task<ActionResult<IEnumerable<NexusUser>>> GetAll()
     {
-        try
-        {
-            var script = @"
-                $users = Get-LocalUser -ErrorAction SilentlyContinue
-                $result = @()
-                foreach ($u in $users) {
-                    $groups = @()
-                    try {
-                        $userGroups = Get-LocalGroup | Where-Object { 
-                            $members = Get-LocalGroupMember -Group $_ -ErrorAction SilentlyContinue 
-                            $members.Name -contains $u.Name -or $members.Name -match ("".*\\"" + $u.Name + ""$"") 
-                        }
-                        $groups = $userGroups.Name
-                    } catch {}
-
-                    $ll = '—'
-                    if ($u.LastLogon) { $ll = $u.LastLogon.ToString('o') }
-
-                    $result += [PSCustomObject]@{
-                        Name = $u.Name
-                        FullName = $u.FullName
-                        LastLogin = $ll
-                        Enabled = $u.Enabled
-                        PasswordNeverExpires = ($u.PasswordExpires -eq $null -or $u.PasswordExpires -eq '')
-                        Groups = $groups
-                    }
-                }
-                $result | ConvertTo-Json -Compress -Depth 3 -WarningAction SilentlyContinue
-            ";
-
-            var base64 = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
-            var psCmd = $"-NoProfile -ExecutionPolicy Bypass -Command \"Invoke-Command -ComputerName {ip} -ScriptBlock {{ [System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String('{base64}')) | Invoke-Expression }}\"";
-            
-            if (ip == "localhost" || ip == "127.0.0.1" || ip.Equals("dc", StringComparison.OrdinalIgnoreCase))
-            {
-                 psCmd = $"-NoProfile -ExecutionPolicy Bypass -Command \"[System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String('{base64}')) | Invoke-Expression\"";
-            }
-
-            var result = await _ps.ExecuteAsync(psCmd, HttpContext.RequestAborted);
-            var output = result.StandardOutput;
-
-            var userList = new List<LocalUserModel>();
-
-            if (!string.IsNullOrWhiteSpace(output))
-            {
-                try
-                {
-                    using var doc = JsonDocument.Parse(output);
-                    if (doc.RootElement.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var el in doc.RootElement.EnumerateArray())
-                        {
-                            userList.Add(ParseUser(el));
-                        }
-                    }
-                    else if (doc.RootElement.ValueKind == JsonValueKind.Object)
-                    {
-                        userList.Add(ParseUser(doc.RootElement));
-                    }
-                }
-                catch (JsonException) { }
-            }
-
-            return Ok(userList);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to get users for {Ip}", ip);
-            return StatusCode(500, ex.Message);
-        }
+        var users = await _db.NexusUsers.OrderBy(u => u.Username).ToListAsync();
+        return Ok(users);
     }
 
-    [HttpGet("groups")]
-    public async Task<ActionResult<IEnumerable<LocalGroupModel>>> GetGroups(string ip)
+    [HttpGet("{id}")]
+    public async Task<ActionResult<NexusUser>> GetById(string id)
     {
-        try
-        {
-            var script = @"
-                $groups = Get-LocalGroup -ErrorAction SilentlyContinue
-                $result = @()
-                foreach ($g in $groups) {
-                    $members = @()
-                    try {
-                        $mList = Get-LocalGroupMember -Group $g -ErrorAction SilentlyContinue
-                        if ($mList) {
-                            $members = $mList.Name
-                        }
-                    } catch {}
-
-                    $result += [PSCustomObject]@{
-                        Name = $g.Name
-                        Description = $g.Description
-                        Members = $members
-                    }
-                }
-                $result | ConvertTo-Json -Compress -Depth 3 -WarningAction SilentlyContinue
-            ";
-
-            var base64 = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
-            var psCmd = $"-NoProfile -ExecutionPolicy Bypass -Command \"Invoke-Command -ComputerName {ip} -ScriptBlock {{ [System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String('{base64}')) | Invoke-Expression }}\"";
-            
-            if (ip == "localhost" || ip == "127.0.0.1" || ip.Equals("dc", StringComparison.OrdinalIgnoreCase))
-            {
-                 psCmd = $"-NoProfile -ExecutionPolicy Bypass -Command \"[System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String('{base64}')) | Invoke-Expression\"";
-            }
-
-            var result = await _ps.ExecuteAsync(psCmd, HttpContext.RequestAborted);
-            var output = result.StandardOutput;
-
-            var groupList = new List<LocalGroupModel>();
-
-            if (!string.IsNullOrWhiteSpace(output))
-            {
-                try
-                {
-                    using var doc = JsonDocument.Parse(output);
-                    if (doc.RootElement.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var el in doc.RootElement.EnumerateArray())
-                        {
-                            groupList.Add(ParseGroup(el));
-                        }
-                    }
-                    else if (doc.RootElement.ValueKind == JsonValueKind.Object)
-                    {
-                        groupList.Add(ParseGroup(doc.RootElement));
-                    }
-                }
-                catch (JsonException) { }
-            }
-
-            return Ok(groupList);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to get groups for {Ip}", ip);
-            return StatusCode(500, ex.Message);
-        }
+        var user = await _db.NexusUsers.FirstOrDefaultAsync(u => u.Id == id);
+        if (user == null) return NotFound();
+        return Ok(user);
     }
 
-    private LocalUserModel ParseUser(JsonElement el)
+    [HttpPost]
+    public async Task<ActionResult<NexusUser>> Create([FromBody] UserCreateDto dto)
     {
-        var model = new LocalUserModel
+        if (string.IsNullOrWhiteSpace(dto.Username))
+            return BadRequest(new { message = "Username is required." });
+        if (!ValidRoles.Contains(dto.Role))
+            return BadRequest(new { message = $"Invalid role. Must be one of: {string.Join(", ", ValidRoles)}" });
+
+        var exists = await _db.NexusUsers.AnyAsync(u => u.Username.ToLower() == dto.Username.ToLower());
+        if (exists)
+            return Conflict(new { message = "User already exists." });
+
+        var user = new NexusUser
         {
-            Name = el.TryGetProperty("Name", out var name) ? name.GetString() ?? "" : "",
-            FullName = el.TryGetProperty("FullName", out var fname) ? fname.GetString() ?? "" : "",
-            LastLogin = el.TryGetProperty("LastLogin", out var ll) ? ll.GetString() ?? "" : "",
-            Enabled = el.TryGetProperty("Enabled", out var en) && en.ValueKind == JsonValueKind.True,
-            PasswordNeverExpires = el.TryGetProperty("PasswordNeverExpires", out var pne) && pne.ValueKind == JsonValueKind.True
+            Id = Guid.NewGuid().ToString(),
+            Username = dto.Username,
+            Role = dto.Role,
+            Source = dto.Source ?? "domain",
+            Domain = dto.Domain ?? "",
+            CreatedAt = DateTime.UtcNow
         };
 
-        if (el.TryGetProperty("Groups", out var g) && g.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var group in g.EnumerateArray())
-            {
-                var gs = group.GetString();
-                if (!string.IsNullOrEmpty(gs)) model.Groups.Add(gs);
-            }
-        }
-        else if (g.ValueKind == JsonValueKind.String)
-        {
-            var gs = g.GetString();
-            if (!string.IsNullOrEmpty(gs)) model.Groups.Add(gs);
-        }
-
-        return model;
+        _db.NexusUsers.Add(user);
+        await _db.SaveChangesAsync();
+        return Ok(user);
     }
 
-    private LocalGroupModel ParseGroup(JsonElement el)
+    [HttpPut("{id}")]
+    public async Task<ActionResult<NexusUser>> Update(string id, [FromBody] UserUpdateDto dto)
     {
-        var model = new LocalGroupModel
-        {
-            Name = el.TryGetProperty("Name", out var name) ? name.GetString() ?? "" : "",
-            Description = el.TryGetProperty("Description", out var desc) ? desc.GetString() ?? "" : ""
-        };
+        var user = await _db.NexusUsers.FirstOrDefaultAsync(u => u.Id == id);
+        if (user == null) return NotFound();
 
-        if (el.TryGetProperty("Members", out var m) && m.ValueKind == JsonValueKind.Array)
+        if (!string.IsNullOrWhiteSpace(dto.Role))
         {
-            foreach (var member in m.EnumerateArray())
-            {
-                var ms = member.GetString();
-                if (!string.IsNullOrEmpty(ms)) model.Members.Add(ms);
-            }
-        }
-        else if (m.ValueKind == JsonValueKind.String)
-        {
-            var ms = m.GetString();
-            if (!string.IsNullOrEmpty(ms)) model.Members.Add(ms);
+            if (!ValidRoles.Contains(dto.Role))
+                return BadRequest(new { message = $"Invalid role. Must be one of: {string.Join(", ", ValidRoles)}" });
+            user.Role = dto.Role;
         }
 
-        return model;
+        await _db.SaveChangesAsync();
+        return Ok(user);
     }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(string id)
+    {
+        var user = await _db.NexusUsers.FirstOrDefaultAsync(u => u.Id == id);
+        if (user == null) return NotFound();
+
+        // Prevent deleting self
+        var currentUser = User.Identity?.Name;
+        if (user.Username.Equals(currentUser, StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "Cannot delete your own account." });
+
+        _db.NexusUsers.Remove(user);
+        await _db.SaveChangesAsync();
+        return Ok(new { message = "User deleted." });
+    }
+
+    [HttpGet("roles")]
+    [AllowAnonymous]
+    public ActionResult<string[]> GetRoles()
+    {
+        return Ok(ValidRoles);
+    }
+}
+
+public class UserCreateDto
+{
+    public string Username { get; set; } = "";
+    public string Role { get; set; } = "Viewer";
+    public string? Source { get; set; }
+    public string? Domain { get; set; }
+}
+
+public class UserUpdateDto
+{
+    public string? Role { get; set; }
 }

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Nexus.Gateway.Data;
@@ -40,6 +41,7 @@ public class RunbooksController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin,SuperAdmin")]
     public async Task<ActionResult<Runbook>> Create([FromBody] RunbookCreateDto dto)
     {
         if (string.IsNullOrWhiteSpace(dto.Name))
@@ -66,6 +68,7 @@ public class RunbooksController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin,SuperAdmin")]
     public async Task<ActionResult<Runbook>> Update(string id, [FromBody] RunbookCreateDto dto)
     {
         var runbook = await _db.Runbooks.FirstOrDefaultAsync(r => r.Id == id);
@@ -83,6 +86,7 @@ public class RunbooksController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin,SuperAdmin")]
     public async Task<IActionResult> Delete(string id)
     {
         var runbook = await _db.Runbooks.FirstOrDefaultAsync(r => r.Id == id);
@@ -97,6 +101,7 @@ public class RunbooksController : ControllerBase
     }
 
     [HttpPost("{id}/run")]
+    [Authorize(Roles = "Operator,Admin,SuperAdmin")]
     public async Task<IActionResult> RunNow(string id, [FromServices] IPowerShellExecutionService ps)
     {
         var runbook = await _db.Runbooks.FirstOrDefaultAsync(r => r.Id == id);

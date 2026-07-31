@@ -50,6 +50,7 @@ public class ServersController : ControllerBase
     }
 
     [HttpDelete("{ip}")]
+    [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,SuperAdmin")]
     public async Task<IActionResult> DeleteServer(string ip)
     {
         var ok = await _serverService.DeleteServerAsync(ip);
@@ -125,6 +126,7 @@ public class ServersController : ControllerBase
     }
 
     [HttpPost("bulk-action")]
+    [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Operator,Admin,SuperAdmin")]
     public async Task<IActionResult> BulkAction([FromBody] BulkActionRequest request, [FromServices] IPowerShellExecutionService ps)
     {
         if (request.ServerIps == null || request.ServerIps.Count == 0)

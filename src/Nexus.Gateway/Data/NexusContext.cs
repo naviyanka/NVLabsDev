@@ -25,6 +25,7 @@ public class NexusContext : DbContext
     public DbSet<TelemetryHistory> TelemetryHistory { get; set; } = null!;
     public DbSet<Runbook> Runbooks { get; set; } = null!;
     public DbSet<RunbookExecution> RunbookExecutions { get; set; } = null!;
+    public DbSet<NexusUser> NexusUsers { get; set; } = null!;
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<PerfSample>().HasIndex(p => new { p.ServerIp, p.T });
