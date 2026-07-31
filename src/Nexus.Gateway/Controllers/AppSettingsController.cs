@@ -126,8 +126,69 @@ public class AppSettingsController : ControllerBase
         node = getProp("AppSubtitle");
         if (node != null) settings.AppSubtitle = node.ToString();
 
+        node = getProp("AlertQuietHours");
+        if (node != null) settings.AlertQuietHours = node.ToString();
+
         await _db.SaveChangesAsync();
         return Ok(settings);
+    }
+
+    [HttpPost("clear-db-cache")]
+    public async Task<ActionResult<object>> ClearDbCache()
+    {
+        int totalCleared = 0;
+
+        var perfCount = await _db.PerfSamples.CountAsync();
+        if (perfCount > 0) { _db.PerfSamples.RemoveRange(_db.PerfSamples); totalCleared += perfCount; }
+
+        var procCount = await _db.Processes.CountAsync();
+        if (procCount > 0) { _db.Processes.RemoveRange(_db.Processes); totalCleared += procCount; }
+
+        var diskCount = await _db.Disks.CountAsync();
+        if (diskCount > 0) { _db.Disks.RemoveRange(_db.Disks); totalCleared += diskCount; }
+
+        var volCount = await _db.Volumes.CountAsync();
+        if (volCount > 0) { _db.Volumes.RemoveRange(_db.Volumes); totalCleared += volCount; }
+
+        var telCount = await _db.TelemetryHistory.CountAsync();
+        if (telCount > 0) { _db.TelemetryHistory.RemoveRange(_db.TelemetryHistory); totalCleared += telCount; }
+
+        var notifCount = await _db.Notifications.CountAsync();
+        if (notifCount > 0) { _db.Notifications.RemoveRange(_db.Notifications); totalCleared += notifCount; }
+
+        var jobCount = await _db.BackgroundJobs.CountAsync();
+        if (jobCount > 0) { _db.BackgroundJobs.RemoveRange(_db.BackgroundJobs); totalCleared += jobCount; }
+
+        await _db.SaveChangesAsync();
+        return Ok(new { message = $"Database cache cleared. Removed {totalCleared} records.", totalCleared });
+    }
+
+    [HttpPost("clear-app-cache")]
+    public async Task<ActionResult<object>> ClearAppCache([FromServices] NexusLogContext logDb)
+    {
+        var logCount = await logDb.LogEntries.CountAsync();
+        if (logCount > 0) { logDb.LogEntries.RemoveRange(logDb.LogEntries); }
+        await logDb.SaveChangesAsync();
+
+        int totalCleared = logCount;
+
+        var secCount = await _db.SecurityEventLogs.CountAsync();
+        if (secCount > 0) { _db.SecurityEventLogs.RemoveRange(_db.SecurityEventLogs); totalCleared += secCount; }
+
+        var snapCount = await _db.SecuritySnapshots.CountAsync();
+        if (snapCount > 0) { _db.SecuritySnapshots.RemoveRange(_db.SecuritySnapshots); totalCleared += snapCount; }
+
+        var appCount = await _db.InstalledApps.CountAsync();
+        if (appCount > 0) { _db.InstalledApps.RemoveRange(_db.InstalledApps); totalCleared += appCount; }
+
+        var roleCount = await _db.ServerRoles.CountAsync();
+        if (roleCount > 0) { _db.ServerRoles.RemoveRange(_db.ServerRoles); totalCleared += roleCount; }
+
+        var updateCount = await _db.ServerUpdates.CountAsync();
+        if (updateCount > 0) { _db.ServerUpdates.RemoveRange(_db.ServerUpdates); totalCleared += updateCount; }
+
+        await _db.SaveChangesAsync();
+        return Ok(new { message = $"Application cache cleared. Removed {totalCleared} cached records.", totalCleared });
     }
 
     [HttpGet("logs")]

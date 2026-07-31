@@ -108,6 +108,13 @@ public class TelemetryBackgroundService : BackgroundService
         var rules = await db.AlertRules.Where(r => r.Enabled).ToListAsync(ct);
         if (rules.Count == 0) return;
 
+        // Check if we're inside Alert Quiet Hours — if so, skip all alert evaluation
+        var setting = await db.AppSettings.FirstOrDefaultAsync(s => s.Id == "global", ct);
+        if (setting != null && !string.IsNullOrWhiteSpace(setting.AlertQuietHours) && IsInsideQuietHours(setting.AlertQuietHours))
+        {
+            return;
+        }
+
         var now = DateTime.UtcNow;
         using var alertScope = _serviceProvider.CreateScope();
         var notificationService = alertScope.ServiceProvider.GetRequiredService<NotificationService>();
@@ -122,6 +129,9 @@ public class TelemetryBackgroundService : BackgroundService
 
             foreach (var srv in targets)
             {
+                // Skip servers in maintenance mode
+                if (srv.MaintenanceMode) continue;
+
                 double value = rule.Metric switch
                 {
                     "cpu" => srv.Cpu,
@@ -182,6 +192,29 @@ public class TelemetryBackgroundService : BackgroundService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to dispatch alert webhook to {Channel}", rule.Channel);
+        }
+    }
+
+    private static bool IsInsideQuietHours(string quietHours)
+    {
+        // Format: "HH:mm-HH:mm" e.g. "22:00-06:00" (10 PM to 6 AM UTC)
+        var parts = quietHours.Split('-', 2);
+        if (parts.Length != 2) return false;
+
+        if (!TimeSpan.TryParse(parts[0].Trim(), out var start) || !TimeSpan.TryParse(parts[1].Trim(), out var end))
+            return false;
+
+        var now = DateTime.UtcNow.TimeOfDay;
+
+        if (start <= end)
+        {
+            // Same-day window: e.g. "02:00-06:00"
+            return now >= start && now <= end;
+        }
+        else
+        {
+            // Overnight window: e.g. "22:00-06:00"
+            return now >= start || now <= end;
         }
     }
 }

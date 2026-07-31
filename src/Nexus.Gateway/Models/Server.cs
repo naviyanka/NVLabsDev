@@ -15,4 +15,5 @@ public class Server
     public string Site { get; set; } = string.Empty;
     public string Group { get; set; } = string.Empty;
     public bool IsAdFetched { get; set; } = false;
+    public bool MaintenanceMode { get; set; } = false;
 }

@@ -80,6 +80,18 @@ public class ServersController : ControllerBase
         return Ok(disks);
     }
 
+    [HttpPost("{ip}/maintenance")]
+    public async Task<IActionResult> ToggleMaintenance(string ip)
+    {
+        var servers = await _serverService.GetServersAsync();
+        var server = servers.FirstOrDefault(s => s.Ip == ip);
+        if (server == null) return NotFound();
+
+        server.MaintenanceMode = !server.MaintenanceMode;
+        await _serverService.SaveChangesAsync();
+        return Ok(new { ip, maintenanceMode = server.MaintenanceMode });
+    }
+
     [HttpPost("sync")]
     public async Task<IActionResult> SyncFromAd([FromServices] ActiveDirectoryService adService, [FromServices] CimService cimService)
     {

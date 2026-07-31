@@ -230,7 +230,8 @@ export function HorizonSettings() {
       'animationsEnabled', 'adSyncInterval', 'sessionTimeout', 'mfaRequired',
       'cpuAlertThreshold', 'ramAlertThreshold', 'notificationEmail', 'webhookUrl',
       'telemetryRetentionDays', 'logLevel', 'pluginCategories', 'terminalTheme',
-      'dashboardLayout', 'appName', 'appSubtitle'
+      'dashboardLayout', 'appName', 'appSubtitle', 'alertQuietHours',
+      'discordWebhookUrl', 'slackWebhookUrl'
     ];
 
     Object.keys(updates).forEach(key => {
@@ -648,6 +649,67 @@ export function HorizonSettings() {
           {activeSection === "diagnostics" && (
             <div className="space-y-6">
               <AlertRulesManager />
+
+              {/* Alert Quiet Hours & Maintenance */}
+              <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 space-y-4 shadow-sm">
+                <div className="border-b border-[var(--border-c)] pb-4">
+                  <h3 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
+                    <Shield size={20} className="text-[var(--amber)]" /> Alert Quiet Hours
+                  </h3>
+                  <p className="text-xs text-[var(--text-sub)] mt-0.5">Suppress all alert notifications during a scheduled maintenance window (UTC time).</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase tracking-wider mb-1.5">Quiet Hours Window (e.g. 22:00-06:00)</label>
+                    <input
+                      type="text"
+                      value={s.alertQuietHours || ""}
+                      onChange={(e) => patch({ alertQuietHours: e.target.value })}
+                      placeholder="22:00-06:00"
+                      className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2 text-xs text-[var(--text)] font-mono focus:border-[var(--amber)] focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* Cache Management */}
+              <section className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-c)] p-6 space-y-4 shadow-sm">
+                <div className="border-b border-[var(--border-c)] pb-4">
+                  <h3 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
+                    <Database size={20} className="text-rose-400" /> Cache Management
+                  </h3>
+                  <p className="text-xs text-[var(--text-sub)] mt-0.5">Clear accumulated telemetry data or cached application state. Data will be re-collected on next poll cycle.</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Clear all telemetry, performance samples, and notification history?")) return;
+                      try {
+                        const res = await fetch(getApiUrl("/settings/clear-db-cache"), { method: "POST" });
+                        const data = await res.json();
+                        toast.success(data.message || "DB cache cleared");
+                      } catch { toast.error("Failed to clear DB cache"); }
+                    }}
+                    className="flex items-center gap-2 rounded-xl border border-rose-400/40 bg-rose-400/10 text-rose-400 px-4 py-2 text-xs font-semibold hover:bg-rose-400 hover:text-black transition-colors cursor-pointer"
+                  >
+                    <Trash2 size={14} /> Clear Telemetry Cache
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Clear all cached app inventories, security logs, roles, and update data?")) return;
+                      try {
+                        const res = await fetch(getApiUrl("/settings/clear-app-cache"), { method: "POST" });
+                        const data = await res.json();
+                        toast.success(data.message || "App cache cleared");
+                      } catch { toast.error("Failed to clear app cache"); }
+                    }}
+                    className="flex items-center gap-2 rounded-xl border border-[var(--amber)]/40 bg-[var(--amber)]/10 text-[var(--amber)] px-4 py-2 text-xs font-semibold hover:bg-[var(--amber)] hover:text-black transition-colors cursor-pointer"
+                  >
+                    <RefreshCw size={14} /> Clear Application Cache
+                  </button>
+                </div>
+              </section>
+
               <BackgroundJobsView />
             </div>
           )}
