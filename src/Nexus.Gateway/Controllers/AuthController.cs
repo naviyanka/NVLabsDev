@@ -1,11 +1,14 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Collections.Concurrent;
 using System.DirectoryServices.AccountManagement;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Nexus.Gateway.Data;
+using Nexus.Gateway.Services;
 
 namespace Nexus.Gateway.Controllers
 {
@@ -14,19 +17,27 @@ namespace Nexus.Gateway.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IConfiguration _config;
+        private readonly NexusContext _db;
+        private readonly ActiveDirectoryService _adService;
+        private readonly CimService _cimService;
+        private readonly ILogger<AuthController> _logger;
 
         private static readonly ConcurrentDictionary<string, (int Count, DateTime WindowStart)> _loginAttempts = new();
         private const int MaxAttempts = 5;
         private static readonly TimeSpan RateLimitWindow = TimeSpan.FromMinutes(15);
 
-        public AuthController(IConfiguration config)
+        public AuthController(IConfiguration config, NexusContext db, ActiveDirectoryService adService, CimService cimService, ILogger<AuthController> logger)
         {
             _config = config;
+            _db = db;
+            _adService = adService;
+            _cimService = cimService;
+            _logger = logger;
         }
 
         [HttpPost("login")]
         [AllowAnonymous]
-        public IActionResult Login([FromBody] LoginRequest request)
+        public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             var remoteIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
@@ -82,8 +93,15 @@ namespace Nexus.Gateway.Controllers
                         return Unauthorized(new { message = "Domain Admin privileges are required to access NEXUS." });
                     }
 
-                    // Successful login, reset attempts
+                    // Successful domain login, reset attempts
                     _loginAttempts.TryRemove(remoteIp, out _);
+
+                    // Update AppLoginMethod to "Domain" so AD discovery is enabled
+                    await UpdateAppLoginMethodAsync("Domain", request.Domain!);
+
+                    // Trigger immediate AD sync in background
+                    _ = Task.Run(() => RunImmediateAdSyncAsync());
+
                     var token = GenerateJwtToken(request.Username, "Domain Admins");
                     return Ok(new { token });
                 }
@@ -133,6 +151,61 @@ namespace Nexus.Gateway.Controllers
                     }
                     return (existing.Count + 1, existing.WindowStart);
                 });
+        }
+
+        private async Task UpdateAppLoginMethodAsync(string method, string domainName)
+        {
+            try
+            {
+                var setting = await _db.AppSettings.FirstOrDefaultAsync(s => s.Id == "global");
+                if (setting != null)
+                {
+                    setting.AppLoginMethod = method;
+                    if (!string.IsNullOrEmpty(domainName))
+                    {
+                        setting.DefaultDomainName = domainName;
+                    }
+                    await _db.SaveChangesAsync();
+                    _logger.LogInformation("Updated AppLoginMethod to '{Method}' with domain '{Domain}'.", method, domainName);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to update AppLoginMethod.");
+            }
+        }
+
+        private async Task RunImmediateAdSyncAsync()
+        {
+            try
+            {
+                _logger.LogInformation("Triggering immediate AD computer sync after domain login.");
+                var adServers = await _adService.GetDomainComputersAsync();
+
+                foreach (var adServer in adServers)
+                {
+                    var existing = await _db.Servers.FirstOrDefaultAsync(s => s.Id == adServer.Id);
+                    if (existing == null)
+                    {
+                        adServer.IsAdFetched = true;
+                        _db.Servers.Add(adServer);
+                        _ = Task.Run(() => _cimService.EnableWinRmAsync(adServer.Ip));
+                    }
+                    else
+                    {
+                        if (existing.IsAdFetched && existing.Ip != adServer.Ip && adServer.Ip != adServer.Name)
+                        {
+                            existing.Ip = adServer.Ip;
+                        }
+                    }
+                }
+                await _db.SaveChangesAsync();
+                _logger.LogInformation("Immediate AD sync completed. Found {Count} domain computers.", adServers.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Immediate AD sync after login failed.");
+            }
         }
 
         private string GenerateJwtToken(string username, string role)

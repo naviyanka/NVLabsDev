@@ -80,6 +80,34 @@ public class ServersController : ControllerBase
         return Ok(disks);
     }
 
+    [HttpPost("sync")]
+    public async Task<IActionResult> SyncFromAd([FromServices] ActiveDirectoryService adService, [FromServices] CimService cimService)
+    {
+        try
+        {
+            var adServers = await adService.GetDomainComputersAsync();
+            int added = 0;
+
+            foreach (var adServer in adServers)
+            {
+                var existing = await _serverService.GetServersAsync();
+                if (!existing.Any(s => s.Id == adServer.Id))
+                {
+                    adServer.IsAdFetched = true;
+                    await _serverService.AddDiscoveredServerAsync(adServer);
+                    _ = Task.Run(() => cimService.EnableWinRmAsync(adServer.Ip));
+                    added++;
+                }
+            }
+
+            return Ok(new { message = $"AD sync complete. Discovered {adServers.Count} computers, added {added} new.", total = adServers.Count, added });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = $"AD sync failed: {ex.Message}" });
+        }
+    }
+
     [HttpPost("bulk-action")]
     public async Task<IActionResult> BulkAction([FromBody] BulkActionRequest request, [FromServices] IPowerShellExecutionService ps)
     {

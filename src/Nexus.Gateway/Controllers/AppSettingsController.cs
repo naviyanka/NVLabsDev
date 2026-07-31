@@ -75,6 +75,12 @@ public class AppSettingsController : ControllerBase
         node = getProp("AdSyncInterval");
         if (node != null) settings.AdSyncInterval = node.GetValue<int>();
 
+        node = getProp("AppLoginMethod");
+        if (node != null) settings.AppLoginMethod = node.ToString();
+
+        node = getProp("DefaultDomainName");
+        if (node != null) settings.DefaultDomainName = node.ToString();
+
         node = getProp("SessionTimeout");
         if (node != null) settings.SessionTimeout = node.GetValue<int>();
 

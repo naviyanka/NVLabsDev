@@ -104,4 +104,13 @@ public class ServerService
         await _db.SaveChangesAsync();
         return true;
     }
+
+    public async Task AddDiscoveredServerAsync(Server server)
+    {
+        if (!await _db.Servers.AnyAsync(s => s.Id == server.Id))
+        {
+            _db.Servers.Add(server);
+            await _db.SaveChangesAsync();
+        }
+    }
 }
