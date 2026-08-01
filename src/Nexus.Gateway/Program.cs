@@ -96,6 +96,7 @@ builder.Services.AddHostedService<PerformanceStreamService>();
 builder.Services.AddHostedService<AuditRetentionService>();
 builder.Services.AddHostedService<RunbookSchedulerService>();
 builder.Services.AddHostedService<AnomalyDetectionService>();
+builder.Services.AddHostedService<DriftDetectionService>();
 builder.Services.AddSignalR();
 builder.Services.AddHttpClient();
 
