@@ -41,7 +41,7 @@ export function HorizonLogin() {
         localStorage.setItem("nexus_token", data.token);
         localStorage.setItem("nexus-user", JSON.stringify({ 
           username, 
-          role: username.toLowerCase() === 'admin' || username.toLowerCase() === 'orgadmin' ? 'Administrator' : 'Operator',
+          role: data.role || "Admin",
           loginTime: new Date().toISOString()
         }));
         toast.success("Authentication successful");

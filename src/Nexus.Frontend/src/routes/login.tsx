@@ -39,6 +39,7 @@ function LoginPage() {
 
       if (res.ok) {
         localStorage.setItem("nexus_token", data.token);
+        localStorage.setItem("nexus-user", JSON.stringify({ username, role: data.role || "Admin", loginTime: new Date().toISOString() }));
         toast.success("Authentication successful");
         navigate({ to: "/" });
       } else {

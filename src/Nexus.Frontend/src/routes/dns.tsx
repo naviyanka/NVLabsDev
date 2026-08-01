@@ -16,6 +16,7 @@ function DnsPage() {
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [recordFilter, setRecordFilter] = useState("");
 
   const fetchZones = async () => {
     try {
@@ -64,6 +65,8 @@ function DnsPage() {
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold text-[var(--text)]">{selectedZone}</h3>
                 <div className="flex gap-2">
+                  <input type="text" placeholder="Filter records..." value={recordFilter} onChange={e => setRecordFilter(e.target.value)}
+                    className="bg-[var(--bg-void)] border border-[var(--border-c)] rounded-lg px-2 py-1 text-xs text-[var(--text)] focus:border-[var(--amber)] focus:outline-none w-40" />
                   <button onClick={() => fetchRecords(selectedZone)} className="p-1.5 rounded-lg text-[var(--text-sub)] hover:text-[var(--text)] cursor-pointer"><RefreshCw size={14} /></button>
                   <button onClick={() => setShowAdd(true)} className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-[var(--amber)] text-black cursor-pointer"><Plus size={12} /> Add</button>
                 </div>
@@ -71,7 +74,11 @@ function DnsPage() {
               <div className="overflow-x-auto max-h-[55vh] overflow-y-auto">
                 <table className="w-full text-xs">
                   <thead><tr className="border-b border-[var(--border-c)]"><th className="px-3 py-2 text-left text-[var(--text-sub)]">Name</th><th className="px-3 py-2 text-left text-[var(--text-sub)]">Type</th><th className="px-3 py-2 text-left text-[var(--text-sub)]">Data</th><th className="px-3 py-2"></th></tr></thead>
-                  <tbody>{records.map((r: any, i) => (
+                  <tbody>{records.filter((r: any) => {
+                    if (!recordFilter) return true;
+                    const q = recordFilter.toLowerCase();
+                    return (r.hostName || r.HostName || "").toLowerCase().includes(q) || (r.recordType || r.RecordType || "").toLowerCase().includes(q) || (r.data || r.Data || "").toLowerCase().includes(q);
+                  }).map((r: any, i) => (
                     <tr key={i} className="border-b border-[var(--border-c)] last:border-0 hover:bg-[var(--bg-void)]/50">
                       <td className="px-3 py-2 font-mono text-[var(--text)]">{r.hostName || r.HostName || ""}</td>
                       <td className="px-3 py-2 text-[var(--amber)] font-bold">{r.recordType || r.RecordType || ""}</td>

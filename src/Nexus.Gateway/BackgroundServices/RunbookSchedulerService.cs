@@ -69,7 +69,22 @@ public class RunbookSchedulerService : BackgroundService
                                 ? $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encoded}"
                                 : $"-NoProfile -ExecutionPolicy Bypass -Command \"Invoke-Command -ComputerName {serverIp} -ScriptBlock {{ [System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String('{encoded}')) | Invoke-Expression }}\"";
 
-                            var result = await ps.ExecuteAsync(cmd, stoppingToken, 120000);
+                            var timeoutMs = runbook.TimeoutSeconds > 0 ? runbook.TimeoutSeconds * 1000 : 120000;
+                            PowerShellResult result = null!;
+                            int attempts = 0;
+                            int maxAttempts = runbook.MaxRetries + 1;
+
+                            while (attempts < maxAttempts)
+                            {
+                                attempts++;
+                                result = await ps.ExecuteAsync(cmd, stoppingToken, timeoutMs);
+                                if (result.ExitCode == 0) break;
+                                if (attempts < maxAttempts)
+                                {
+                                    _logger.LogInformation("Runbook '{Name}' failed on {Server} (attempt {A}/{M}). Retrying...", runbook.Name, serverIp, attempts, maxAttempts);
+                                    await Task.Delay(3000, stoppingToken);
+                                }
+                            }
 
                             execution.ExitCode = result.ExitCode;
                             execution.Output = string.IsNullOrWhiteSpace(result.StandardOutput) ? result.StandardError : result.StandardOutput;
@@ -78,6 +93,9 @@ public class RunbookSchedulerService : BackgroundService
 
                             runbook.LastRunStatus = execution.Status;
                             runbook.LastRunOutput = execution.Output.Length > 2000 ? execution.Output[..2000] : execution.Output;
+                            runbook.TotalRuns++;
+                            if (execution.Status == "Success") runbook.SuccessfulRuns++;
+                            else runbook.FailedRuns++;
                         }
                         catch (Exception ex)
                         {
@@ -86,19 +104,25 @@ public class RunbookSchedulerService : BackgroundService
                             execution.ExitCode = -1;
                             execution.CompletedAt = DateTime.UtcNow;
                             runbook.LastRunStatus = "Failed";
+                            runbook.TotalRuns++;
+                            runbook.FailedRuns++;
                             runbook.LastRunOutput = ex.Message;
                         }
 
                         await db.SaveChangesAsync(stoppingToken);
                     }
 
-                    // Send notification
-                    var statusEmoji = runbook.LastRunStatus == "Success" ? "OK" : "FAIL";
-                    await notificationService.AddAndBroadcastNotificationAsync(
-                        runbook.LastRunStatus == "Success" ? "Info" : "Warning",
-                        $"Runbook '{runbook.Name}' completed: {statusEmoji}",
-                        servers.FirstOrDefault() ?? ""
-                    );
+                    // Send notification based on preferences
+                    if ((runbook.LastRunStatus == "Failed" && runbook.NotifyOnFailure) ||
+                        (runbook.LastRunStatus == "Success" && runbook.NotifyOnSuccess))
+                    {
+                        var statusEmoji = runbook.LastRunStatus == "Success" ? "OK" : "FAIL";
+                        await notificationService.AddAndBroadcastNotificationAsync(
+                            runbook.LastRunStatus == "Success" ? "Info" : "Warning",
+                            $"Runbook '{runbook.Name}' completed: {statusEmoji} (run #{runbook.TotalRuns})",
+                            servers.FirstOrDefault() ?? ""
+                        );
+                    }
                 }
 
                 await db.SaveChangesAsync(stoppingToken);

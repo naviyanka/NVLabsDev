@@ -58,6 +58,11 @@ public class RunbooksController : ControllerBase
             CronExpression = dto.CronExpression ?? "",
             TargetServers = dto.TargetServers ?? "*",
             Enabled = dto.Enabled,
+            MaxRetries = dto.MaxRetries,
+            TimeoutSeconds = dto.TimeoutSeconds > 0 ? dto.TimeoutSeconds : 120,
+            NotifyOnFailure = dto.NotifyOnFailure,
+            NotifyOnSuccess = dto.NotifyOnSuccess,
+            Tags = dto.Tags ?? "",
             CreatedAt = DateTime.UtcNow,
             CreatedBy = User.Identity?.Name ?? "system"
         };
@@ -79,7 +84,12 @@ public class RunbooksController : ControllerBase
         if (dto.Script != null) runbook.Script = dto.Script;
         if (dto.CronExpression != null) runbook.CronExpression = dto.CronExpression;
         if (dto.TargetServers != null) runbook.TargetServers = dto.TargetServers;
+        if (dto.Tags != null) runbook.Tags = dto.Tags;
         runbook.Enabled = dto.Enabled;
+        runbook.MaxRetries = dto.MaxRetries;
+        runbook.TimeoutSeconds = dto.TimeoutSeconds > 0 ? dto.TimeoutSeconds : 120;
+        runbook.NotifyOnFailure = dto.NotifyOnFailure;
+        runbook.NotifyOnSuccess = dto.NotifyOnSuccess;
 
         await _db.SaveChangesAsync();
         return Ok(runbook);
@@ -191,4 +201,9 @@ public class RunbookCreateDto
     public string? CronExpression { get; set; }
     public string? TargetServers { get; set; }
     public bool Enabled { get; set; } = true;
+    public int MaxRetries { get; set; } = 0;
+    public int TimeoutSeconds { get; set; } = 120;
+    public bool NotifyOnFailure { get; set; } = true;
+    public bool NotifyOnSuccess { get; set; } = false;
+    public string? Tags { get; set; }
 }

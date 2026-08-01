@@ -169,6 +169,7 @@ function RunbooksPage() {
                     <p className="text-xs text-[var(--text-sub)] mt-0.5 truncate">
                       {rb.description || rb.cronExpression || "No schedule"}
                       {rb.cronExpression && <span className="ml-2 font-mono text-[var(--amber)]">[{rb.cronExpression}]</span>}
+                      {(rb as any).totalRuns > 0 && <span className="ml-2 text-[10px] text-[var(--text-sub)]">({(rb as any).successfulRuns}/{(rb as any).totalRuns} runs OK)</span>}
                     </p>
                   </div>
                 </div>
@@ -273,7 +274,21 @@ function RunbookModal({ editId, runbooks, onClose, onSaved }: { editId: string |
   const [cron, setCron] = useState(existing?.cronExpression || "");
   const [targets, setTargets] = useState(existing?.targetServers || "*");
   const [enabled, setEnabled] = useState(existing?.enabled ?? true);
+  const [maxRetries, setMaxRetries] = useState((existing as any)?.maxRetries ?? 0);
+  const [timeoutSeconds, setTimeoutSeconds] = useState((existing as any)?.timeoutSeconds ?? 120);
+  const [notifyOnFailure, setNotifyOnFailure] = useState((existing as any)?.notifyOnFailure ?? true);
+  const [notifyOnSuccess, setNotifyOnSuccess] = useState((existing as any)?.notifyOnSuccess ?? false);
+  const [tags, setTags] = useState((existing as any)?.tags || "");
   const [saving, setSaving] = useState(false);
+
+  const CRON_PRESETS = [
+    { label: "Every 5 min", value: "*/5 * * * *" },
+    { label: "Hourly", value: "0 * * * *" },
+    { label: "Daily 2 AM", value: "0 2 * * *" },
+    { label: "Weekly Sun 3 AM", value: "0 3 * * 0" },
+    { label: "Monthly 1st", value: "0 0 1 * *" },
+    { label: "Weekdays 9 AM", value: "0 9 * * 1-5" },
+  ];
 
   const handleSave = async () => {
     if (!name.trim() || !script.trim()) {
@@ -282,7 +297,7 @@ function RunbookModal({ editId, runbooks, onClose, onSaved }: { editId: string |
     }
     setSaving(true);
     try {
-      const body = { name, description, script, cronExpression: cron, targetServers: targets, enabled };
+      const body = { name, description, script, cronExpression: cron, targetServers: targets, enabled, maxRetries, timeoutSeconds, notifyOnFailure, notifyOnSuccess, tags };
       const url = editId ? getApiUrl(`/runbooks/${editId}`) : getApiUrl("/runbooks");
       const method = editId ? "PUT" : "POST";
       const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -311,29 +326,71 @@ function RunbookModal({ editId, runbooks, onClose, onSaved }: { editId: string |
               className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2 text-sm text-[var(--text)] focus:border-[var(--amber)] focus:outline-none" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase mb-1">Cron Schedule (UTC)</label>
-            <input value={cron} onChange={e => setCron(e.target.value)} placeholder="0 2 * * 0 (Sun 2AM)"
-              className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2 text-sm text-[var(--text)] font-mono focus:border-[var(--amber)] focus:outline-none" />
+            <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase mb-1">Tags (comma-separated)</label>
+            <input value={tags} onChange={e => setTags(e.target.value)} placeholder="maintenance, cleanup"
+              className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2 text-sm text-[var(--text)] focus:border-[var(--amber)] focus:outline-none" />
           </div>
         </div>
 
         <div>
           <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase mb-1">Description</label>
-          <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional description..."
+          <input value={description} onChange={e => setDescription(e.target.value)} placeholder="What this runbook does..."
             className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2 text-sm text-[var(--text)] focus:border-[var(--amber)] focus:outline-none" />
         </div>
 
+        {/* Cron with presets */}
         <div>
-          <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase mb-1">Target Servers (comma-separated IPs, or * for all)</label>
+          <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase mb-1">Schedule (Cron UTC)</label>
+          <div className="flex gap-2 mb-2 flex-wrap">
+            {CRON_PRESETS.map(p => (
+              <button key={p.value} type="button" onClick={() => setCron(p.value)}
+                className={`px-2 py-1 rounded-lg text-[10px] font-semibold border cursor-pointer transition-all ${cron === p.value ? "bg-[var(--amber)]/10 border-[var(--amber)] text-[var(--amber)]" : "border-[var(--border-c)] text-[var(--text-sub)] hover:text-[var(--text)]"}`}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <input value={cron} onChange={e => setCron(e.target.value)} placeholder="min hour day month weekday (e.g., 0 2 * * 0)"
+            className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2 text-sm text-[var(--text)] font-mono focus:border-[var(--amber)] focus:outline-none" />
+          {cron && <p className="text-[10px] text-[var(--text-sub)] mt-1 font-mono">Format: minute(0-59) hour(0-23) day(1-31) month(1-12) weekday(0-6, Sun=0)</p>}
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase mb-1">Target Servers (* = all, or comma-separated IPs)</label>
           <input value={targets} onChange={e => setTargets(e.target.value)} placeholder="192.168.1.10, 192.168.1.20 or *"
             className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2 text-sm text-[var(--text)] font-mono focus:border-[var(--amber)] focus:outline-none" />
         </div>
 
         <div>
           <label className="block text-xs font-semibold text-[var(--text-sub)] uppercase mb-1">PowerShell Script</label>
-          <textarea value={script} onChange={e => setScript(e.target.value)} rows={10}
+          <textarea value={script} onChange={e => setScript(e.target.value)} rows={8}
             placeholder="Get-ChildItem C:\Temp | Remove-Item -Recurse -Force"
             className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2 text-sm text-[var(--text)] font-mono focus:border-[var(--amber)] focus:outline-none resize-y" />
+        </div>
+
+        {/* Execution Options */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-[10px] font-semibold text-[var(--text-sub)] uppercase mb-1">Timeout (sec)</label>
+            <input type="number" value={timeoutSeconds} onChange={e => setTimeoutSeconds(parseInt(e.target.value) || 120)}
+              className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2 text-xs text-[var(--text)] focus:border-[var(--amber)] focus:outline-none" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold text-[var(--text-sub)] uppercase mb-1">Max Retries</label>
+            <input type="number" value={maxRetries} onChange={e => setMaxRetries(parseInt(e.target.value) || 0)} min={0} max={5}
+              className="w-full bg-[var(--bg-void)] border border-[var(--border-c)] rounded-xl px-3 py-2 text-xs text-[var(--text)] focus:border-[var(--amber)] focus:outline-none" />
+          </div>
+          <div className="flex items-end">
+            <label className="flex items-center gap-1.5 text-[10px] text-[var(--text)] cursor-pointer">
+              <input type="checkbox" checked={notifyOnFailure} onChange={e => setNotifyOnFailure(e.target.checked)} className="rounded" />
+              Notify on Fail
+            </label>
+          </div>
+          <div className="flex items-end">
+            <label className="flex items-center gap-1.5 text-[10px] text-[var(--text)] cursor-pointer">
+              <input type="checkbox" checked={notifyOnSuccess} onChange={e => setNotifyOnSuccess(e.target.checked)} className="rounded" />
+              Notify on Success
+            </label>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">

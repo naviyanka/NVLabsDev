@@ -9,9 +9,17 @@ public class Runbook
     public string CronExpression { get; set; } = string.Empty; // "0 2 * * 0" = Sunday 2 AM
     public string TargetServers { get; set; } = "*"; // comma-separated IPs or "*" for all
     public bool Enabled { get; set; } = true;
+    public int MaxRetries { get; set; } = 0; // 0 = no retry
+    public int TimeoutSeconds { get; set; } = 120;
+    public bool NotifyOnFailure { get; set; } = true;
+    public bool NotifyOnSuccess { get; set; } = false;
+    public string Tags { get; set; } = string.Empty; // comma-separated tags for filtering
     public DateTime? LastRunAt { get; set; }
-    public string LastRunStatus { get; set; } = string.Empty; // Success, Failed, Running
+    public string LastRunStatus { get; set; } = string.Empty;
     public string LastRunOutput { get; set; } = string.Empty;
+    public int TotalRuns { get; set; } = 0;
+    public int SuccessfulRuns { get; set; } = 0;
+    public int FailedRuns { get; set; } = 0;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string CreatedBy { get; set; } = string.Empty;
 }
