@@ -21,10 +21,10 @@ public class CopilotController : ControllerBase
     /// For advanced generation, use the Copilot Drawer which calls the configured AI provider.
     /// </summary>
     [HttpPost("generate-command")]
-    public async Task<IActionResult> GenerateCommand([FromBody] GenerateCommandRequest request)
+    public Task<IActionResult> GenerateCommand([FromBody] GenerateCommandRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Prompt))
-            return BadRequest(new { message = "Prompt is required." });
+            return Task.FromResult<IActionResult>(BadRequest(new { message = "Prompt is required." }));
 
         var prompt = request.Prompt.Trim().ToLowerInvariant();
         var serverContext = request.ServerIp ?? "localhost";
@@ -34,23 +34,23 @@ public class CopilotController : ControllerBase
 
         if (string.IsNullOrEmpty(command))
         {
-            return Ok(new
+            return Task.FromResult<IActionResult>(Ok(new
             {
                 command = "",
                 safety = "unknown",
                 description = "Could not generate a command from that prompt. Try being more specific (e.g., 'show stopped auto-start services').",
                 generated = false
-            });
+            }));
         }
 
-        return Ok(new
+        return Task.FromResult<IActionResult>(Ok(new
         {
             command,
             safety,
             description,
             generated = true,
             serverIp = serverContext
-        });
+        }));
     }
 
     [HttpGet("baselines")]
