@@ -84,7 +84,7 @@ public class NexusContext : DbContext
             new PluginEntity { Id = "builtin-compliance", Name = "Compliance", Description = "CIS Benchmarks & Drift Detection", Icon = "shield-check", Category = "Security", IsBuiltIn = true, IsActive = true, TargetRoute = "/compliance" },
             new PluginEntity { Id = "builtin-reports", Name = "Reports", Description = "Fleet Health & Patch Compliance", Icon = "file-text", Category = "Management", IsBuiltIn = true, IsActive = true, TargetRoute = "/reports" },
             new PluginEntity { Id = "builtin-dashboard-custom", Name = "Custom Dashboard", Description = "Configurable Widget Dashboard", Icon = "layout-dashboard", Category = "Management", IsBuiltIn = true, IsActive = true, TargetRoute = "/dashboard-custom" },
-            new PluginEntity { Id = "builtin-users", Name = "User Management", Description = "RBAC Users & Roles", Icon = "users", Category = "Security", IsBuiltIn = true, IsActive = true, TargetRoute = "/users" },
+            new PluginEntity { Id = "builtin-user-mgmt", Name = "User Management", Description = "RBAC Users & Roles", Icon = "users", Category = "Security", IsBuiltIn = true, IsActive = true, TargetRoute = "/users" },
             new PluginEntity { Id = "builtin-api-keys", Name = "API Keys", Description = "External API Key Management", Icon = "key", Category = "Security", IsBuiltIn = true, IsActive = true, TargetRoute = "/api-keys" }
         );
     }
