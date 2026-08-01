@@ -45,6 +45,7 @@ import {
 import { toast } from "sonner";
 import { PageHeader, PageWrapper } from "@/components/layout/PageWrapper";
 import { ServerSelector } from "@/components/ui/ServerSelector";
+import { getApiUrl } from "@/lib/backend";
 import {
   getServersClient,
   getRdpSessionsClient,
@@ -135,6 +136,7 @@ function RDPPage() {
   // Web Console Simulation state
   const [webSessionActive, setWebSessionActive] = useState(false);
   const [webSessionWindow, setWebSessionWindow] = useState<"desktop" | "startmenu" | "powershell" | "taskmgr" | "sysinfo">("desktop");
+  const [webLiveData, setWebLiveData] = useState<any>(null);
   const [webPsOutput, setWebPsOutput] = useState<string[]>([
     "Windows PowerShell v7.4.2 - NEXUS Remote Session",
     "Type 'help' or commands: 'Get-Process', 'Get-Service', 'hostname', 'ipconfig'\n"
@@ -182,6 +184,12 @@ function RDPPage() {
         .finally(() => setLoadingSessions(false));
     } else if (activeTab === "security") {
       getRdpConfigClient(activeHost).then(setRdpConfig);
+    } else if (activeTab === "web_console") {
+      // Fetch live data for web studio
+      fetch(getApiUrl(`/servers/${encodeURIComponent(activeHost)}/rdp/live-data`))
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d) setWebLiveData(d); })
+        .catch(() => {});
     }
   }, [activeTab, activeHost]);
 
@@ -829,15 +837,15 @@ Ethernet adapter vEthernet (Internal):
                     <div className="grid grid-cols-3 gap-3">
                       <div className="p-3 rounded-lg bg-[#0d1117] border border-[#30363d]">
                         <div className="text-[10px] text-slate-400">CPU Usage</div>
-                        <div className="text-lg font-bold text-emerald-400">14%</div>
+                        <div className="text-lg font-bold text-emerald-400">{selectedServer?.cpu ?? "—"}%</div>
                       </div>
                       <div className="p-3 rounded-lg bg-[#0d1117] border border-[#30363d]">
                         <div className="text-[10px] text-slate-400">Memory Used</div>
-                        <div className="text-lg font-bold text-blue-400">6.2 / 32 GB (19%)</div>
+                        <div className="text-lg font-bold text-blue-400">{selectedServer?.mem ?? "—"}%</div>
                       </div>
                       <div className="p-3 rounded-lg bg-[#0d1117] border border-[#30363d]">
-                        <div className="text-[10px] text-slate-400">Disk Throughput</div>
-                        <div className="text-lg font-bold text-amber-400">1.2 MB/s</div>
+                        <div className="text-[10px] text-slate-400">Disk Usage</div>
+                        <div className="text-lg font-bold text-amber-400">{selectedServer?.disk ?? "—"}%</div>
                       </div>
                     </div>
 
@@ -848,24 +856,19 @@ Ethernet adapter vEthernet (Internal):
                         <span>Memory</span>
                         <span>Status</span>
                       </div>
-                      <div className="py-2 flex justify-between">
-                        <span>lsass.exe</span>
-                        <span>1042</span>
-                        <span>212 MB</span>
-                        <span className="text-emerald-400">Running</span>
-                      </div>
-                      <div className="py-2 flex justify-between">
-                        <span>NexusAgent.exe</span>
-                        <span>3102</span>
-                        <span>410 MB</span>
-                        <span className="text-emerald-400">Running</span>
-                      </div>
-                      <div className="py-2 flex justify-between">
-                        <span>svchost.exe (TermService)</span>
-                        <span>5120</span>
-                        <span>58 MB</span>
-                        <span className="text-emerald-400">Running</span>
-                      </div>
+                      {(() => {
+                        try {
+                          const procs = webLiveData?.processes ? JSON.parse(webLiveData.processes) : [];
+                          return (Array.isArray(procs) ? procs : [procs]).slice(0, 8).map((p: any, i: number) => (
+                            <div key={i} className="py-2 flex justify-between">
+                              <span>{p.Name || p.name || "—"}</span>
+                              <span>{p.Id || p.id || "—"}</span>
+                              <span>{p.MemMB || p.memMB || "—"} MB</span>
+                              <span className="text-emerald-400">Running</span>
+                            </div>
+                          ));
+                        } catch { return <div className="py-2 text-slate-400">Loading process data...</div>; }
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -885,15 +888,19 @@ Ethernet adapter vEthernet (Internal):
                   <div className="p-5 space-y-3 font-mono text-xs text-slate-200">
                     <div className="p-3 rounded-lg bg-[#0d1117] border border-[#30363d]">
                       <span className="text-slate-400 block">Host OS:</span>
-                      <span className="text-white font-bold">Windows Server 2025 Standard (Build 26100)</span>
+                      <span className="text-white font-bold">{(() => { try { const s = webLiveData?.systemInfo ? JSON.parse(webLiveData.systemInfo) : {}; return s.OS || s.os || "Windows Server"; } catch { return "Windows Server"; } })()}</span>
                     </div>
                     <div className="p-3 rounded-lg bg-[#0d1117] border border-[#30363d]">
-                      <span className="text-slate-400 block">Domain / Workgroup:</span>
-                      <span className="text-white font-bold">NEXUS.LOCAL (Domain Controller)</span>
+                      <span className="text-slate-400 block">Hostname / Domain:</span>
+                      <span className="text-white font-bold">{webLiveData?.hostname || selectedServer?.name || activeHost} · {(() => { try { const s = webLiveData?.systemInfo ? JSON.parse(webLiveData.systemInfo) : {}; return s.Domain || s.domain || ""; } catch { return ""; } })()}</span>
                     </div>
                     <div className="p-3 rounded-lg bg-[#0d1117] border border-[#30363d]">
-                      <span className="text-slate-400 block">Active Roles:</span>
-                      <span className="text-amber-400 font-bold">Active Directory Domain Services, DNS Server, WSUS, Hyper-V</span>
+                      <span className="text-slate-400 block">Uptime:</span>
+                      <span className="text-amber-400 font-bold">{webLiveData?.uptime || selectedServer?.uptime || "—"}</span>
+                    </div>
+                    <div className="p-3 rounded-lg bg-[#0d1117] border border-[#30363d]">
+                      <span className="text-slate-400 block">Hardware:</span>
+                      <span className="text-white font-bold">{(() => { try { const s = webLiveData?.systemInfo ? JSON.parse(webLiveData.systemInfo) : {}; return `${s.Processors || s.processors || "?"} vCPU · ${s.TotalRAM || s.totalRAM || "?"} GB RAM`; } catch { return "—"; } })()}</span>
                     </div>
                   </div>
                 </div>

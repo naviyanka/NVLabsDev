@@ -1956,6 +1956,22 @@ export async function updateRdpConfigClient(serverId: string, config: Partial<Rd
   }
 }
 
+export async function getRdpLiveDataClient(serverId: string): Promise<any> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/rdp/live-data`));
+    if (res.ok) return await res.json();
+  } catch {}
+  return null;
+}
+
+export async function getRdpSecurityAuditClient(serverId: string): Promise<any> {
+  try {
+    const res = await fetch(getApiUrl(`/servers/${serverId}/rdp/security-audit`));
+    if (res.ok) return await res.json();
+  } catch {}
+  return null;
+}
+
 // Windows Defender Security
 export async function getDefenderStatusClient(serverId: string): Promise<DefenderStatus | null> {
   try {
