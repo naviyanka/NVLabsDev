@@ -46,6 +46,7 @@ import { Route as ComplianceRouteImport } from './routes/compliance'
 import { Route as CertificatesRouteImport } from './routes/certificates'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as AppsRouteImport } from './routes/apps'
+import { Route as ApiKeysRouteImport } from './routes/api-keys'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PluginIdRouteImport } from './routes/plugin.$id'
 
@@ -234,6 +235,11 @@ const AppsRoute = AppsRouteImport.update({
   path: '/apps',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiKeysRoute = ApiKeysRouteImport.update({
+  id: '/api-keys',
+  path: '/api-keys',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -247,6 +253,7 @@ const PluginIdRoute = PluginIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api-keys': typeof ApiKeysRoute
   '/apps': typeof AppsRoute
   '/audit': typeof AuditRoute
   '/certificates': typeof CertificatesRoute
@@ -288,6 +295,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api-keys': typeof ApiKeysRoute
   '/apps': typeof AppsRoute
   '/audit': typeof AuditRoute
   '/certificates': typeof CertificatesRoute
@@ -330,6 +338,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api-keys': typeof ApiKeysRoute
   '/apps': typeof AppsRoute
   '/audit': typeof AuditRoute
   '/certificates': typeof CertificatesRoute
@@ -373,6 +382,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/api-keys'
     | '/apps'
     | '/audit'
     | '/certificates'
@@ -414,6 +424,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/api-keys'
     | '/apps'
     | '/audit'
     | '/certificates'
@@ -455,6 +466,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/api-keys'
     | '/apps'
     | '/audit'
     | '/certificates'
@@ -497,6 +509,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiKeysRoute: typeof ApiKeysRoute
   AppsRoute: typeof AppsRoute
   AuditRoute: typeof AuditRoute
   CertificatesRoute: typeof CertificatesRoute
@@ -798,6 +811,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api-keys': {
+      id: '/api-keys'
+      path: '/api-keys'
+      fullPath: '/api-keys'
+      preLoaderRoute: typeof ApiKeysRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -817,6 +837,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiKeysRoute: ApiKeysRoute,
   AppsRoute: AppsRoute,
   AuditRoute: AuditRoute,
   CertificatesRoute: CertificatesRoute,

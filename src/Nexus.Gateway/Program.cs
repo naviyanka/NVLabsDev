@@ -245,6 +245,7 @@ app.UseForwardedHeaders();
 app.UseCors("AllowRestricted");
 app.UseWebSockets();
 app.UseAuthentication();
+app.UseApiKeyAuth();
 app.UseAuthorization();
 app.UseMiddleware<AuditLoggingMiddleware>();
 app.MapControllers();
